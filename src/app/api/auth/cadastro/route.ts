@@ -9,6 +9,7 @@ const Corpo = z.object({
   email: z.string().trim().toLowerCase().email("E-mail inválido."),
   senha: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres."),
   escola: z.string().trim().optional(),
+  aceite: z.literal("on", { errorMap: () => ({ message: "Para criar a conta, aceite a política de privacidade." }) }),
 });
 
 export async function POST(req: Request) {
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   const { nome, email, senha, escola } = r.data;
   if (await prisma.professor.findUnique({ where: { email } }))
     return NextResponse.json({ erro: "Já existe uma conta com este e-mail. Entre com sua senha." }, { status: 409 });
-  const p = await prisma.professor.create({ data: { nome, email, escola: escola || null, senhaHash: await bcrypt.hash(senha, 10) } });
+  const p = await prisma.professor.create({ data: { nome, email, escola: escola || null, aceitouTermosEm: new Date(), senhaHash: await bcrypt.hash(senha, 10) } });
   await criarSessao(p.id);
   return NextResponse.json({ ok: true });
 }

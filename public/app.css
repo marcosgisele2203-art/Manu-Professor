@@ -91,7 +91,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.45}
 
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 20px;display:flex;flex-direction:column;gap:2px}
-.stat .v{font-family:var(--f-display);font-size:1.9rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .v{font-family:var(--f-display);font-size:1.9rem;font-weight:800;line-height:1.1}
 .cols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
 
 .list{display:flex;flex-direction:column}
@@ -204,3 +204,9 @@ a.btn.primary{color:var(--accent-ink)}
 .auth-card .manu{width:120px;margin:0 auto -4px}
 td .grade{border-radius:8px;min-height:36px}
 @media (max-width:760px){.nav a{font-size:.75rem}.nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-soft-ink)}.rail{background:var(--surface);border-top:1px solid var(--line)}.nav a{color:var(--ink)}.hello img{width:56px;height:56px}}
+.doc-legal h2{font-size:1.05rem;margin-top:8px}
+.doc-legal p{max-width:65ch}
+.auth-check{display:flex;gap:10px;align-items:flex-start;font-size:.9rem}
+.auth-check input{width:18px;height:18px;margin-top:2px;accent-color:var(--accent);flex:none}
+.uso-ia{display:flex;flex-direction:column;gap:4px}
+.uso-ia .bar{background:rgba(255,255,255,.12)}

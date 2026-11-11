@@ -3,8 +3,8 @@ import { useState } from "react";
 
 type Campo = { nome: string; rotulo: string; tipo?: string; auto?: string; opcional?: boolean };
 
-export default function FormAuth({ titulo, sub, campos, url, botao, rodape }: {
-  titulo: string; sub: string; campos: Campo[]; url: string; botao: string; rodape: React.ReactNode;
+export default function FormAuth({ titulo, sub, campos, url, botao, rodape, extra }: {
+  titulo: string; sub: string; campos: Campo[]; url: string; botao: string; rodape: React.ReactNode; extra?: React.ReactNode;
 }) {
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -29,6 +29,7 @@ export default function FormAuth({ titulo, sub, campos, url, botao, rodape }: {
             <input className="input" id={c.nome} name={c.nome} type={c.tipo || "text"} autoComplete={c.auto} required={!c.opcional} />
           </div>
         ))}
+        {extra}
         {erro && <p className="auth-erro" role="alert">{erro}</p>}
         <button className="btn primary" type="submit" disabled={enviando}>{enviando ? "Aguarde…" : botao}</button>
         <p className="small muted">{rodape}</p>

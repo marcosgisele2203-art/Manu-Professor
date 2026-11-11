@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { lerSessao } from "@/lib/auth";
+import { situacaoIA, registrarUso } from "@/lib/uso";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -8,7 +9,7 @@ export const maxDuration = 300;
 const MODELO = "claude-opus-5-5";
 const client = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
 
-const SISTEMA = `Você é a Manu, assistente pedagógica que apoia professores da educação básica no Brasil. Escreva em português do Brasil, de forma prática e direta, alinhado à BNCC quando fizer sentido. Não invente dados sobre alunos.`;
+const SISTEMA = `Você é a Manu, assistente pedagógica que apoia professores da educação básica no Brasil. Escreva em português do Brasil, de forma prática e direta, alinhado à BNCC quando fizer sentido. Não invente dados sobre alunos. Na Educação Infantil, trabalhe com os campos de experiência e os objetivos de aprendizagem e desenvolvimento da BNCC (códigos como EI03EF01), com propostas lúdicas e sem provas; no Ensino Médio, use as competências e habilidades por área (códigos como EM13LGG101).`;
 
 const Turma = z.object({ nome: z.string().max(120), disciplina: z.string().max(120), serie: z.string().max(120).optional(), alunos: z.number().optional() }).partial();
 const Pedido = z.discriminatedUnion("tipo", [
@@ -77,11 +78,18 @@ function erroAPI(e: unknown) {
 }
 
 export async function POST(req: Request) {
-  if (!(await lerSessao())) return Response.json({ erro: "Faça login para continuar." }, { status: 401 });
+  const pid = await lerSessao();
+  if (!pid) return Response.json({ erro: "Faça login para continuar." }, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ erro: "A IA ainda não foi configurada neste servidor (falta ANTHROPIC_API_KEY)." }, { status: 503 });
   const r = Pedido.safeParse(await req.json().catch(() => ({})));
   if (!r.success) return Response.json({ erro: "Pedido inválido: " + r.error.issues[0].message }, { status: 400 });
+  const sit = await situacaoIA(pid);
+  if (sit.bloqueado) return Response.json({ erro: "O uso da IA está suspenso na sua conta. Fale com o administrador." }, { status: 403 });
+  if (sit.restantes <= 0) return Response.json({ erro: `Você já usou os ${sit.limite} pedidos de IA deste mês. O limite renova no dia 1º.` }, { status: 429 });
   const { mensagens, json } = montar(r.data);
+  const tipo = r.data.tipo;
+  const registrar = (m: { usage?: { input_tokens?: number | null; output_tokens?: number | null } }) =>
+    registrarUso(pid, tipo, m.usage?.input_tokens ?? 0, m.usage?.output_tokens ?? 0);
 
   const stream = client.beta.messages.stream({
     model: MODELO,
@@ -97,6 +105,7 @@ export async function POST(req: Request) {
   if (json) {
     try {
       const msg = await stream.finalMessage();
+      await registrar(msg);
       if (msg.stop_reason === "refusal") return Response.json({ erro: "A IA não atendeu esse pedido. Tente reformular o tema." }, { status: 422 });
       const texto = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
       try { return Response.json({ dados: extrairJSON(texto) }); }
@@ -113,6 +122,7 @@ export async function POST(req: Request) {
           if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") ctl.enqueue(enc.encode(ev.delta.text));
         }
         const fim = await stream.finalMessage();
+        await registrar(fim);
         if (fim.stop_reason === "refusal") ctl.enqueue(enc.encode("\n\n[A IA não atendeu esse pedido. Tente reformular.]"));
       } catch (e) {
         ctl.enqueue(enc.encode("\n\n[" + erroAPI(e).erro + "]"));

@@ -10,6 +10,8 @@ export default function Inicio() {
           <div className="brand"><div className="brand-mark"><img src="/manu/manu-boas-vindas.webp" alt="" /></div><div><b>Manu</b><span className="small muted">Professor</span></div></div>
           <nav className="nav" id="nav"></nav>
           <div className="rail-foot">
+            <div className="uso-ia small" id="usoIA" hidden></div>
+            <a className="btn sm ghost" id="adminLink" href="/admin" hidden>Administração</a>
             <span className="small muted" id="who"></span>
             <form action="/api/auth/sair" method="post"><button className="btn sm ghost" type="submit">Sair</button></form>
           </div>

@@ -118,7 +118,7 @@ async function iniciar() {
   render();
   try {
     const eu = await api("GET", "/api/eu");
-    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia;
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin;
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     S.mode = "live";
@@ -175,6 +175,9 @@ document.addEventListener("focusout", () => setTimeout(() => { if (pending) rend
 function renderNav() {
   $("#nav").innerHTML = VIEWS.map(([k, n, ai]) => `<a href="#${k}" ${S.view === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
   $("#who").textContent = S.nome ? S.nome + (S.escola ? " · " + S.escola : "") : "";
+  $("#adminLink").hidden = !S.admin;
+  const u = S.usoIA, box = $("#usoIA");
+  if (u && cap.ia) { box.hidden = false; box.innerHTML = `<span>IA este mês: <b class="num">${u.usados}</b> de <span class="num">${u.limite}</span></span><div class="bar"><i style="width:${Math.min(100, Math.round(u.usados / Math.max(1, u.limite) * 100))}%"></i></div>`; }
 }
 function renderTurmaSel() {
   const sel = $("#turmaSel"); const t = turmaAtual();
@@ -509,8 +512,9 @@ async function comIA(fn) {
   if (st) st.textContent = "Pensando… pode levar até um minuto.";
   try { await fn(sampleCtl.signal, st); }
   catch (e) { if (st) st.textContent = iaErro(e); }
-  finally { btns.forEach(b => b.disabled = false); if (stop) stop.hidden = true; sampleCtl = null; }
+  finally { btns.forEach(b => b.disabled = false); if (stop) stop.hidden = true; sampleCtl = null; atualizarUso(); }
 }
+async function atualizarUso() { try { const eu = await api("GET", "/api/eu"); S.usoIA = eu.usoIA; renderNav(); } catch (_) {} }
 function turmaIA(id) { const t = turma(id); return t ? { nome: t.nome, disciplina: t.disciplina, serie: t.serie || "", alunos: (t.alunos || []).length } : undefined; }
 async function iaJSON(pedido, signal) {
   const r = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pedido), signal });
@@ -570,7 +574,7 @@ Próximas aulas planejadas: ${S.planos.filter(p => p.data >= hoje()).slice(0, 5)
     const text = await iaTexto({ tipo: "chat", contexto, mensagens: hist.map(({ role, content }) => ({ role, content })) }, undefined, text => { S.chat[S.chat.length - 1].content = text; const b = bubble(); if (b.length) b[b.length - 1].textContent = text; const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; });
     S.chat[S.chat.length - 1].content = text || "(sem resposta)";
   } catch (e) { const m = S.chat[S.chat.length - 1]; m.content = "⚠ " + iaErro(e); m.erro = true; }
-  enviarChat.busy = false; render();
+  enviarChat.busy = false; render(); atualizarUso();
 }
 
 /* ---------- exportações ---------- */

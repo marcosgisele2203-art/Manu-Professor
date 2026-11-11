@@ -15,7 +15,25 @@ model Professor {
   senhaHash String
   escola    String?
   criadoEm  DateTime @default(now())
+  aceitouTermosEm DateTime?
+  limiteIA  Int?     // usos de IA por mês; vazio = usa o padrão (LIMITE_IA_MENSAL)
+  bloqueado Boolean  @default(false)
   registros Registro[]
+  usosIA    UsoIA[]
+}
+
+// Cada chamada à IA, para controlar o limite mensal e o custo
+model UsoIA {
+  id            String    @id @default(cuid())
+  professorId   String
+  professor     Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  tipo          String
+  tokensEntrada Int       @default(0)
+  tokensSaida   Int       @default(0)
+  criadoEm      DateTime  @default(now())
+
+  @@index([professorId, criadoEm])
+  @@index([criadoEm])
 }
 
 // Cada turma, plano, chamada, avaliação, atividade, questão e prova do professor
