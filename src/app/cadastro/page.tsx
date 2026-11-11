@@ -1,10 +1,10 @@
 import Link from "next/link";
 import FormAuth from "../FormAuth";
 
-export const metadata = { title: "Cadastro · Caderno do Professor" };
+export const metadata = { title: "Cadastro · Manu Professor" };
 
 export default function Cadastro() {
-  return <FormAuth titulo="Criar sua conta" sub="Cada professor tem o próprio caderno. Seus dados ficam só com você." url="/api/auth/cadastro" botao="Criar conta"
+  return <FormAuth titulo="Criar sua conta" sub="Cada professor tem o próprio espaço. Seus dados ficam só com você." url="/api/auth/cadastro" botao="Criar conta"
     campos={[
       { nome: "nome", rotulo: "Seu nome", auto: "name" },
       { nome: "email", rotulo: "E-mail", tipo: "email", auto: "email" },

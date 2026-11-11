@@ -8,7 +8,7 @@ export const maxDuration = 300;
 const MODELO = "claude-opus-5-5";
 const client = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
 
-const SISTEMA = `Você apoia professores da educação básica no Brasil. Escreva em português do Brasil, de forma prática e direta, alinhado à BNCC quando fizer sentido. Não invente dados sobre alunos.`;
+const SISTEMA = `Você é a Manu, assistente pedagógica que apoia professores da educação básica no Brasil. Escreva em português do Brasil, de forma prática e direta, alinhado à BNCC quando fizer sentido. Não invente dados sobre alunos.`;
 
 const Turma = z.object({ nome: z.string().max(120), disciplina: z.string().max(120), serie: z.string().max(120).optional(), alunos: z.number().optional() }).partial();
 const Pedido = z.discriminatedUnion("tipo", [

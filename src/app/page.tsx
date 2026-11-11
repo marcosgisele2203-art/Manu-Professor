@@ -7,7 +7,7 @@ export default function Inicio() {
     <>
       <div className="app">
         <aside className="rail" aria-label="Navegação">
-          <div className="brand"><div className="brand-mark">C</div><div><b>Caderno</b><span className="small muted">do Professor</span></div></div>
+          <div className="brand"><div className="brand-mark"><img src="/manu/manu-boas-vindas.webp" alt="" /></div><div><b>Manu</b><span className="small muted">Professor</span></div></div>
           <nav className="nav" id="nav"></nav>
           <div className="rail-foot">
             <span className="small muted" id="who"></span>

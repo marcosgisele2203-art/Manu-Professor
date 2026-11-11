@@ -1,6 +1,6 @@
-# Caderno do Professor
+# Manu Professor
 
-Sistema para professores: turmas e alunos, chamada, notas com média ponderada, planejamento de aulas alinhado à BNCC, atividades com controle de entregas, banco de questões, montagem de provas com gabarito e um assistente pedagógico. A IA (Claude, da Anthropic) gera planos de aula, instruções de atividades e questões.
+A Manu para professores: turmas e alunos, chamada, notas com média ponderada, planejamento de aulas alinhado à BNCC, atividades com controle de entregas, banco de questões, montagem de provas com gabarito e a Manu como assistente pedagógica. A IA (Claude, da Anthropic) gera planos de aula, instruções de atividades e questões.
 
 Cada professor cria a própria conta (e-mail e senha) e só vê os próprios dados.
 
@@ -13,7 +13,7 @@ Cada professor cria a própria conta (e-mail e senha) e só vê os próprios dad
 
 ## Deploy no EasyPanel
 
-1. **Crie um projeto** no EasyPanel (ex.: `caderno`).
+1. **Crie um projeto** no EasyPanel (ex.: `manu-professor`).
 2. **Adicione um serviço Postgres** (+ Service → Postgres). Depois de criado, copie a *Internal Connection URL*.
 3. **Adicione um serviço App** (+ Service → App):
    - Source: **GitHub**, escolha este repositório e o branch `main`.
@@ -46,5 +46,6 @@ npm run dev
 - `src/app/api/auth/*` cadastro, login e sair
 - `src/app/api/dados/[col]` leitura e gravação dos registros do professor (turmas, planos, chamadas, avaliações, atividades, questões, provas)
 - `src/app/api/ia` chamadas à IA (plano, atividade, questões, assistente)
-- `public/app.js` e `public/app.css` a interface principal
+- `public/app.js` e `public/app.css` a interface principal (cores e fonte do design system da Manu)
+- `public/manu/` as artes da Manu
 - `prisma/schema.prisma` o banco

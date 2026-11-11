@@ -21,8 +21,8 @@ export default function FormAuth({ titulo, sub, campos, url, botao, rodape }: {
   return (
     <div className="auth">
       <form className="auth-card" onSubmit={enviar}>
-        <div className="brand" style={{ padding: 0 }}><div className="brand-mark">C</div><div><b>Caderno</b><span className="small muted">do Professor</span></div></div>
-        <div><h1>{titulo}</h1><p className="muted" style={{ marginTop: 4 }}>{sub}</p></div>
+        <img className="manu" src="/manu/manu-boas-vindas.webp" alt="Manu, acenando" width={120} height={180} />
+        <div><span className="eyebrow">Manu Professor</span><h1>{titulo}</h1><p className="muted" style={{ marginTop: 4 }}>{sub}</p></div>
         {campos.map((c) => (
           <div className="field" key={c.nome}>
             <label htmlFor={c.nome}>{c.rotulo}{c.opcional ? " (opcional)" : ""}</label>

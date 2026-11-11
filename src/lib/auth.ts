@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-export const COOKIE = "caderno_sessao";
+export const COOKIE = "manu_sessao";
 const DIAS = 30;
 
 function segredo() {

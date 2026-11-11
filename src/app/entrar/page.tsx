@@ -1,7 +1,7 @@
 import Link from "next/link";
 import FormAuth from "../FormAuth";
 
-export const metadata = { title: "Entrar · Caderno do Professor" };
+export const metadata = { title: "Entrar · Manu Professor" };
 
 export default function Entrar() {
   return <FormAuth titulo="Entrar" sub="Acesse suas turmas, notas e planejamentos." url="/api/auth/login" botao="Entrar"

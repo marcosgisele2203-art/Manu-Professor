@@ -6,7 +6,7 @@ const PUBLICAS = ["/entrar", "/cadastro", "/api/auth/login", "/api/auth/cadastro
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (PUBLICAS.some((p) => pathname.startsWith(p))) return NextResponse.next();
-  const token = req.cookies.get("caderno_sessao")?.value;
+  const token = req.cookies.get("manu_sessao")?.value;
   let ok = false;
   if (token && process.env.AUTH_SECRET) {
     try {
@@ -19,4 +19,4 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(new URL("/entrar", req.url));
 }
 
-export const config = { matcher: ["/((?!_next|favicon.ico|app.js|app.css).*)"] };
+export const config = { matcher: ["/((?!_next|favicon.ico|app.js|app.css|manu/).*)"] };
