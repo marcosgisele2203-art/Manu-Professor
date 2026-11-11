@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Professor {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  escola    String?
+  criadoEm  DateTime @default(now())
+  registros Registro[]
+}
+
+// Cada turma, plano, chamada, avaliação, atividade, questão e prova do professor
+// é um registro JSON numa coleção. Simples de evoluir sem migrações a cada campo novo.
+model Registro {
+  id          String    @id
+  colecao     String
+  dados       Json
+  professorId String
+  professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  criadoEm    DateTime  @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([professorId, colecao, id])
+  @@index([professorId, colecao])
+}

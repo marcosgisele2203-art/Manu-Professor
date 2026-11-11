@@ -1,0 +1,711 @@
+
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/-/g, "").slice(0, 14);
+const hoje = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const fmtData = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+const fmtDataLonga = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) : "—";
+const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas"];
+const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
+const MEDIA_MIN = 6, FREQ_MIN = 75;
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600);
+}
+
+const I = {
+  inicio: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  turmas: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c3 .2 5.5 2.6 5.5 5.8"/>',
+  chamada: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  notas: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  planos: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  atividades: '<path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/>',
+  questoes: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
+  provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  spark: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  dl: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'
+};
+const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
+
+const VIEWS = [
+  ["inicio", "Início"], ["turmas", "Turmas"], ["chamada", "Chamada"], ["notas", "Notas"],
+  ["planos", "Planejamento", true], ["atividades", "Atividades", true], ["questoes", "Questões", true],
+  ["provas", "Provas"], ["assistente", "Assistente", true]
+];
+
+/* ---------- estado ---------- */
+const S = {
+  mode: "loading", // loading | live | demo
+  uid: null, nome: "", base: null,
+  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [],
+  turmaSel: null, view: "inicio",
+  chamadaData: hoje(), filtroQ: { disc: "", dif: "", txt: "" },
+  chat: [], loaded: new Set()
+};
+const cap = { ia: false };
+async function api(metodo, url, corpo) {
+  const r = await fetch(url, { method: metodo, headers: corpo ? { "Content-Type": "application/json" } : {}, body: corpo ? JSON.stringify(corpo) : undefined });
+  if (r.status === 401) { location.href = "/entrar"; throw { code: "auth" }; }
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw { code: r.status, message: j.erro }; }
+  return r.headers.get("content-type")?.includes("json") ? r.json() : r;
+}
+
+/* ---------- dados de exemplo (modo demonstração e botão "carregar exemplo") ---------- */
+function exemplo() {
+  const nomesA = ["Ana Beatriz Souza", "Bruno Henrique Lima", "Carla Mendes", "Davi Oliveira", "Eduarda Ramos", "Felipe Costa", "Gabriela Nunes", "Heitor Alves"];
+  const nomesB = ["Isabela Rocha", "João Pedro Martins", "Larissa Teixeira", "Mateus Ferreira", "Nicole Barbosa", "Otávio Pires", "Paula Cardoso"];
+  const t1 = { id: "ex6a", nome: "6º ano A", disciplina: "Matemática", serie: "6º ano EF", ano: "2026", turno: "Manhã", cor: CORES[0], alunos: nomesA.map((n, i) => ({ id: "a" + i, nome: n })), exemplo: true };
+  const t2 = { id: "ex8b", nome: "8º ano B", disciplina: "Ciências", serie: "8º ano EF", ano: "2026", turno: "Tarde", cor: CORES[1], alunos: nomesB.map((n, i) => ({ id: "b" + i, nome: n })), exemplo: true };
+  const d0 = hoje();
+  const chamadas = [];
+  [-9, -7, -2].forEach((off, k) => {
+    [t1, t2].forEach(t => {
+      const p = {}; t.alunos.forEach((a, i) => p[a.id] = ((i + k) % 7 === 3) ? "F" : ((i === 5 && t === t1) ? "F" : "P"));
+      chamadas.push({ id: t.id + "_" + addDias(d0, off), turmaId: t.id, data: addDias(d0, off), presencas: p, conteudo: off === -2 ? "Correção de exercícios" : "", exemplo: true });
+    });
+  });
+  const notasA1 = [8.5, 6, 7.5, 4.5, 9, 5, 7, 8], notasA2 = [9, 5.5, 8, 5, 9.5, 4, 6.5, 7.5];
+  const avaliacoes = [
+    { id: "exav1", turmaId: t1.id, nome: "Prova 1 — Frações", peso: 2, data: addDias(d0, -14), bimestre: "1", notas: Object.fromEntries(t1.alunos.map((a, i) => [a.id, notasA1[i]])), exemplo: true },
+    { id: "exav2", turmaId: t1.id, nome: "Trabalho em grupo", peso: 1, data: addDias(d0, -5), bimestre: "1", notas: Object.fromEntries(t1.alunos.map((a, i) => [a.id, notasA2[i]])), exemplo: true },
+    { id: "exav3", turmaId: t2.id, nome: "Relatório — Célula", peso: 1, data: addDias(d0, -6), bimestre: "1", notas: Object.fromEntries(t2.alunos.map((a, i) => [a.id, [7, 8.5, 6, 5.5, 9, 6.5, 8][i]])), exemplo: true }
+  ];
+  const planos = [
+    { id: "expl1", turmaId: t1.id, data: addDias(d0, 1), titulo: "Frações equivalentes", duracao: "2 aulas de 50 min", bncc: "EF06MA07", objetivos: "Reconhecer frações equivalentes e simplificar frações usando a divisão pelo mesmo número.", conteudo: "Frações equivalentes; simplificação; comparação de frações.", metodologia: "1. Problema inicial com barras de chocolate (10 min).\n2. Dobraduras em tiras de papel para representar 1/2, 2/4 e 4/8 (20 min).\n3. Sistematização no quadro (15 min).\n4. Lista de exercícios em duplas (aula 2).", recursos: "Tiras de papel, régua, lápis de cor, quadro.", avaliacao: "Observação das duplas e correção coletiva da lista.", status: "planejado", exemplo: true },
+    { id: "expl2", turmaId: t2.id, data: addDias(d0, 3), titulo: "Sistema circulatório", duracao: "1 aula de 50 min", bncc: "EF08CI08", objetivos: "Descrever o caminho do sangue no corpo e a função do coração.", conteudo: "Coração, vasos sanguíneos, circulação pulmonar e sistêmica.", metodologia: "Vídeo curto, esquema no quadro e medição da frequência cardíaca antes e depois de pular.", recursos: "Projetor, cronômetro.", avaliacao: "Registro da frequência cardíaca no caderno.", status: "planejado", exemplo: true }
+  ];
+  const atividades = [
+    { id: "exat1", turmaId: t1.id, titulo: "Lista de exercícios — Frações", descricao: "Resolver as questões 1 a 12 da página 87 do livro.", prazo: addDias(d0, 2), valor: 1, entregas: { a0: true, a2: true, a4: true, a7: true }, exemplo: true },
+    { id: "exat2", turmaId: t2.id, titulo: "Maquete da célula", descricao: "Em grupos de 3, montar uma maquete de célula animal com materiais recicláveis e legendas.", prazo: addDias(d0, 6), valor: 2, entregas: {}, exemplo: true }
+  ];
+  const questoes = [
+    { id: "exq1", disciplina: "Matemática", tema: "Frações", serie: "6º ano EF", tipo: "multipla", dificuldade: "facil", enunciado: "Qual fração é equivalente a 2/4?", alternativas: ["1/3", "1/2", "3/4", "2/3"], correta: 1, resposta: "", bncc: "EF06MA07", exemplo: true },
+    { id: "exq2", disciplina: "Matemática", tema: "Frações", serie: "6º ano EF", tipo: "multipla", dificuldade: "media", enunciado: "Uma pizza foi cortada em 8 pedaços iguais. Lia comeu 3 e Rui comeu 2. Que fração da pizza sobrou?", alternativas: ["5/8", "3/8", "2/8", "1/2"], correta: 1, resposta: "", bncc: "EF06MA09", exemplo: true },
+    { id: "exq3", disciplina: "Matemática", tema: "Frações", serie: "6º ano EF", tipo: "aberta", dificuldade: "media", enunciado: "Explique com um desenho por que 3/6 e 1/2 representam a mesma quantidade.", alternativas: [], correta: null, resposta: "O desenho deve mostrar um inteiro dividido em 6 partes com 3 pintadas, ocupando a mesma área que metade do inteiro.", bncc: "EF06MA07", exemplo: true },
+    { id: "exq4", disciplina: "Ciências", tema: "Sistema circulatório", serie: "8º ano EF", tipo: "vf", dificuldade: "facil", enunciado: "As artérias levam o sangue do coração para o resto do corpo.", alternativas: ["Verdadeiro", "Falso"], correta: 0, resposta: "", bncc: "EF08CI08", exemplo: true }
+  ];
+  const provas = [{ id: "expr1", titulo: "Avaliação — Frações", turmaId: t1.id, data: addDias(d0, 8), instrucoes: "Leia com atenção. Use caneta azul ou preta. Duração: 50 minutos.", questaoIds: ["exq1", "exq2", "exq3"], exemplo: true }];
+  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas };
+}
+
+/* ---------- camada de dados ---------- */
+async function salvar(col, obj) {
+  const arr = S[col]; const i = arr.findIndex(x => x.id === obj.id);
+  if (i >= 0) arr[i] = obj; else arr.push(obj);
+  render();
+  $("#syncState").textContent = "Salvando…";
+  try { await api("PUT", "/api/dados/" + col, obj); $("#syncState").textContent = "Tudo salvo"; return true; }
+  catch (e) { erroDb(e); return false; }
+}
+async function apagar(col, id) {
+  S[col] = S[col].filter(x => x.id !== id); render();
+  try { await api("DELETE", "/api/dados/" + col + "/" + encodeURIComponent(id)); } catch (e) { erroDb(e); }
+}
+function erroDb(e) {
+  if (e && e.code === "auth") return;
+  $("#syncState").textContent = "Erro ao salvar";
+  toast((e && e.message) || "Não foi possível salvar agora. Verifique a internet e tente de novo.");
+}
+
+async function iniciar() {
+  render();
+  try {
+    const eu = await api("GET", "/api/eu");
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia;
+    const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
+    COLS.forEach((c, i) => S[c] = listas[i]);
+    S.mode = "live";
+    $("#syncState").textContent = "Tudo salvo";
+  } catch (e) {
+    if (e && e.code === "auth") return;
+    S.mode = "erro";
+  }
+  render();
+}
+
+/* ---------- cálculos ---------- */
+const turma = id => S.turmas.find(t => t.id === id);
+const turmaAtual = () => turma(S.turmaSel) || S.turmas[0] || null;
+function freqAluno(t, alunoId) {
+  const ch = S.chamadas.filter(c => c.turmaId === t.id && c.presencas && c.presencas[alunoId]);
+  if (!ch.length) return null;
+  const pres = ch.filter(c => c.presencas[alunoId] !== "F").length;
+  return Math.round(pres / ch.length * 100);
+}
+function mediaAluno(t, alunoId) {
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id);
+  let soma = 0, pesos = 0;
+  avs.forEach(a => { const n = a.notas && a.notas[alunoId]; if (n !== undefined && n !== null && n !== "" && !isNaN(n)) { soma += Number(n) * (Number(a.peso) || 1); pesos += (Number(a.peso) || 1); } });
+  return pesos ? soma / pesos : null;
+}
+function alertas() {
+  const out = [];
+  S.turmas.forEach(t => (t.alunos || []).forEach(a => {
+    const f = freqAluno(t, a.id), m = mediaAluno(t, a.id);
+    if (f !== null && f < FREQ_MIN) out.push({ t, a, tipo: "freq", txt: `Frequência ${f}%`, cls: "bad" });
+    if (m !== null && m < MEDIA_MIN) out.push({ t, a, tipo: "nota", txt: `Média ${fmtNota(m)}`, cls: "warn" });
+  }));
+  return out;
+}
+
+/* ---------- renderização ---------- */
+let pending = false;
+function render() {
+  const ae = document.activeElement;
+  if (ae && $("#view").contains(ae) && ae.matches("input.grade, textarea, input[type=text], input[type=search]")) { pending = true; return; }
+  pending = false;
+  renderNav(); renderTurmaSel();
+  const v = $("#view");
+  if (S.mode === "loading") { v.innerHTML = `<div class="empty"><h3>Abrindo seu caderno…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
+  if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
+  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const banner = "";
+  v.innerHTML = banner + fn();
+  if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
+}
+document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
+
+function renderNav() {
+  $("#nav").innerHTML = VIEWS.map(([k, n, ai]) => `<a href="#${k}" ${S.view === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
+  $("#who").textContent = S.nome ? S.nome + (S.escola ? " · " + S.escola : "") : "";
+}
+function renderTurmaSel() {
+  const sel = $("#turmaSel"); const t = turmaAtual();
+  sel.innerHTML = S.turmas.length ? S.turmas.map(x => `<option value="${esc(x.id)}" ${t && t.id === x.id ? "selected" : ""}>${esc(x.nome)} · ${esc(x.disciplina)}</option>`).join("") : `<option>Nenhuma turma ainda</option>`;
+  sel.disabled = !S.turmas.length;
+}
+$("#turmaSel").addEventListener("change", e => { S.turmaSel = e.target.value; try { localStorage.setItem("cp_turma", S.turmaSel); } catch (_) {} render(); });
+try { S.turmaSel = localStorage.getItem("cp_turma"); } catch (_) {}
+
+function semTurma(msg) {
+  return `<div class="empty"><h3>Crie sua primeira turma</h3><p>${esc(msg || "Cadastre uma turma com a lista de alunos para usar chamada, notas e atividades.")}</p>
+  <div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button>${S.mode === "live" ? `<button class="btn" data-act="seed">Carregar exemplo</button>` : ""}</div></div>`;
+}
+
+/* ----- Início ----- */
+function vInicio() {
+  const d0 = hoje(), em7 = addDias(d0, 7);
+  const proxAulas = S.planos.filter(p => p.data >= d0 && p.data <= em7).sort((a, b) => a.data.localeCompare(b.data));
+  const proxAtiv = S.atividades.filter(a => a.prazo >= d0).sort((a, b) => a.prazo.localeCompare(b.prazo)).slice(0, 5);
+  const al = alertas();
+  const totAlunos = S.turmas.reduce((s, t) => s + (t.alunos || []).length, 0);
+  const saud = new Date().getHours() < 12 ? "Bom dia" : new Date().getHours() < 18 ? "Boa tarde" : "Boa noite";
+  if (!S.turmas.length) return `<div class="page-head"><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1></div></div>` + semTurma("Comece cadastrando uma turma. Depois você faz a chamada, lança notas e planeja aulas com ajuda da IA.");
+  return `
+  <div class="page-head"><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div>
+  <div class="toolbar"><a class="btn" href="#chamada">Fazer chamada</a><button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Planejar aula com IA</button></div></div>
+  <div class="stats">
+    <div class="stat"><span class="eyebrow">Turmas</span><span class="v num">${S.turmas.length}</span><span class="small muted">${totAlunos} alunos</span></div>
+    <div class="stat"><span class="eyebrow">Aulas nos próximos 7 dias</span><span class="v num">${proxAulas.length}</span><span class="small muted">planejadas</span></div>
+    <div class="stat"><span class="eyebrow">Atividades abertas</span><span class="v num">${S.atividades.filter(a => a.prazo >= d0).length}</span><span class="small muted">com prazo a vencer</span></div>
+    <div class="stat"><span class="eyebrow">Alunos em alerta</span><span class="v num" style="color:${al.length ? "var(--bad)" : "var(--ok)"}">${new Set(al.map(x => x.t.id + x.a.id)).size}</span><span class="small muted">frequência ou média baixa</span></div>
+  </div>
+  <div class="cols">
+    <section class="panel"><div class="panel-head"><h2>Próximas aulas</h2><a class="btn sm ghost" href="#planos">Ver planejamento</a></div>
+      ${proxAulas.length ? `<div class="list">${proxAulas.map(p => { const t = turma(p.turmaId); return `<div class="row"><span class="dot" style="background:${esc(t?.cor || "var(--muted)")}"></span><div class="grow"><div class="title">${esc(p.titulo)}</div><div class="small muted">${esc(t?.nome || "Sem turma")} · ${esc(p.duracao || "")}</div></div>${p.bncc ? `<span class="bncc">${esc(p.bncc)}</span>` : ""}<span class="chip num">${fmtData(p.data)}</span><button class="btn sm" data-act="ver-plano" data-id="${esc(p.id)}">Abrir</button></div>`; }).join("")}</div>`
+        : `<p class="muted">Nenhuma aula planejada para esta semana. <button class="btn sm ai" data-act="novo-plano-ia">${ico("spark")}Planejar com IA</button></p>`}
+    </section>
+    <section class="panel"><div class="panel-head"><h2>Precisam de atenção</h2></div>
+      ${al.length ? `<div class="list">${al.slice(0, 8).map(x => `<div class="row"><div class="grow"><div class="title">${esc(x.a.nome)}</div><div class="small muted">${esc(x.t.nome)}</div></div><span class="chip ${x.cls}">${esc(x.txt)}</span></div>`).join("")}</div>`
+        : `<p class="muted">Nenhum aluno abaixo de ${FREQ_MIN}% de frequência ou média ${MEDIA_MIN}.</p>`}
+    </section>
+  </div>
+  <section class="panel"><div class="panel-head"><h2>Prazos de atividades</h2><a class="btn sm ghost" href="#atividades">Ver todas</a></div>
+    ${proxAtiv.length ? `<div class="list">${proxAtiv.map(a => { const t = turma(a.turmaId); const n = (t?.alunos || []).length; const e = Object.values(a.entregas || {}).filter(Boolean).length; return `<div class="row"><span class="dot" style="background:${esc(t?.cor || "var(--muted)")}"></span><div class="grow"><div class="title">${esc(a.titulo)}</div><div class="small muted">${esc(t?.nome || "")}</div></div><span class="small muted num">${e}/${n} entregues</span><span class="chip ${a.prazo === d0 ? "warn" : ""} num">${fmtData(a.prazo)}</span></div>`; }).join("")}</div>` : `<p class="muted">Nenhuma atividade com prazo aberto.</p>`}
+  </section>`;
+}
+
+/* ----- Turmas ----- */
+function vTurmas() {
+  const head = `<div class="page-head"><div><h1>Turmas</h1><p class="muted">Suas turmas, alunos e o resumo de cada uma.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button></div></div>`;
+  if (!S.turmas.length) return head + semTurma();
+  return head + `<div class="cards">${S.turmas.map(t => {
+    const al = t.alunos || []; const meds = al.map(a => mediaAluno(t, a.id)).filter(x => x !== null);
+    const fr = al.map(a => freqAluno(t, a.id)).filter(x => x !== null);
+    const mm = meds.length ? meds.reduce((a, b) => a + b, 0) / meds.length : null;
+    const fm = fr.length ? Math.round(fr.reduce((a, b) => a + b, 0) / fr.length) : null;
+    return `<article class="card"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3>${esc(t.nome)}</h3><p class="small muted">${esc(t.disciplina)} · ${esc(t.serie || "")}${t.turno ? " · " + esc(t.turno) : ""}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
+      <div class="grid3" style="gap:8px"><div><span class="eyebrow">Alunos</span><div class="num" style="font-size:1.2rem">${al.length}</div></div><div><span class="eyebrow">Média</span><div class="num" style="font-size:1.2rem">${fmtNota(mm)}</div></div><div><span class="eyebrow">Freq.</span><div class="num" style="font-size:1.2rem">${fm === null ? "—" : fm + "%"}</div></div></div>
+      <div class="toolbar"><button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar e alunos</button><button class="btn sm ghost" data-act="ir" data-view="chamada" data-id="${esc(t.id)}">Chamada</button><button class="btn sm ghost" data-act="ir" data-view="notas" data-id="${esc(t.id)}">Notas</button></div></article>`;
+  }).join("")}</div>`;
+}
+
+/* ----- Chamada ----- */
+function vChamada() {
+  const t = turmaAtual();
+  const head = `<div class="page-head"><div><h1>Chamada</h1><p class="muted">Marque P (presente), F (falta) ou J (falta justificada). Salva sozinho.</p></div></div>`;
+  if (!t) return head + semTurma();
+  const id = t.id + "_" + S.chamadaData;
+  const ch = S.chamadas.find(c => c.id === id);
+  const pres = ch?.presencas || {};
+  const al = t.alunos || [];
+  const nP = al.filter(a => pres[a.id] === "P").length, nF = al.filter(a => pres[a.id] === "F").length, nJ = al.filter(a => pres[a.id] === "J").length;
+  const hist = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 8);
+  return head + `
+  <section class="panel">
+    <div class="panel-head">
+      <div class="toolbar"><div class="field"><label for="chData">Data da aula</label><input class="input" type="date" id="chData" value="${esc(S.chamadaData)}"></div>
+      <div class="field" style="min-width:220px;flex:1"><label for="chConteudo">Conteúdo da aula (diário)</label><input class="input" type="text" id="chConteudo" value="${esc(ch?.conteudo || "")}" placeholder="Ex.: Frações equivalentes, p. 84"></div></div>
+      <div class="toolbar"><span class="chip ok num">${nP} P</span><span class="chip bad num">${nF} F</span><span class="chip warn num">${nJ} J</span><button class="btn sm" data-act="todos-presentes">Todos presentes</button></div>
+    </div>
+    ${al.length ? `<div class="list">${al.map((a, i) => `<div class="row"><span class="num muted small" style="width:22px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Frequência: ${freqAluno(t, a.id) ?? "—"}${freqAluno(t, a.id) !== null ? "%" : ""}</div></div>
+      <div class="pres" role="group" aria-label="Presença de ${esc(a.nome)}">${["P", "F", "J"].map(v => `<button data-act="marcar" data-aluno="${esc(a.id)}" data-v="${v}" aria-pressed="${pres[a.id] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>`
+      : `<p class="muted">Esta turma ainda não tem alunos. <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Adicionar alunos</button></p>`}
+  </section>
+  <section class="panel"><h2>Aulas registradas</h2>
+    ${hist.length ? `<div class="list">${hist.map(c => { const v = Object.values(c.presencas || {}); return `<div class="row"><span class="chip num">${fmtData(c.data)}</span><div class="grow small">${esc(c.conteudo || "Sem conteúdo registrado")}</div><span class="small muted num">${v.filter(x => x !== "F").length}/${v.length} presentes</span><button class="btn sm ghost" data-act="abrir-chamada" data-data="${esc(c.data)}">Abrir</button></div>`; }).join("")}</div>` : `<p class="muted">Nenhuma chamada registrada nesta turma.</p>`}
+  </section>`;
+}
+
+/* ----- Notas ----- */
+function vNotas() {
+  const t = turmaAtual();
+  const head = `<div class="page-head"><div><h1>Notas</h1><p class="muted">Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exportar-notas">${ico("dl")}Exportar boletim (.csv)</button><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
+  if (!t) return head + semTurma();
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const al = t.alunos || [];
+  if (!avs.length) return head + `<div class="empty"><h3>Nenhuma avaliação em ${esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.</p><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button></div>`;
+  return head + `<div class="table-wrap"><table>
+    <thead><tr><th class="sticky-col">Aluno</th>${avs.map(a => `<th class="c"><button class="btn sm ghost" data-act="editar-avaliacao" data-id="${esc(a.id)}" title="Editar avaliação">${esc(a.nome)}</button><div class="num" style="text-transform:none">peso ${esc(a.peso)} · ${fmtData(a.data)}</div></th>`).join("")}<th class="c">Média</th><th class="c">Freq.</th><th class="c">Situação</th></tr></thead>
+    <tbody>${al.map(s => { const m = mediaAluno(t, s.id), f = freqAluno(t, s.id);
+      const sit = m === null ? `<span class="chip">sem notas</span>` : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">em dia</span>` : (m < MEDIA_MIN ? `<span class="chip warn">recuperação</span>` : `<span class="chip bad">frequência</span>`);
+      return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avs.map(a => { const n = a.notas?.[s.id]; return `<td class="c"><input class="grade" type="text" inputmode="decimal" aria-label="Nota de ${esc(s.nome)} em ${esc(a.nome)}" data-av="${esc(a.id)}" data-aluno="${esc(s.id)}" value="${n === undefined || n === null ? "" : esc(String(n).replace(".", ","))}"></td>`; }).join("")}
+      <td class="c num" style="font-weight:600;color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td><td class="c num" style="color:${f !== null && f < FREQ_MIN ? "var(--bad)" : "inherit"}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td></tr>`; }).join("")}</tbody></table></div>
+    <p class="small muted">Digite a nota de 0 a 10 e saia do campo para salvar. Use vírgula ou ponto.</p>`;
+}
+
+/* ----- Planejamento ----- */
+function vPlanos() {
+  const t = turmaAtual();
+  const lista = S.planos.filter(p => !t || p.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const head = `<div class="page-head"><div><h1>Planejamento</h1><p class="muted">Planos de aula de ${esc(t ? t.nome : "todas as turmas")}, com habilidades da BNCC.</p></div><div class="toolbar"><button class="btn" data-act="novo-plano">${ico("plus")}Plano em branco</button><button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Criar com IA</button></div></div>`;
+  if (!S.turmas.length) return head + semTurma();
+  if (!lista.length) return head + `<div class="empty"><h3>Nenhum plano de aula ainda</h3><p>Diga o tema e a IA monta objetivos, sequência didática, recursos e avaliação. Você revisa e salva.</p><button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Criar com IA</button></div>`;
+  const d0 = hoje();
+  return head + `<div class="cards">${lista.map(p => { const tt = turma(p.turmaId); return `<article class="card"><div class="card-top"><div style="min-width:0"><span class="eyebrow">${fmtData(p.data)} · ${esc(tt?.nome || "")}</span><h3>${esc(p.titulo)}</h3></div><span class="chip ${p.status === "dada" ? "ok" : p.data < d0 ? "warn" : "acc"}">${p.status === "dada" ? "aula dada" : p.data < d0 ? "pendente" : "planejado"}</span></div>
+    <p class="small muted" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(p.objetivos || "")}</p>
+    <div class="meta">${p.bncc ? p.bncc.split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("") : ""}${p.duracao ? `<span class="chip">${esc(p.duracao)}</span>` : ""}</div>
+    <div class="toolbar"><button class="btn sm" data-act="ver-plano" data-id="${esc(p.id)}">Abrir</button><button class="btn sm ghost" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button></div></article>`; }).join("")}</div>`;
+}
+
+/* ----- Atividades ----- */
+function vAtividades() {
+  const t = turmaAtual();
+  const head = `<div class="page-head"><div><h1>Atividades e entregas</h1><p class="muted">Tarefas com prazo e controle de quem entregou.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-atividade">${ico("plus")}Nova atividade</button></div></div>`;
+  if (!t) return head + semTurma();
+  const lista = S.atividades.filter(a => a.turmaId === t.id).sort((a, b) => (b.prazo || "").localeCompare(a.prazo || ""));
+  if (!lista.length) return head + `<div class="empty"><h3>Nenhuma atividade em ${esc(t.nome)}</h3><p>Crie uma tarefa, descreva o que os alunos devem fazer (a IA ajuda) e marque as entregas.</p><button class="btn primary" data-act="nova-atividade">${ico("plus")}Nova atividade</button></div>`;
+  const n = (t.alunos || []).length, d0 = hoje();
+  return head + lista.map(a => { const e = (t.alunos || []).filter(s => a.entregas?.[s.id]).length; const pct = n ? Math.round(e / n * 100) : 0; return `<section class="panel">
+    <div class="panel-head"><div style="min-width:0"><span class="eyebrow">Prazo ${fmtData(a.prazo)}${a.valor ? " · vale " + esc(a.valor) + " ponto(s)" : ""}</span><h2>${esc(a.titulo)}</h2></div>
+    <div class="toolbar"><span class="chip ${a.prazo < d0 ? (e < n ? "bad" : "ok") : "acc"}">${a.prazo < d0 ? "encerrada" : "aberta"}</span><span class="small num">${e}/${n} entregues</span><button class="btn sm" data-act="editar-atividade" data-id="${esc(a.id)}">Editar</button></div></div>
+    <p style="white-space:pre-wrap">${esc(a.descricao || "")}</p>
+    <div class="bar" aria-hidden="true"><i style="width:${pct}%"></i></div>
+    <details><summary class="small" style="cursor:pointer;font-weight:600">Marcar entregas</summary>
+      <div class="grid2" style="margin-top:8px">${(t.alunos || []).map(s => `<label class="check" style="border:0;padding:4px 0"><input type="checkbox" data-act="entrega" data-id="${esc(a.id)}" data-aluno="${esc(s.id)}" ${a.entregas?.[s.id] ? "checked" : ""}><span>${esc(s.nome)}</span></label>`).join("")}</div>
+    </details></section>`; }).join("");
+}
+
+/* ----- Banco de questões ----- */
+const DIF = { facil: "Fácil", media: "Média", dificil: "Difícil" };
+const TIPO = { multipla: "Múltipla escolha", vf: "Verdadeiro ou falso", aberta: "Dissertativa" };
+function questaoHTML(q, idx, gabarito = true) {
+  const letras = "ABCDE";
+  return `<div class="q">${idx != null ? `<b>${idx}.</b> ` : ""}<span style="white-space:pre-wrap">${esc(q.enunciado)}</span>
+    ${q.tipo !== "aberta" && q.alternativas?.length ? `<ol type="A">${q.alternativas.map((alt, i) => `<li class="${gabarito && i === q.correta ? "correct" : ""}">${esc(alt)}</li>`).join("")}</ol>` : ""}
+    ${gabarito && q.tipo === "aberta" && q.resposta ? `<p class="small" style="color:var(--ok)"><b>Resposta esperada:</b> ${esc(q.resposta)}</p>` : ""}
+    ${gabarito && q.tipo !== "aberta" && q.correta != null ? `<p class="small" style="color:var(--ok)"><b>Gabarito:</b> ${letras[q.correta] || ""}</p>` : ""}</div>`;
+}
+function vQuestoes() {
+  const f = S.filtroQ;
+  const discs = [...new Set(S.questoes.map(q => q.disciplina).filter(Boolean))].sort();
+  const lista = S.questoes.filter(q => (!f.disc || q.disciplina === f.disc) && (!f.dif || q.dificuldade === f.dif) && (!f.txt || (q.enunciado + " " + q.tema).toLowerCase().includes(f.txt.toLowerCase())));
+  const head = `<div class="page-head"><div><h1>Banco de questões</h1><p class="muted">${S.questoes.length} questões guardadas para montar provas.</p></div><div class="toolbar"><button class="btn" data-act="nova-questao">${ico("plus")}Nova questão</button><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
+  if (!S.questoes.length) return head + `<div class="empty"><h3>Seu banco está vazio</h3><p>Peça à IA questões sobre um tema, escolha as que gostar e guarde aqui.</p><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div>`;
+  return head + `<section class="panel"><div class="toolbar">
+      <div class="field" style="flex:1;min-width:180px"><label for="fTxt">Buscar</label><input class="input" type="search" id="fTxt" value="${esc(f.txt)}" placeholder="Tema ou trecho do enunciado"></div>
+      <div class="field"><label for="fDisc">Disciplina</label><select class="input" id="fDisc"><option value="">Todas</option>${discs.map(d => `<option ${f.disc === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
+      <div class="field"><label for="fDif">Dificuldade</label><select class="input" id="fDif"><option value="">Todas</option>${Object.entries(DIF).map(([k, v]) => `<option value="${k}" ${f.dif === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
+    <div class="list">${lista.map(q => `<div class="row" style="align-items:flex-start"><div class="grow">${questaoHTML(q, null)}<div class="toolbar" style="margin-top:6px"><span class="chip">${esc(q.disciplina)}</span><span class="chip">${esc(q.tema)}</span><span class="chip">${esc(TIPO[q.tipo] || q.tipo)}</span><span class="chip ${q.dificuldade === "dificil" ? "bad" : q.dificuldade === "media" ? "warn" : "ok"}">${esc(DIF[q.dificuldade] || "")}</span>${q.bncc ? `<span class="bncc">${esc(q.bncc)}</span>` : ""}</div></div>
+      <div class="toolbar" style="flex-direction:column"><button class="btn sm" data-act="editar-questao" data-id="${esc(q.id)}">Editar</button></div></div>`).join("") || `<p class="muted">Nenhuma questão com esses filtros.</p>`}</div></section>`;
+}
+
+/* ----- Provas ----- */
+function vProvas() {
+  const head = `<div class="page-head"><div><h1>Provas</h1><p class="muted">Monte provas com questões do banco e baixe com gabarito.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-prova">${ico("plus")}Nova prova</button></div></div>`;
+  if (!S.provas.length) return head + `<div class="empty"><h3>Nenhuma prova montada</h3><p>${S.questoes.length ? "Escolha questões do seu banco para montar a primeira." : "Primeiro guarde algumas questões no banco, depois monte a prova."}</p><button class="btn primary" data-act="${S.questoes.length ? "nova-prova" : "ir"}" data-view="questoes">${S.questoes.length ? "Nova prova" : "Ir ao banco de questões"}</button></div>`;
+  return head + `<div class="cards">${S.provas.map(p => { const t = turma(p.turmaId); return `<article class="card"><span class="eyebrow">${fmtData(p.data)} · ${esc(t?.nome || "Sem turma")}</span><h3>${esc(p.titulo)}</h3><p class="small muted">${(p.questaoIds || []).length} questões</p><div class="toolbar"><button class="btn sm" data-act="ver-prova" data-id="${esc(p.id)}">Visualizar</button><button class="btn sm ghost" data-act="editar-prova" data-id="${esc(p.id)}">Editar</button></div></article>`; }).join("")}</div>`;
+}
+
+/* ----- Assistente ----- */
+function vAssistente() {
+  const sugest = ["Sugira uma dinâmica de 10 minutos para começar a aula", "Como adaptar uma atividade para um aluno com TDAH?", "Escreva um bilhete para os responsáveis sobre a feira de ciências", "Ideias de avaliação formativa para minha turma"];
+  return `<div class="page-head"><div><h1>Assistente pedagógico</h1><p class="muted">Converse sobre suas aulas. O assistente conhece o nome, a série e a disciplina das suas turmas, mas não vê os nomes dos alunos.</p></div>${S.chat.length ? `<button class="btn ghost" data-act="limpar-chat">Nova conversa</button>` : ""}</div>
+  ${!cap.ia ? `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic (ANTHROPIC_API_KEY) no servidor.</span></div>` : ""}
+  <section class="panel"><div class="chat" id="chatLog">${S.chat.length ? S.chat.map(m => `<div class="msg ${m.role === "user" ? "user" : "bot"}">${esc(m.content)}</div>`).join("") : `<div class="muted">Comece com uma pergunta ou escolha uma sugestão:</div><div class="suggest">${sugest.map(s => `<button class="btn sm" data-act="sugestao" data-txt="${esc(s)}">${esc(s)}</button>`).join("")}</div>`}</div>
+  <form class="chat-form" id="chatForm"><textarea class="input" id="chatInput" placeholder="Pergunte algo sobre suas aulas…" ${cap.ia ? "" : "disabled"}></textarea><button class="btn primary" id="chatSend" ${cap.ia ? "" : "disabled"}>Enviar</button></form></section>`;
+}
+
+/* ---------- diálogos ---------- */
+const dlg = $("#dlg");
+function abrirDlg(titulo, corpo, rodape) {
+  dlg.innerHTML = `<form class="dlg" method="dialog" id="dlgForm"><div class="dlg-head"><h2>${titulo}</h2><button type="button" class="btn ghost sm" data-act="fechar" aria-label="Fechar">${ico("x")}</button></div><div class="dlg-body">${corpo}</div><div class="dlg-foot">${rodape}</div></form>`;
+  if (!dlg.open) dlg.showModal();
+}
+const fechar = () => { if (sampleCtl) sampleCtl.abort(); dlg.close(); };
+const val = id => { const el = dlg.querySelector("#" + id); return el ? el.value.trim() : ""; };
+const turmaOpts = sel => S.turmas.map(t => `<option value="${esc(t.id)}" ${sel === t.id ? "selected" : ""}>${esc(t.nome)} · ${esc(t.disciplina)}</option>`).join("");
+
+function dlgTurma(t) {
+  t = t || { id: uid(), nome: "", disciplina: "", serie: "", ano: String(new Date().getFullYear()), turno: "", cor: CORES[S.turmas.length % CORES.length], alunos: [] };
+  dlg._obj = t;
+  abrirDlg(t.nome ? "Editar turma" : "Nova turma", `
+    <div class="grid2"><div class="field"><label for="tNome">Nome da turma</label><input class="input" id="tNome" required value="${esc(t.nome)}" placeholder="7º ano C"></div>
+    <div class="field"><label for="tDisc">Disciplina</label><input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa"></div></div>
+    <div class="grid3"><div class="field"><label for="tSerie">Série / etapa</label><input class="input" id="tSerie" value="${esc(t.serie)}" placeholder="7º ano EF"></div>
+    <div class="field"><label for="tAno">Ano letivo</label><input class="input" id="tAno" value="${esc(t.ano)}"></div>
+    <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${["", "Manhã", "Tarde", "Noite", "Integral"].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>
+    <div class="field"><label>Cor</label><div class="toolbar">${CORES.map(c => `<label style="cursor:pointer"><input type="radio" name="tCor" value="${c}" ${t.cor === c ? "checked" : ""} style="accent-color:${c}"> <span class="dot" style="display:inline-block;background:${c}"></span></label>`).join("")}</div></div>
+    <div class="field"><label for="tAlunos">Alunos, um por linha (cole da lista da secretaria)</label><textarea class="input" id="tAlunos" rows="8" placeholder="Ana Beatriz Souza&#10;Bruno Henrique Lima">${esc((t.alunos || []).map(a => a.nome).join("\n"))}</textarea><span class="small muted">Remover um nome apaga as notas e presenças dele nesta turma.</span></div>`,
+    `${S.turmas.some(x => x.id === t.id) ? `<button type="button" class="btn danger" data-act="apagar-turma" style="margin-right:auto">Apagar turma</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-turma">Salvar turma</button>`);
+}
+
+function dlgPlano(p, comIA) {
+  const t = turmaAtual();
+  p = p || { id: uid(), turmaId: t?.id || "", data: hoje(), titulo: "", duracao: "1 aula de 50 min", bncc: "", objetivos: "", conteudo: "", metodologia: "", recursos: "", avaliacao: "", status: "planejado" };
+  dlg._obj = p;
+  abrirDlg(S.planos.some(x => x.id === p.id) ? "Editar plano de aula" : "Novo plano de aula", `
+    ${comIA ? `<div class="ai-box"><div class="grid2"><div class="field"><label for="iaTema">Tema da aula</label><input class="input" id="iaTema" placeholder="Ex.: Frações equivalentes"></div><div class="field"><label for="iaExtra">Detalhes (opcional)</label><input class="input" id="iaExtra" placeholder="Turma agitada, sem projetor, 2 aulas…"></div></div>
+      <div class="toolbar"><button type="button" class="btn ai" data-act="ia-plano">${ico("spark")}Gerar plano</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">A IA preenche os campos abaixo. Você revisa antes de salvar.</span></div></div>` : ""}
+    <div class="grid3"><div class="field"><label for="pTurma">Turma</label><select class="input" id="pTurma">${turmaOpts(p.turmaId)}</select></div>
+    <div class="field"><label for="pData">Data</label><input class="input" type="date" id="pData" value="${esc(p.data)}"></div>
+    <div class="field"><label for="pDur">Duração</label><input class="input" id="pDur" value="${esc(p.duracao)}"></div></div>
+    <div class="grid2"><div class="field"><label for="pTitulo">Título</label><input class="input" id="pTitulo" value="${esc(p.titulo)}"></div>
+    <div class="field"><label for="pBncc">Habilidades BNCC</label><input class="input" id="pBncc" value="${esc(p.bncc)}" placeholder="EF06MA07, EF06MA08"></div></div>
+    <div class="field"><label for="pObj">Objetivos de aprendizagem</label><textarea class="input" id="pObj" rows="3">${esc(p.objetivos)}</textarea></div>
+    <div class="field"><label for="pCont">Conteúdos</label><textarea class="input" id="pCont" rows="2">${esc(p.conteudo)}</textarea></div>
+    <div class="field"><label for="pMet">Metodologia / sequência didática</label><textarea class="input" id="pMet" rows="6">${esc(p.metodologia)}</textarea></div>
+    <div class="grid2"><div class="field"><label for="pRec">Recursos</label><textarea class="input" id="pRec" rows="3">${esc(p.recursos)}</textarea></div>
+    <div class="field"><label for="pAval">Avaliação</label><textarea class="input" id="pAval" rows="3">${esc(p.avaliacao)}</textarea></div></div>
+    <label class="check" style="border:0"><input type="checkbox" id="pDada" ${p.status === "dada" ? "checked" : ""}><span>Aula já foi dada</span></label>`,
+    `${S.planos.some(x => x.id === p.id) ? `<button type="button" class="btn danger" data-act="apagar-plano" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-plano">Salvar plano</button>`);
+}
+
+function dlgVerPlano(p) {
+  const t = turma(p.turmaId);
+  const sec = (h, v) => v ? `<div class="sec"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
+  abrirDlg(esc(p.titulo), `<div class="doc" style="border:0;padding:0">
+    <div class="toolbar"><span class="chip">${esc(t?.nome || "")}</span><span class="chip">${esc(fmtDataLonga(p.data))}</span><span class="chip">${esc(p.duracao || "")}</span>${(p.bncc || "").split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>
+    ${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}</div>`,
+    `<button type="button" class="btn" data-act="baixar-plano" data-id="${esc(p.id)}">${ico("dl")}Baixar (.html)</button><button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+}
+
+function dlgAvaliacao(a) {
+  const t = turmaAtual();
+  a = a || { id: uid(), turmaId: t.id, nome: "", peso: 1, data: hoje(), bimestre: "1", notas: {} };
+  dlg._obj = a;
+  abrirDlg(S.avaliacoes.some(x => x.id === a.id) ? "Editar avaliação" : "Nova avaliação", `
+    <div class="field"><label for="aNome">Nome</label><input class="input" id="aNome" value="${esc(a.nome)}" placeholder="Prova 2 — Equações"></div>
+    <div class="grid3"><div class="field"><label for="aPeso">Peso na média</label><input class="input" id="aPeso" type="number" min="0" step="0.5" value="${esc(a.peso)}"></div>
+    <div class="field"><label for="aData">Data</label><input class="input" id="aData" type="date" value="${esc(a.data)}"></div>
+    <div class="field"><label for="aBim">Bimestre</label><select class="input" id="aBim">${["1", "2", "3", "4"].map(b => `<option value="${b}" ${a.bimestre === b ? "selected" : ""}>${b}º bimestre</option>`).join("")}</select></div></div>`,
+    `${S.avaliacoes.some(x => x.id === a.id) ? `<button type="button" class="btn danger" data-act="apagar-avaliacao" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-avaliacao">Salvar</button>`);
+}
+
+function dlgAtividade(a) {
+  const t = turmaAtual();
+  a = a || { id: uid(), turmaId: t.id, titulo: "", descricao: "", prazo: addDias(hoje(), 7), valor: "", entregas: {} };
+  dlg._obj = a;
+  abrirDlg(S.atividades.some(x => x.id === a.id) ? "Editar atividade" : "Nova atividade", `
+    <div class="grid3"><div class="field"><label for="atTurma">Turma</label><select class="input" id="atTurma">${turmaOpts(a.turmaId)}</select></div>
+    <div class="field"><label for="atPrazo">Prazo</label><input class="input" type="date" id="atPrazo" value="${esc(a.prazo)}"></div>
+    <div class="field"><label for="atValor">Vale (pontos)</label><input class="input" id="atValor" value="${esc(a.valor)}"></div></div>
+    <div class="field"><label for="atTitulo">Título</label><input class="input" id="atTitulo" value="${esc(a.titulo)}" placeholder="Pesquisa sobre a Revolução Industrial"></div>
+    <div class="field"><label for="atDesc">Instruções para os alunos</label><textarea class="input" id="atDesc" rows="7">${esc(a.descricao)}</textarea></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai sm" data-act="ia-atividade">${ico("spark")}Escrever instruções com IA</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Usa o título e a turma para redigir passo a passo e critérios.</span></div></div>`,
+    `${S.atividades.some(x => x.id === a.id) ? `<button type="button" class="btn danger" data-act="apagar-atividade" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-atividade">Salvar atividade</button>`);
+}
+
+function dlgQuestao(q) {
+  const t = turmaAtual();
+  q = q || { id: uid(), disciplina: t?.disciplina || "", tema: "", serie: t?.serie || "", tipo: "multipla", dificuldade: "media", enunciado: "", alternativas: ["", "", "", ""], correta: 0, resposta: "", bncc: "" };
+  dlg._obj = q;
+  abrirDlg(S.questoes.some(x => x.id === q.id) ? "Editar questão" : "Nova questão", `
+    <div class="grid3"><div class="field"><label for="qDisc">Disciplina</label><input class="input" id="qDisc" value="${esc(q.disciplina)}"></div>
+    <div class="field"><label for="qTema">Tema</label><input class="input" id="qTema" value="${esc(q.tema)}"></div>
+    <div class="field"><label for="qBncc">BNCC</label><input class="input" id="qBncc" value="${esc(q.bncc)}"></div></div>
+    <div class="grid3"><div class="field"><label for="qTipo">Tipo</label><select class="input" id="qTipo">${Object.entries(TIPO).map(([k, v]) => `<option value="${k}" ${q.tipo === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+    <div class="field"><label for="qDif">Dificuldade</label><select class="input" id="qDif">${Object.entries(DIF).map(([k, v]) => `<option value="${k}" ${q.dificuldade === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+    <div class="field"><label for="qSerie">Série</label><input class="input" id="qSerie" value="${esc(q.serie)}"></div></div>
+    <div class="field"><label for="qEnun">Enunciado</label><textarea class="input" id="qEnun" rows="4">${esc(q.enunciado)}</textarea></div>
+    <div class="field"><label for="qAlts">Alternativas, uma por linha (para dissertativa, deixe vazio)</label><textarea class="input" id="qAlts" rows="5">${esc((q.alternativas || []).join("\n"))}</textarea></div>
+    <div class="grid2"><div class="field"><label for="qCorreta">Alternativa correta</label><select class="input" id="qCorreta">${"ABCDE".split("").map((l, i) => `<option value="${i}" ${q.correta === i ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    <div class="field"><label for="qResp">Resposta esperada (dissertativa)</label><input class="input" id="qResp" value="${esc(q.resposta)}"></div></div>`,
+    `${S.questoes.some(x => x.id === q.id) ? `<button type="button" class="btn danger" data-act="apagar-questao" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-questao">Salvar questão</button>`);
+}
+
+function dlgGerarQuestoes() {
+  const t = turmaAtual();
+  dlg._gerada = [];
+  abrirDlg("Gerar questões com IA", `
+    <div class="ai-box">
+      <div class="grid2"><div class="field"><label for="gTema">Tema</label><input class="input" id="gTema" placeholder="Ex.: Ciclo da água"></div>
+      <div class="field"><label for="gDisc">Disciplina</label><input class="input" id="gDisc" value="${esc(t?.disciplina || "")}"></div></div>
+      <div class="grid3" style="grid-template-columns:repeat(4,minmax(0,1fr))"><div class="field"><label for="gSerie">Série</label><input class="input" id="gSerie" value="${esc(t?.serie || "")}"></div>
+      <div class="field"><label for="gTipo">Tipo</label><select class="input" id="gTipo"><option value="misto">Misto</option>${Object.entries(TIPO).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+      <div class="field"><label for="gDif">Dificuldade</label><select class="input" id="gDif"><option value="variada">Variada</option>${Object.entries(DIF).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+      <div class="field"><label for="gQtd">Quantidade</label><input class="input" id="gQtd" type="number" min="1" max="15" value="5"></div></div>
+      <div class="toolbar"><button type="button" class="btn ai" data-act="ia-questoes">${ico("spark")}Gerar</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Revise cada questão e marque as que quer guardar.</span></div>
+    </div><div id="gLista"></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-geradas" id="gSalvar" disabled>Guardar selecionadas</button>`);
+}
+
+function dlgProva(p) {
+  const t = turmaAtual();
+  p = p || { id: uid(), titulo: "", turmaId: t?.id || "", data: addDias(hoje(), 7), instrucoes: "Leia com atenção antes de responder. Duração: 50 minutos.", questaoIds: [] };
+  dlg._obj = p;
+  const discs = [...new Set(S.questoes.map(q => q.disciplina))];
+  abrirDlg(S.provas.some(x => x.id === p.id) ? "Editar prova" : "Nova prova", `
+    <div class="grid3"><div class="field"><label for="prTitulo">Título</label><input class="input" id="prTitulo" value="${esc(p.titulo)}" placeholder="Avaliação do 2º bimestre"></div>
+    <div class="field"><label for="prTurma">Turma</label><select class="input" id="prTurma">${turmaOpts(p.turmaId)}</select></div>
+    <div class="field"><label for="prData">Data</label><input class="input" type="date" id="prData" value="${esc(p.data)}"></div></div>
+    <div class="field"><label for="prInst">Instruções</label><textarea class="input" id="prInst" rows="2">${esc(p.instrucoes)}</textarea></div>
+    <div class="field"><label>Questões do banco (na ordem em que aparecem)</label>
+      <div>${discs.map(d => `<div class="eyebrow" style="margin-top:8px">${esc(d)}</div>${S.questoes.filter(q => q.disciplina === d).map(q => `<label class="check"><input type="checkbox" name="prQ" value="${esc(q.id)}" ${(p.questaoIds || []).includes(q.id) ? "checked" : ""}><span><span class="small">${esc(q.enunciado.slice(0, 140))}${q.enunciado.length > 140 ? "…" : ""}</span><br><span class="chip">${esc(q.tema)}</span> <span class="chip">${esc(TIPO[q.tipo])}</span></span></label>`).join("")}`).join("") || `<p class="muted">O banco de questões está vazio.</p>`}</div></div>`,
+    `${S.provas.some(x => x.id === p.id) ? `<button type="button" class="btn danger" data-act="apagar-prova" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-prova">Salvar prova</button>`);
+}
+
+function provaDoc(p, gabarito) {
+  const t = turma(p.turmaId);
+  const qs = (p.questaoIds || []).map(id => S.questoes.find(q => q.id === id)).filter(Boolean);
+  return `<div class="doc"><div><span class="eyebrow">${esc(t?.disciplina || "")} · ${esc(t?.nome || "")} · ${esc(fmtDataLonga(p.data))}</span><h2 style="margin-top:4px">${esc(p.titulo)}</h2></div>
+    <div class="grid2 small"><div>Nome: ______________________________</div><div>Nº: _____ &nbsp; Nota: _____</div></div>
+    ${p.instrucoes ? `<p class="small muted" style="white-space:pre-wrap">${esc(p.instrucoes)}</p>` : ""}
+    ${qs.map((q, i) => questaoHTML(q, i + 1, gabarito) + (q.tipo === "aberta" && !gabarito ? `<div style="border-bottom:1px solid var(--line);height:64px"></div>` : "")).join("")}</div>`;
+}
+function dlgVerProva(p, gab) {
+  abrirDlg(esc(p.titulo), `<div class="toolbar"><button type="button" class="btn sm ${gab ? "" : "primary"}" data-act="ver-prova" data-id="${esc(p.id)}">Versão do aluno</button><button type="button" class="btn sm ${gab ? "primary" : ""}" data-act="ver-prova-gab" data-id="${esc(p.id)}">Com gabarito</button></div>${provaDoc(p, gab)}`,
+    `<button type="button" class="btn" data-act="baixar-prova" data-id="${esc(p.id)}" data-gab="0">${ico("dl")}Baixar prova</button><button type="button" class="btn" data-act="baixar-prova" data-id="${esc(p.id)}" data-gab="1">${ico("dl")}Baixar gabarito</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+}
+
+/* ---------- IA ---------- */
+let sampleCtl = null;
+function iaErro(e) {
+  if (e && e.name === "AbortError") return "Parado.";
+  return (e && e.message) || "Não foi possível falar com a IA agora. Tente de novo.";
+}
+async function comIA(fn) {
+  const st = dlg.querySelector("#iaStatus"), stop = dlg.querySelector("#iaStop");
+  if (!cap.ia) { if (st) st.textContent = "A IA ainda não foi configurada neste servidor. Peça ao administrador para definir a chave da Anthropic."; return; }
+  const btns = dlg.querySelectorAll('[data-act^="ia-"]'); btns.forEach(b => b.disabled = true);
+  sampleCtl = new AbortController(); if (stop) stop.hidden = false;
+  if (st) st.textContent = "Pensando… pode levar até um minuto.";
+  try { await fn(sampleCtl.signal, st); }
+  catch (e) { if (st) st.textContent = iaErro(e); }
+  finally { btns.forEach(b => b.disabled = false); if (stop) stop.hidden = true; sampleCtl = null; }
+}
+function turmaIA(id) { const t = turma(id); return t ? { nome: t.nome, disciplina: t.disciplina, serie: t.serie || "", alunos: (t.alunos || []).length } : undefined; }
+async function iaJSON(pedido, signal) {
+  const r = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pedido), signal });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw { message: j.erro };
+  return j.dados;
+}
+async function iaTexto(pedido, signal, onText) {
+  const r = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pedido), signal });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw { message: j.erro }; }
+  const rd = r.body.getReader(), dec = new TextDecoder(); let txt = "";
+  for (;;) { const { done, value } = await rd.read(); if (done) break; txt += dec.decode(value, { stream: true }); onText(txt); }
+  return txt;
+}
+
+async function iaPlano() {
+  const tema = val("iaTema"); if (!tema) { dlg.querySelector("#iaStatus").textContent = "Escreva o tema da aula primeiro."; return; }
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "plano", tema, duracao: val("pDur"), detalhes: val("iaExtra"), turma: turmaIA(val("pTurma")) }, signal);
+    const set = (id, v) => { const el = dlg.querySelector("#" + id); if (el && v) el.value = String(v); };
+    set("pTitulo", r.titulo); set("pBncc", r.bncc); set("pObj", r.objetivos); set("pCont", r.conteudo); set("pMet", r.metodologia); set("pRec", r.recursos); set("pAval", r.avaliacao);
+    st.textContent = "Pronto. Revise e ajuste antes de salvar.";
+  });
+}
+async function iaAtividade() {
+  const titulo = val("atTitulo"); if (!titulo) { dlg.querySelector("#iaStatus").textContent = "Escreva o título da atividade primeiro."; return; }
+  await comIA(async (signal, st) => {
+    const el = dlg.querySelector("#atDesc");
+    await iaTexto({ tipo: "atividade", titulo, prazo: fmtDataLonga(val("atPrazo")), valor: val("atValor"), turma: turmaIA(val("atTurma")) }, signal, t => { el.value = t; });
+    st.textContent = "Pronto. Revise antes de salvar.";
+  });
+}
+async function iaQuestoes() {
+  const tema = val("gTema"); if (!tema) { dlg.querySelector("#iaStatus").textContent = "Escreva o tema primeiro."; return; }
+  const qtd = Math.max(1, Math.min(15, parseInt(val("gQtd")) || 5));
+  await comIA(async (signal, st) => {
+    const arr = await iaJSON({ tipo: "questoes", tema, disciplina: val("gDisc"), serie: val("gSerie"), quantidade: qtd,
+      tipoQuestao: val("gTipo") === "misto" ? "misture múltipla escolha, verdadeiro ou falso e dissertativa" : TIPO[val("gTipo")],
+      dificuldade: val("gDif") === "variada" ? "variada" : DIF[val("gDif")] }, signal);
+    if (!Array.isArray(arr) || !arr.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
+    dlg._gerada = arr.filter(q => q && q.enunciado).map(q => ({ id: uid(), disciplina: val("gDisc"), tema, serie: val("gSerie"), tipo: TIPO[q.tipo] ? q.tipo : "multipla", dificuldade: DIF[q.dificuldade] ? q.dificuldade : "media", enunciado: String(q.enunciado), alternativas: Array.isArray(q.alternativas) ? q.alternativas.map(String) : [], correta: Number.isInteger(q.correta) ? q.correta : null, resposta: String(q.resposta || ""), bncc: String(q.bncc || "") }));
+    dlg.querySelector("#gLista").innerHTML = dlg._gerada.map((q, i) => `<label class="check"><input type="checkbox" name="gSel" value="${i}" checked><div style="min-width:0;flex:1">${questaoHTML(q, i + 1)}<div class="toolbar" style="margin-top:4px"><span class="chip">${esc(TIPO[q.tipo])}</span><span class="chip">${esc(DIF[q.dificuldade])}</span>${q.bncc ? `<span class="bncc">${esc(q.bncc)}</span>` : ""}</div></div></label>`).join("");
+    dlg.querySelector("#gSalvar").disabled = false;
+    st.textContent = `${dlg._gerada.length} questões geradas. Desmarque as que não quiser.`;
+  });
+}
+async function enviarChat(texto) {
+  if (!texto || !cap.ia || enviarChat.busy) return;
+  enviarChat.busy = true;
+  S.chat.push({ role: "user", content: texto }, { role: "assistant", content: "Pensando…" });
+  render();
+  const contexto = `Turmas: ${S.turmas.map(t => `${t.nome} (${t.disciplina}, ${t.serie || "série não informada"}, ${(t.alunos || []).length} alunos)`).join("; ") || "nenhuma cadastrada"}.
+Próximas aulas planejadas: ${S.planos.filter(p => p.data >= hoje()).slice(0, 5).map(p => `${p.titulo} em ${p.data}`).join("; ") || "nenhuma"}.`;
+  const hist = S.chat.slice(0, -1).slice(-12).filter(m => !m.erro);
+  const bubble = () => document.querySelectorAll("#chatLog .msg.bot");
+  try {
+    const text = await iaTexto({ tipo: "chat", contexto, mensagens: hist.map(({ role, content }) => ({ role, content })) }, undefined, text => { S.chat[S.chat.length - 1].content = text; const b = bubble(); if (b.length) b[b.length - 1].textContent = text; const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; });
+    S.chat[S.chat.length - 1].content = text || "(sem resposta)";
+  } catch (e) { const m = S.chat[S.chat.length - 1]; m.content = "⚠ " + iaErro(e); m.erro = true; }
+  enviarChat.busy = false; render();
+}
+
+/* ---------- exportações ---------- */
+async function baixar(nome, conteudo) {
+  const tipo = nome.endsWith(".csv") ? "text/csv;charset=utf-8" : "text/html;charset=utf-8";
+  const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  const a = document.createElement("a"); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+const htmlArquivo = (titulo, corpo) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#111;line-height:1.5}h1,h2{margin:0 0 8px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#555}.q{margin:18px 0}ol{margin:6px 0}.correct{font-weight:bold;color:#1f7a4a}.chip,.bncc{display:inline-block;border:1px solid #ccc;border-radius:4px;padding:0 6px;margin-right:4px;font-size:12px}.sec h3{font-size:13px;text-transform:uppercase;color:#1d6b58;margin:16px 0 4px}.sec div{white-space:pre-wrap}.grid2{display:flex;gap:24px}.small{font-size:14px}.muted{color:#555}.toolbar{display:flex;gap:6px;flex-wrap:wrap}</style></head><body>${corpo}</body></html>`;
+const slug = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "arquivo";
+
+/* ---------- ações ---------- */
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act, id = b.dataset.id;
+  if (b.type === "checkbox") return;
+  const t = turmaAtual();
+  switch (act) {
+    case "fechar": fechar(); break;
+    case "ir": if (id) S.turmaSel = id; location.hash = b.dataset.view; break;
+    case "nova-turma": dlgTurma(); break;
+    case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
+    case "salvar-turma": {
+      const o = dlg._obj; o.nome = val("tNome"); o.disciplina = val("tDisc");
+      if (!o.nome || !o.disciplina) { toast("Preencha o nome da turma e a disciplina."); return; }
+      o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno");
+      o.cor = (dlg.querySelector('input[name="tCor"]:checked') || {}).value || o.cor;
+      const nomes = val("tAlunos").split(/\n+/).map(s => s.replace(/^\s*\d+[\s.\-–)]+/, "").trim()).filter(Boolean);
+      const antigos = o.alunos || [];
+      o.alunos = nomes.map(n => antigos.find(a => a.nome === n) || { id: uid(), nome: n });
+      delete o.exemplo;
+      fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); break; }
+    case "apagar-turma": {
+      if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar turma e tudo dela"; return; }
+      const tid = dlg._obj.id; fechar();
+      for (const col of ["chamadas", "avaliacoes", "atividades", "planos"]) for (const x of S[col].filter(x => x.turmaId === tid)) await apagar(col, x.id);
+      await apagar("turmas", tid); toast("Turma apagada"); break; }
+    case "seed": {
+      if (S.mode !== "live") return; b.disabled = true;
+      const sfx = uid().slice(0, 6); const ex = JSON.parse(JSON.stringify(exemplo()).replace(/"(ex(?:6a|8b|pl\d+|av\d+|at\d+|q\d+|pr\d+))(_|")/g, (m, id, fim) => `"${id}-${sfx}${fim}`)); for (const col of COLS) for (const o of ex[col]) await salvar(col, o);
+      toast("Exemplo carregado. Apague ou edite quando quiser."); break; }
+
+    case "marcar": {
+      const cid = t.id + "_" + S.chamadaData;
+      const ch = JSON.parse(JSON.stringify(S.chamadas.find(c => c.id === cid) || { id: cid, turmaId: t.id, data: S.chamadaData, presencas: {}, conteudo: "" }));
+      ch.presencas[b.dataset.aluno] = b.dataset.v; await salvar("chamadas", ch); break; }
+    case "todos-presentes": {
+      const cid = t.id + "_" + S.chamadaData;
+      const ch = JSON.parse(JSON.stringify(S.chamadas.find(c => c.id === cid) || { id: cid, turmaId: t.id, data: S.chamadaData, presencas: {}, conteudo: "" }));
+      (t.alunos || []).forEach(a => { if (!ch.presencas[a.id]) ch.presencas[a.id] = "P"; }); await salvar("chamadas", ch); toast("Chamada salva"); break; }
+    case "abrir-chamada": S.chamadaData = b.dataset.data; render(); window.scrollTo(0, 0); break;
+
+    case "nova-avaliacao": dlgAvaliacao(); break;
+    case "editar-avaliacao": dlgAvaliacao(JSON.parse(JSON.stringify(S.avaliacoes.find(a => a.id === id)))); break;
+    case "salvar-avaliacao": { const o = dlg._obj; o.nome = val("aNome"); if (!o.nome) { toast("Dê um nome à avaliação."); return; } o.peso = Number(val("aPeso")) || 1; o.data = val("aData"); o.bimestre = val("aBim"); delete o.exemplo; fechar(); await salvar("avaliacoes", o); toast("Avaliação salva"); break; }
+    case "apagar-avaliacao": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar com as notas"; return; } { const aid = dlg._obj.id; fechar(); await apagar("avaliacoes", aid); toast("Avaliação apagada"); } break;
+    case "exportar-notas": {
+      const avs = S.avaliacoes.filter(a => a.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+      const q = s => `"${String(s).replace(/"/g, '""')}"`;
+      const linhas = [["Aluno", ...avs.map(a => `${a.nome} (peso ${a.peso})`), "Média", "Frequência %"].map(q).join(";")];
+      (t.alunos || []).forEach(s => { const m = mediaAluno(t, s.id), f = freqAluno(t, s.id); linhas.push([q(s.nome), ...avs.map(a => { const n = a.notas?.[s.id]; return n == null ? "" : String(n).replace(".", ","); }), m == null ? "" : m.toFixed(1).replace(".", ","), f == null ? "" : f].join(";")); });
+      await baixar(`boletim-${slug(t.nome)}.csv`, "﻿" + linhas.join("\n")); break; }
+
+    case "novo-plano": dlgPlano(null, false); break;
+    case "novo-plano-ia": if (!S.turmas.length) { dlgTurma(); toast("Crie uma turma antes de planejar."); return; } dlgPlano(null, true); setTimeout(() => dlg.querySelector("#iaTema")?.focus(), 50); break;
+    case "editar-plano": dlgPlano(JSON.parse(JSON.stringify(S.planos.find(p => p.id === id))), true); break;
+    case "ver-plano": dlgVerPlano(S.planos.find(p => p.id === id)); break;
+    case "ia-plano": iaPlano(); break;
+    case "parar-ia": sampleCtl?.abort(); break;
+    case "salvar-plano": { const o = dlg._obj; o.titulo = val("pTitulo"); if (!o.titulo) { toast("Dê um título ao plano."); return; }
+      Object.assign(o, { turmaId: val("pTurma"), data: val("pData"), duracao: val("pDur"), bncc: val("pBncc"), objetivos: val("pObj"), conteudo: val("pCont"), metodologia: val("pMet"), recursos: val("pRec"), avaliacao: val("pAval"), status: dlg.querySelector("#pDada").checked ? "dada" : "planejado" }); delete o.exemplo;
+      fechar(); await salvar("planos", o); toast("Plano salvo"); break; }
+    case "apagar-plano": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const pid = dlg._obj.id; fechar(); await apagar("planos", pid); toast("Plano apagado"); } break;
+    case "baixar-plano": { const p = S.planos.find(x => x.id === id); const tt = turma(p.turmaId); const sec = (h, v) => v ? `<div class="sec"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
+      await baixar(`plano-${slug(p.titulo)}.html`, htmlArquivo(p.titulo, `<div class="eyebrow">${esc(tt?.disciplina || "")} · ${esc(tt?.nome || "")} · ${esc(fmtDataLonga(p.data))} · ${esc(p.duracao || "")}</div><h1>${esc(p.titulo)}</h1>${p.bncc ? `<p>BNCC: ${esc(p.bncc)}</p>` : ""}${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}`)); break; }
+
+    case "nova-atividade": dlgAtividade(); break;
+    case "editar-atividade": dlgAtividade(JSON.parse(JSON.stringify(S.atividades.find(a => a.id === id)))); break;
+    case "ia-atividade": iaAtividade(); break;
+    case "salvar-atividade": { const o = dlg._obj; o.titulo = val("atTitulo"); if (!o.titulo) { toast("Dê um título à atividade."); return; } Object.assign(o, { turmaId: val("atTurma"), prazo: val("atPrazo"), valor: val("atValor"), descricao: val("atDesc") }); delete o.exemplo; fechar(); await salvar("atividades", o); toast("Atividade salva"); break; }
+    case "apagar-atividade": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const aid = dlg._obj.id; fechar(); await apagar("atividades", aid); toast("Atividade apagada"); } break;
+
+    case "nova-questao": dlgQuestao(); break;
+    case "editar-questao": dlgQuestao(JSON.parse(JSON.stringify(S.questoes.find(q => q.id === id)))); break;
+    case "salvar-questao": { const o = dlg._obj; o.enunciado = val("qEnun"); if (!o.enunciado) { toast("Escreva o enunciado."); return; }
+      Object.assign(o, { disciplina: val("qDisc"), tema: val("qTema"), bncc: val("qBncc"), tipo: val("qTipo"), dificuldade: val("qDif"), serie: val("qSerie"), alternativas: val("qAlts").split("\n").map(s => s.trim()).filter(Boolean), resposta: val("qResp") });
+      o.correta = o.tipo === "aberta" ? null : Number(val("qCorreta")); delete o.exemplo; fechar(); await salvar("questoes", o); toast("Questão salva"); break; }
+    case "apagar-questao": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const qid = dlg._obj.id; fechar(); await apagar("questoes", qid); toast("Questão apagada"); } break;
+    case "gerar-questoes": dlgGerarQuestoes(); setTimeout(() => dlg.querySelector("#gTema")?.focus(), 50); break;
+    case "ia-questoes": iaQuestoes(); break;
+    case "salvar-geradas": { const sel = [...dlg.querySelectorAll('input[name="gSel"]:checked')].map(x => dlg._gerada[Number(x.value)]); fechar(); for (const q of sel) await salvar("questoes", q); toast(`${sel.length} questões guardadas no banco`); break; }
+
+    case "nova-prova": if (!S.questoes.length) { location.hash = "questoes"; return; } dlgProva(); break;
+    case "editar-prova": dlgProva(JSON.parse(JSON.stringify(S.provas.find(p => p.id === id)))); break;
+    case "salvar-prova": { const o = dlg._obj; o.titulo = val("prTitulo"); if (!o.titulo) { toast("Dê um título à prova."); return; }
+      Object.assign(o, { turmaId: val("prTurma"), data: val("prData"), instrucoes: val("prInst"), questaoIds: [...dlg.querySelectorAll('input[name="prQ"]:checked')].map(x => x.value) }); delete o.exemplo;
+      fechar(); await salvar("provas", o); toast("Prova salva"); break; }
+    case "apagar-prova": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const pid = dlg._obj.id; fechar(); await apagar("provas", pid); toast("Prova apagada"); } break;
+    case "ver-prova": dlgVerProva(S.provas.find(p => p.id === id), false); break;
+    case "ver-prova-gab": dlgVerProva(S.provas.find(p => p.id === id), true); break;
+    case "baixar-prova": { const p = S.provas.find(x => x.id === id); const g = b.dataset.gab === "1"; await baixar(`${slug(p.titulo)}${g ? "-gabarito" : ""}.html`, htmlArquivo(p.titulo, provaDoc(p, g))); break; }
+
+    case "sugestao": enviarChat(b.dataset.txt); break;
+    case "limpar-chat": S.chat = []; render(); break;
+  }
+});
+
+document.addEventListener("change", async e => {
+  const el = e.target;
+  if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); return; }
+  if (el.id === "chConteudo") { const t = turmaAtual(); const cid = t.id + "_" + S.chamadaData; const ch = JSON.parse(JSON.stringify(S.chamadas.find(c => c.id === cid) || { id: cid, turmaId: t.id, data: S.chamadaData, presencas: {}, conteudo: "" })); ch.conteudo = el.value.trim(); await salvar("chamadas", ch); toast("Conteúdo registrado"); return; }
+  if (el.matches("input.grade")) {
+    const a = JSON.parse(JSON.stringify(S.avaliacoes.find(x => x.id === el.dataset.av))); a.notas = a.notas || {};
+    const raw = el.value.trim().replace(",", ".");
+    if (raw === "") delete a.notas[el.dataset.aluno];
+    else { const n = Number(raw); if (isNaN(n) || n < 0 || n > 10) { toast("A nota deve ser um número de 0 a 10."); el.value = ""; return; } a.notas[el.dataset.aluno] = n; }
+    await salvar("avaliacoes", a); return;
+  }
+  if (el.dataset.act === "entrega") { const a = JSON.parse(JSON.stringify(S.atividades.find(x => x.id === el.dataset.id))); a.entregas = a.entregas || {}; a.entregas[el.dataset.aluno] = el.checked; await salvar("atividades", a); return; }
+  if (el.id === "fDisc") { S.filtroQ.disc = el.value; render(); }
+  if (el.id === "fDif") { S.filtroQ.dif = el.value; render(); }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "fTxt") { S.filtroQ.txt = e.target.value; clearTimeout(document._ft); document._ft = setTimeout(() => { const pos = e.target.selectionStart; e.target.blur(); render(); const f = $("#fTxt"); if (f) { f.focus(); f.setSelectionRange(pos, pos); } }, 300); }
+});
+document.addEventListener("submit", e => {
+  if (e.target.id === "chatForm") { e.preventDefault(); const i = $("#chatInput"); const v = i.value.trim(); i.value = ""; i.blur(); enviarChat(v); }
+});
+document.addEventListener("keydown", e => {
+  if (e.target.id === "chatInput" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatForm").requestSubmit(); }
+});
+dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); });
+
+function rota() { const h = location.hash.slice(1); S.view = VIEWS.some(v => v[0] === h) ? h : "inicio"; render(); window.scrollTo(0, 0); }
+window.addEventListener("hashchange", rota);
+S.view = VIEWS.some(v => v[0] === location.hash.slice(1)) ? location.hash.slice(1) : "inicio";
+iniciar();
