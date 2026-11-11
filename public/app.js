@@ -8,7 +8,7 @@ const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d
 const fmtData = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
 const fmtDataLonga = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) : "—";
 const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas"];
+const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais"];
 const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
 const MEDIA_MIN = 6, FREQ_MIN = 75;
 
@@ -25,6 +25,7 @@ const I = {
   planos: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   atividades: '<path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/>',
   questoes: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
+  materiais: '<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -36,7 +37,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [
   ["inicio", "Início"], ["turmas", "Turmas"], ["chamada", "Chamada"], ["notas", "Notas"],
-  ["planos", "Planejamento", true], ["atividades", "Atividades", true], ["questoes", "Questões", true],
+  ["planos", "Planejamento", true], ["atividades", "Atividades", true], ["materiais", "Materiais", true], ["questoes", "Questões", true],
   ["provas", "Provas"], ["assistente", "Manu", true]
 ];
 
@@ -44,7 +45,7 @@ const VIEWS = [
 const S = {
   mode: "loading", // loading | live | demo
   uid: null, nome: "", base: null,
-  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [],
+  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [], materiais: [],
   turmaSel: null, view: "inicio",
   chamadaData: hoje(), filtroQ: { disc: "", dif: "", txt: "" },
   chat: [], loaded: new Set()
@@ -92,7 +93,7 @@ function exemplo() {
     { id: "exq4", disciplina: "Ciências", tema: "Sistema circulatório", serie: "8º ano EF", tipo: "vf", dificuldade: "facil", enunciado: "As artérias levam o sangue do coração para o resto do corpo.", alternativas: ["Verdadeiro", "Falso"], correta: 0, resposta: "", bncc: "EF08CI08", exemplo: true }
   ];
   const provas = [{ id: "expr1", titulo: "Avaliação — Frações", turmaId: t1.id, data: addDias(d0, 8), instrucoes: "Leia com atenção. Use caneta azul ou preta. Duração: 50 minutos.", questaoIds: ["exq1", "exq2", "exq3"], exemplo: true }];
-  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas };
+  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [] };
 }
 
 /* ---------- camada de dados ---------- */
@@ -165,7 +166,7 @@ function render() {
   const v = $("#view");
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
-  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   const banner = "";
   v.innerHTML = banner + fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
@@ -586,6 +587,232 @@ async function baixar(nome, conteudo) {
 }
 const htmlArquivo = (titulo, corpo) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:32px auto;padding:0 16px;color:#111;line-height:1.5}h1,h2{margin:0 0 8px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#555}.q{margin:18px 0}ol{margin:6px 0}.correct{font-weight:bold;color:#1f7a4a}.chip,.bncc{display:inline-block;border:1px solid #ccc;border-radius:4px;padding:0 6px;margin-right:4px;font-size:12px}.sec h3{font-size:13px;text-transform:uppercase;color:#1d6b58;margin:16px 0 4px}.sec div{white-space:pre-wrap}.grid2{display:flex;gap:24px}.small{font-size:14px}.muted{color:#555}.toolbar{display:flex;gap:6px;flex-wrap:wrap}</style></head><body>${corpo}</body></html>`;
 const slug = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "arquivo";
+
+/* ---------- Materiais para imprimir e adaptação para inclusão ---------- */
+const MAT_TIPOS = {
+  lista: ["Lista de exercícios", "Questões variadas para fazer em sala ou em casa."],
+  interpretacao: ["Interpretação de texto", "Um texto original com perguntas de compreensão."],
+  cruzadinha: ["Cruzadinha", "Palavras do tema com dicas, montada automaticamente."],
+  cacapalavras: ["Caça-palavras", "Grade com as palavras do tema escondidas."],
+  ludica: ["Atividade lúdica", "Desenhar, pintar, ligar e contar, para os pequenos."],
+  adaptar: ["Adaptar uma atividade", "Cole uma atividade que você já tem e a Manu adapta."]
+};
+const ADAPT = { "": "Nenhuma adaptação", tdah: "TDAH", dislexia: "Dislexia", tea: "TEA (autismo)", visual: "Baixa visão", intelectual: "Deficiência intelectual" };
+S.matForm = { subtipo: "lista", turmaId: "", serie: "", disciplina: "", tema: "", quantidade: 8, adaptacao: "", observacoes: "", texto: "" };
+S.matAtual = null; S.matStatus = ""; S.matBusy = false;
+let matCtl = null;
+
+const semAcento = w => String(w).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z]/g, "");
+
+function montarCruzadinha(lista) {
+  const vistos = new Set();
+  const itens = lista.map(x => ({ w: semAcento(x.palavra), palavra: String(x.palavra || ""), dica: String(x.dica || "") }))
+    .filter(x => x.w.length >= 2 && !vistos.has(x.w) && vistos.add(x.w)).sort((a, b) => b.w.length - a.w.length);
+  const cel = new Map(), dirDe = new Map(), postos = [];
+  const k = (r, c) => r + "," + c;
+  const pode = (w, r, c, d) => {
+    const dr = d === "v" ? 1 : 0, dc = d === "h" ? 1 : 0; let cruz = 0;
+    if (cel.has(k(r - dr, c - dc)) || cel.has(k(r + dr * w.length, c + dc * w.length))) return -1;
+    for (let i = 0; i < w.length; i++) {
+      const rr = r + dr * i, cc = c + dc * i, x = cel.get(k(rr, cc));
+      if (x) { if (x !== w[i] || (dirDe.get(k(rr, cc)) || "").includes(d)) return -1; cruz++; }
+      else if (d === "h" ? (cel.has(k(rr - 1, cc)) || cel.has(k(rr + 1, cc))) : (cel.has(k(rr, cc - 1)) || cel.has(k(rr, cc + 1)))) return -1;
+    }
+    return cruz;
+  };
+  const por = (it, r, c, d) => {
+    const dr = d === "v" ? 1 : 0, dc = d === "h" ? 1 : 0;
+    for (let i = 0; i < it.w.length; i++) { const kk = k(r + dr * i, c + dc * i); cel.set(kk, it.w[i]); dirDe.set(kk, (dirDe.get(kk) || "") + d); }
+    postos.push({ ...it, r, c, d });
+  };
+  let resto = itens.slice();
+  if (resto.length) por(resto.shift(), 0, 0, "h");
+  for (let volta = 0; volta < 3 && resto.length; volta++) {
+    const falta = [];
+    for (const it of resto) {
+      let melhor = null;
+      for (const [kk, letra] of cel) {
+        const [r0, c0] = kk.split(",").map(Number);
+        for (let i = 0; i < it.w.length; i++) {
+          if (it.w[i] !== letra) continue;
+          for (const d of ["h", "v"]) {
+            const r = d === "v" ? r0 - i : r0, c = d === "h" ? c0 - i : c0;
+            const n = pode(it.w, r, c, d);
+            if (n > 0 && (!melhor || n > melhor.n)) melhor = { r, c, d, n };
+          }
+        }
+      }
+      if (melhor) por(it, melhor.r, melhor.c, melhor.d); else falta.push(it);
+    }
+    resto = falta;
+  }
+  let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
+  for (const kk of cel.keys()) { const [r, c] = kk.split(",").map(Number); minR = Math.min(minR, r); minC = Math.min(minC, c); maxR = Math.max(maxR, r); maxC = Math.max(maxC, c); }
+  const celulas = {}; for (const [kk, v] of cel) { const [r, c] = kk.split(",").map(Number); celulas[(r - minR) + "," + (c - minC)] = v; }
+  const ps = postos.map(p => ({ ...p, r: p.r - minR, c: p.c - minC })).sort((a, b) => a.r - b.r || a.c - b.c);
+  const nums = new Map(); let n = 0;
+  ps.forEach(p => { const kk = p.r + "," + p.c; if (!nums.has(kk)) nums.set(kk, ++n); p.num = nums.get(kk); });
+  return { linhas: maxR - minR + 1, colunas: maxC - minC + 1, celulas, palavras: ps.map(p => ({ num: p.num, d: p.d, r: p.r, c: p.c, w: p.w, palavra: p.palavra, dica: p.dica })), fora: resto.map(x => x.palavra) };
+}
+
+function montarCaca(palavras, diagonais) {
+  const ws = [...new Set(palavras.map(semAcento).filter(w => w.length >= 2))].sort((a, b) => b.length - a.length);
+  const n = Math.max(10, Math.min(16, (ws[0] || "").length + 3, Math.ceil(Math.sqrt(ws.join("").length * 2.2))));
+  const g = Array.from({ length: n }, () => Array(n).fill(""));
+  const dirs = [[0, 1], [1, 0]].concat(diagonais ? [[1, 1], [-1, 1]] : []);
+  const pos = {}, fora = [];
+  for (const w of ws) {
+    if (w.length > n) { fora.push(w); continue; }
+    let ok = false;
+    for (let t = 0; t < 300 && !ok; t++) {
+      const [dr, dc] = dirs[Math.floor(Math.random() * dirs.length)];
+      const r = Math.floor(Math.random() * n), c = Math.floor(Math.random() * n);
+      const er = r + dr * (w.length - 1), ec = c + dc * (w.length - 1);
+      if (er < 0 || er >= n || ec >= n) continue;
+      let cabe = true;
+      for (let i = 0; i < w.length; i++) { const x = g[r + dr * i][c + dc * i]; if (x && x !== w[i]) { cabe = false; break; } }
+      if (!cabe) continue;
+      pos[w] = [];
+      for (let i = 0; i < w.length; i++) { g[r + dr * i][c + dc * i] = w[i]; pos[w].push([r + dr * i, c + dc * i]); }
+      ok = true;
+    }
+    if (!ok) fora.push(w);
+  }
+  const letras = "AAAEEEIIOOOUUBCDFGLMNPRRSSTTV";
+  return { n, grade: g.map(l => l.map(x => x || letras[Math.floor(Math.random() * letras.length)]).join("")), pos, palavras: ws.filter(w => pos[w]), fora };
+}
+
+function linhasResp(n) { return n > 0 ? `<div class="linhas">${'<div></div>'.repeat(Math.min(n, 12))}</div>` : ""; }
+function questoesHTML(qs, gab) {
+  return `<ol class="qs">${(qs || []).map(q => `<li><div class="enun">${esc(q.enunciado)}</div>${(q.alternativas || []).length ? `<ol class="alts" type="a">${q.alternativas.map(a => `<li>${esc(a)}</li>`).join("")}</ol>` : linhasResp(q.linhas ?? 3)}${gab && q.resposta ? `<div class="gab">Resposta: ${esc(q.resposta)}</div>` : ""}</li>`).join("")}</ol>`;
+}
+function materialCorpo(m, gab) {
+  const t = turma(m.turmaId);
+  let corpo = "";
+  if (m.subtipo === "lista" || m.subtipo === "adaptar") corpo = questoesHTML(m.questoes, gab);
+  else if (m.subtipo === "interpretacao") corpo = `<div class="texto">${esc(m.texto).split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")}${m.autoria ? `<p class="autoria">${esc(m.autoria)}</p>` : ""}</div>${questoesHTML(m.questoes, gab)}`;
+  else if (m.subtipo === "cruzadinha" && m.grade) {
+    const G = m.grade, inicio = {}; G.palavras.forEach(p => inicio[p.r + "," + p.c] = p.num);
+    let tab = '<table class="cruz">';
+    for (let r = 0; r < G.linhas; r++) { tab += "<tr>"; for (let c = 0; c < G.colunas; c++) { const v = G.celulas[r + "," + c]; tab += v ? `<td class="on">${inicio[r + "," + c] ? `<sup>${inicio[r + "," + c]}</sup>` : ""}${gab ? v : ""}</td>` : "<td></td>"; } tab += "</tr>"; }
+    tab += "</table>";
+    const dicas = d => G.palavras.filter(p => p.d === d).map(p => `<li value="${p.num}">${esc(p.dica)} <span class="nl">(${p.w.length} letras)</span></li>`).join("");
+    corpo = `<div class="cruz-wrap">${tab}</div><div class="dicas"><div><h3>Horizontais</h3><ol>${dicas("h")}</ol></div><div><h3>Verticais</h3><ol>${dicas("v")}</ol></div></div>`;
+  } else if (m.subtipo === "cacapalavras" && m.grade) {
+    const G = m.grade, marc = new Set(); if (gab) Object.values(G.pos).forEach(ps => ps.forEach(([r, c]) => marc.add(r + "," + c)));
+    corpo = `<table class="caca">${G.grade.map((l, r) => `<tr>${[...l].map((x, c) => `<td class="${marc.has(r + "," + c) ? "achou" : ""}">${x}</td>`).join("")}</tr>`).join("")}</table>
+      <div class="banco"><b>Encontre:</b> ${G.palavras.map(w => `<span>${w}</span>`).join("")}</div>${m.tarefa ? `<p class="enun">${esc(m.tarefa)}</p>${linhasResp(4)}` : ""}`;
+  } else if (m.subtipo === "ludica") corpo = `<ol class="qs ludica">${(m.itens || []).map(it => `<li><div class="enun">${esc(it.comando)}</div>${it.espaco === "desenho" ? '<div class="quadro"></div>' : it.espaco === "linhas" ? linhasResp(3) : ""}</li>`).join("")}</ol>`;
+  return `<div class="cab"><div>Escola: ________________________________</div><div>Data: ____/____/______</div><div>Nome: ____________________________________</div><div>Turma: ${t ? esc(t.nome) : "_______"}</div></div>
+    <h1>${esc(m.titulo)}${gab ? " · Gabarito" : ""}</h1>${m.instrucoes ? `<p class="instr">${esc(m.instrucoes)}</p>` : ""}${corpo}`;
+}
+const CSS_FOLHA = `.folha{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;font-size:12pt;line-height:1.45}
+.folha .cab{display:grid;grid-template-columns:2fr 1fr;gap:6px 16px;font-size:10.5pt;border-bottom:1.5px solid #111;padding-bottom:8px;margin-bottom:12px}
+.folha h1{font-size:16pt;margin:4px 0 6px;font-family:Arial,Helvetica,sans-serif;font-weight:700}
+.folha .instr{font-style:italic;margin:0 0 10px}
+.folha .texto{border:1px solid #999;border-radius:6px;padding:10px 14px;margin-bottom:12px}.folha .texto p{margin:0 0 8px}.folha .autoria{font-size:9pt;color:#555}
+.folha .qs{padding-left:22px;margin:0}.folha .qs>li{margin:0 0 14px;break-inside:avoid}.folha .enun{white-space:pre-wrap}
+.folha .alts{margin:6px 0 0;padding-left:22px}.folha .alts li{margin:2px 0}
+.folha .linhas div{border-bottom:1px solid #888;height:26px}
+.folha .gab{color:#1f6b3b;font-weight:700;margin-top:4px}
+.folha .cruz-wrap{overflow-x:auto;margin:6px 0 12px}.folha table.cruz{border-collapse:collapse;margin:0 auto}
+.folha .cruz td{width:26px;height:26px;padding:0;border:0;text-align:center;font-weight:700;font-size:12pt;position:relative;white-space:normal}
+.folha .cruz td.on{border:1.5px solid #111}.folha .cruz sup{position:absolute;top:1px;left:2px;font-size:7pt;font-weight:400;line-height:1}
+.folha .dicas{display:grid;grid-template-columns:1fr 1fr;gap:16px}.folha .dicas h3{font-size:12pt;margin:0 0 4px;color:#111;text-transform:none;letter-spacing:0}.folha .dicas ol{margin:0;padding-left:26px}.folha .nl{color:#666;font-size:9pt}
+.folha table.caca{border-collapse:collapse;margin:6px auto 12px}.folha .caca td{width:26px;height:26px;text-align:center;font-weight:700;font-size:13pt;border:1px solid #ccc;padding:0}
+.folha .caca td.achou{background:#ffe08a}
+.folha .banco{display:flex;flex-wrap:wrap;gap:6px 12px;margin-bottom:10px}.folha .banco span{border:1px solid #999;border-radius:4px;padding:1px 8px}
+.folha .quadro{border:1.5px dashed #888;border-radius:10px;height:150px;margin-top:6px}
+.folha.ampliado{font-size:18pt;line-height:1.6}.folha.ampliado h1{font-size:24pt}.folha.ampliado .cab{font-size:14pt;grid-template-columns:1fr}.folha.ampliado .linhas div{height:38px}.folha.ampliado .cruz td,.folha.ampliado .caca td{width:38px;height:38px;font-size:18pt}
+.folha.dislexia{font-family:Verdana,Arial,sans-serif;font-size:14pt;line-height:1.9;letter-spacing:.03em;word-spacing:.12em}.folha.dislexia .qs>li{margin-bottom:20px}`;
+document.head.insertAdjacentHTML("beforeend", `<style>${CSS_FOLHA}</style>`);
+const estiloFolha = m => m.adaptacao === "visual" ? "ampliado" : m.adaptacao === "dislexia" ? "dislexia" : "";
+function folhaHTML(m, gab) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(m.titulo)}</title><style>@page{size:A4;margin:14mm}body{margin:0}${CSS_FOLHA}</style></head><body><div class="folha ${estiloFolha(m)}">${materialCorpo(m, gab)}</div></body></html>`;
+}
+function imprimir(html) {
+  const f = document.createElement("iframe");
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(f);
+  f.onload = () => { setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 60000); }, 200); };
+  f.srcdoc = html;
+}
+const serieInicial = s => /infantil|pr[ée]|creche|\b[1-5]\s*[ºo°]?\s*ano\b/i.test(s || "") && !/m[ée]dio|EM\b/i.test(s || "");
+
+function vMateriais() {
+  const f = S.matForm, cur = S.matAtual;
+  const salvos = S.materiais.slice().sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
+  return `<div class="page-head"><div><h1>Materiais para imprimir</h1><p class="muted">Atividades prontas para imprimir e adaptações para inclusão, feitas pela Manu. Revise sempre antes de usar.</p></div></div>
+  ${!cap.ia ? `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic no servidor.</span></div>` : ""}
+  <section class="panel">
+    <div class="mat-tipos" role="radiogroup" aria-label="Tipo de material">${Object.entries(MAT_TIPOS).map(([k, [n, d]]) => `<button type="button" class="mat-tipo" role="radio" aria-checked="${f.subtipo === k}" data-act="mat-tipo" data-v="${k}"><b>${n}</b><span>${d}</span></button>`).join("")}</div>
+    <div class="grid3">
+      <div class="field"><label for="mTurma">Turma (opcional)</label><select class="input" id="mTurma"><option value="">Sem turma</option>${S.turmas.map(t => `<option value="${esc(t.id)}" ${f.turmaId === t.id ? "selected" : ""}>${esc(t.nome)} · ${esc(t.disciplina)}</option>`).join("")}</select></div>
+      <div class="field"><label for="mSerie">Série ou etapa</label><input class="input" id="mSerie" value="${esc(f.serie)}" placeholder="Ex.: 3º ano EF, Pré II, 1ª série EM"></div>
+      <div class="field"><label for="mDisc">Componente ou campo de experiência</label><input class="input" id="mDisc" value="${esc(f.disciplina)}" placeholder="Ex.: Ciências, Língua Portuguesa"></div>
+    </div>
+    ${f.subtipo === "adaptar"
+      ? `<div class="field"><label for="mTexto">Atividade original (cole o texto)</label><textarea class="input" id="mTexto" rows="8" placeholder="Cole aqui o enunciado e as questões da atividade que você quer adaptar.">${esc(f.texto)}</textarea></div>`
+      : `<div class="grid2" style="grid-template-columns:minmax(0,3fr) minmax(0,1fr)"><div class="field"><label for="mTema">Tema</label><input class="input" id="mTema" value="${esc(f.tema)}" placeholder="Ex.: Ciclo da água, Adição com reserva, Animais da fazenda"></div>
+         <div class="field"><label for="mQtd">${f.subtipo === "cruzadinha" || f.subtipo === "cacapalavras" ? "Palavras" : f.subtipo === "ludica" ? "Propostas" : "Questões"}</label><input class="input" id="mQtd" type="number" min="3" max="20" value="${esc(f.quantidade)}"></div></div>`}
+    <div class="grid2">
+      <div class="field"><label for="mAdapt">Adaptar para</label><select class="input" id="mAdapt">${Object.entries(ADAPT).map(([k, v]) => `<option value="${k}" ${f.adaptacao === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      <div class="field"><label for="mObs">Pedido extra (opcional)</label><input class="input" id="mObs" value="${esc(f.observacoes)}" placeholder="Ex.: usar exemplos da nossa cidade, nível fácil"></div>
+    </div>
+    <div class="toolbar"><button class="btn ai" data-act="mat-gerar" ${S.matBusy || !cap.ia ? "disabled" : ""}>${ico("spark")}${S.matBusy ? "Gerando…" : "Gerar material"}</button>${S.matBusy ? `<button class="btn ghost sm" data-act="mat-parar">Parar</button>` : ""}<span class="ai-status" id="mStatus">${esc(S.matStatus)}</span></div>
+  </section>
+  ${cur ? `<section class="panel" id="matResultado">
+    <div class="panel-head"><div><span class="eyebrow">${esc(MAT_TIPOS[cur.subtipo][0])}${cur.adaptacao ? " · adaptado para " + esc(ADAPT[cur.adaptacao]) : ""}</span><h2>${esc(cur.titulo)}</h2></div>
+      <div class="toolbar"><button class="btn primary" data-act="mat-imprimir">Imprimir</button>${cur.subtipo !== "ludica" ? `<button class="btn" data-act="mat-imprimir-gab">Imprimir gabarito</button>` : ""}<button class="btn" data-act="mat-baixar">${ico("dl")}Baixar</button>${S.materiais.some(x => x.id === cur.id) ? `<span class="chip ok">Salvo nos materiais</span>` : `<button class="btn" data-act="mat-salvar">Salvar</button>`}</div></div>
+    ${cur.grade && cur.grade.fora && cur.grade.fora.length ? `<div class="banner"><span>Não couberam na grade: ${esc(cur.grade.fora.join(", "))}.</span></div>` : ""}
+    ${cur.orientacoes || cur.mudancas ? `<div class="ai-box small">${cur.mudancas ? `<div><b>O que foi adaptado:</b> ${esc(cur.mudancas)}</div>` : ""}${cur.orientacoes ? `<div><b>Dicas para aplicar:</b> ${esc(Array.isArray(cur.orientacoes) ? cur.orientacoes.join(" ") : cur.orientacoes)}</div>` : ""}${cur.bncc ? `<div><b>BNCC:</b> ${esc(cur.bncc)}</div>` : ""}</div>` : (cur.bncc ? `<div class="toolbar">${String(cur.bncc).split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>` : "")}
+    <div class="folha-wrap"><div class="folha ${estiloFolha(cur)}">${materialCorpo(cur, false)}</div></div>
+  </section>` : ""}
+  <section class="panel"><h2>Meus materiais</h2>
+    ${salvos.length ? `<div class="list">${salvos.map(m => `<div class="row"><div class="grow"><div class="title">${esc(m.titulo)}</div><div class="small muted">${esc(MAT_TIPOS[m.subtipo]?.[0] || "")} · ${esc(m.tema || m.serie || "")} · ${fmtData((m.criadoEm || "").slice(0, 10))}</div></div>${m.adaptacao ? `<span class="chip acc">${esc(ADAPT[m.adaptacao])}</span>` : ""}<button class="btn sm" data-act="mat-abrir" data-id="${esc(m.id)}">Abrir</button><button class="btn sm ghost danger" data-act="mat-apagar" data-id="${esc(m.id)}">Apagar</button></div>`).join("")}</div>` : `<p class="muted">Os materiais que você salvar aparecem aqui para imprimir de novo.</p>`}
+  </section>`;
+}
+
+async function gerarMaterial() {
+  const f = S.matForm;
+  if (f.subtipo === "adaptar" ? f.texto.trim().length < 20 : f.tema.trim().length < 2) { S.matStatus = f.subtipo === "adaptar" ? "Cole a atividade que você quer adaptar." : "Escreva o tema primeiro."; render(); return; }
+  S.matBusy = true; S.matStatus = "A Manu está preparando o material… pode levar até um minuto."; render();
+  matCtl = new AbortController();
+  try {
+    const d = await iaJSON({ tipo: "material", subtipo: f.subtipo, tema: f.tema, serie: f.serie, disciplina: f.disciplina, quantidade: Number(f.quantidade) || 8, adaptacao: f.adaptacao, observacoes: f.observacoes, texto: f.subtipo === "adaptar" ? f.texto : undefined }, matCtl.signal);
+    if (!d || typeof d !== "object" || !d.titulo) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
+    const m = { ...d, id: uid(), subtipo: f.subtipo, tema: f.tema, serie: f.serie, disciplina: f.disciplina, turmaId: f.turmaId, adaptacao: f.adaptacao, criadoEm: new Date().toISOString() };
+    if (f.subtipo === "cruzadinha") m.grade = montarCruzadinha(Array.isArray(d.palavras) ? d.palavras : []);
+    if (f.subtipo === "cacapalavras") m.grade = montarCaca((Array.isArray(d.palavras) ? d.palavras : []).map(x => typeof x === "string" ? x : x.palavra || ""), !serieInicial(f.serie) && f.adaptacao === "");
+    S.matAtual = m; S.matStatus = "Pronto. Revise antes de imprimir.";
+  } catch (e) { S.matStatus = iaErro(e); }
+  S.matBusy = false; matCtl = null; render(); atualizarUso();
+  setTimeout(() => document.getElementById("matResultado")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+}
+
+document.addEventListener("input", e => {
+  const id = e.target.id, f = S.matForm;
+  const mapa = { mSerie: "serie", mDisc: "disciplina", mTema: "tema", mQtd: "quantidade", mObs: "observacoes", mTexto: "texto" };
+  if (mapa[id]) f[mapa[id]] = e.target.value;
+});
+document.addEventListener("change", e => {
+  const id = e.target.id, f = S.matForm;
+  if (id === "mAdapt") f.adaptacao = e.target.value;
+  if (id === "mTurma") { f.turmaId = e.target.value; const t = turma(f.turmaId); if (t) { f.serie = t.serie || f.serie; f.disciplina = t.disciplina || f.disciplina; } render(); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='mat-']"); if (!b) return;
+  const act = b.dataset.act, cur = S.matAtual;
+  if (act === "mat-tipo") { S.matForm.subtipo = b.dataset.v; render(); }
+  else if (act === "mat-gerar") gerarMaterial();
+  else if (act === "mat-parar") matCtl?.abort();
+  else if (act === "mat-imprimir" && cur) imprimir(folhaHTML(cur, false));
+  else if (act === "mat-imprimir-gab" && cur) imprimir(folhaHTML(cur, true));
+  else if (act === "mat-baixar" && cur) baixar(`${slug(cur.titulo)}.html`, folhaHTML(cur, false));
+  else if (act === "mat-salvar" && cur) { await salvar("materiais", JSON.parse(JSON.stringify(cur))); toast("Material salvo"); }
+  else if (act === "mat-abrir") { const m = S.materiais.find(x => x.id === b.dataset.id); if (m) { S.matAtual = JSON.parse(JSON.stringify(m)); render(); setTimeout(() => document.getElementById("matResultado")?.scrollIntoView({ behavior: "smooth" }), 50); } }
+  else if (act === "mat-apagar") { if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar"; return; } if (S.matAtual?.id === b.dataset.id) S.matAtual = null; await apagar("materiais", b.dataset.id); toast("Material apagado"); }
+});
 
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {

@@ -210,3 +210,14 @@ td .grade{border-radius:8px;min-height:36px}
 .auth-check input{width:18px;height:18px;margin-top:2px;accent-color:var(--accent);flex:none}
 .uso-ia{display:flex;flex-direction:column;gap:4px}
 .uso-ia .bar{background:rgba(255,255,255,.12)}
+
+/* Materiais para imprimir */
+.mat-tipos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mat-tipo{display:flex;flex-direction:column;gap:2px;text-align:left;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;color:var(--ink)}
+.mat-tipo b{font-size:.95rem}.mat-tipo span{font-size:.8rem;color:var(--muted);line-height:1.35}
+.mat-tipo:hover{border-color:var(--accent)}
+.mat-tipo[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.mat-tipo[aria-checked="true"] span{color:var(--accent-soft-ink)}
+.folha-wrap{background:var(--surface-2);border-radius:12px;padding:20px;overflow-x:auto}
+.folha-wrap .folha{max-width:760px;margin:0 auto;padding:28px 32px;border-radius:4px;box-shadow:var(--shadow-pop)}
+@media (max-width:760px){.mat-tipos{grid-template-columns:repeat(2,minmax(0,1fr))}.folha-wrap{padding:8px}.folha-wrap .folha{padding:16px}.folha .cab{grid-template-columns:1fr!important}.folha .dicas{grid-template-columns:1fr!important}}
