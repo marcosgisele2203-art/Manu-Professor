@@ -19,4 +19,4 @@ export async function middleware(req: NextRequest) {
   return NextResponse.redirect(new URL("/entrar", req.url));
 }
 
-export const config = { matcher: ["/((?!_next|favicon.ico|app.js|app.css|manu/).*)"] };
+export const config = { matcher: ["/((?!_next|favicon.ico|app.js|app.css|manu/|vendor/).*)"] };

@@ -8,7 +8,7 @@ const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d
 const fmtData = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
 const fmtDataLonga = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) : "—";
 const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais"];
+const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides"];
 const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
 const MEDIA_MIN = 6, FREQ_MIN = 75;
 
@@ -26,6 +26,7 @@ const I = {
   atividades: '<path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/>',
   questoes: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
   materiais: '<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/>',
+  slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -37,7 +38,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [
   ["inicio", "Início"], ["turmas", "Turmas"], ["chamada", "Chamada"], ["notas", "Notas"],
-  ["planos", "Planejamento", true], ["atividades", "Atividades", true], ["materiais", "Materiais", true], ["questoes", "Questões", true],
+  ["planos", "Planejamento", true], ["atividades", "Atividades", true], ["materiais", "Materiais", true], ["slides", "Slides", true], ["questoes", "Questões", true],
   ["provas", "Provas"], ["assistente", "Manu", true]
 ];
 
@@ -45,7 +46,7 @@ const VIEWS = [
 const S = {
   mode: "loading", // loading | live | demo
   uid: null, nome: "", base: null,
-  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [], materiais: [],
+  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [], materiais: [], slides: [],
   turmaSel: null, view: "inicio",
   chamadaData: hoje(), filtroQ: { disc: "", dif: "", txt: "" },
   chat: [], loaded: new Set()
@@ -93,7 +94,7 @@ function exemplo() {
     { id: "exq4", disciplina: "Ciências", tema: "Sistema circulatório", serie: "8º ano EF", tipo: "vf", dificuldade: "facil", enunciado: "As artérias levam o sangue do coração para o resto do corpo.", alternativas: ["Verdadeiro", "Falso"], correta: 0, resposta: "", bncc: "EF08CI08", exemplo: true }
   ];
   const provas = [{ id: "expr1", titulo: "Avaliação — Frações", turmaId: t1.id, data: addDias(d0, 8), instrucoes: "Leia com atenção. Use caneta azul ou preta. Duração: 50 minutos.", questaoIds: ["exq1", "exq2", "exq3"], exemplo: true }];
-  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [] };
+  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [], slides: [] };
 }
 
 /* ---------- camada de dados ---------- */
@@ -166,7 +167,7 @@ function render() {
   const v = $("#view");
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
-  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   const banner = "";
   v.innerHTML = banner + fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
@@ -408,7 +409,7 @@ function dlgVerPlano(p) {
   abrirDlg(esc(p.titulo), `<div class="doc" style="border:0;padding:0">
     <div class="toolbar"><span class="chip">${esc(t?.nome || "")}</span><span class="chip">${esc(fmtDataLonga(p.data))}</span><span class="chip">${esc(p.duracao || "")}</span>${(p.bncc || "").split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>
     ${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}</div>`,
-    `<button type="button" class="btn" data-act="baixar-plano" data-id="${esc(p.id)}">${ico("dl")}Baixar (.html)</button><button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+    `<button type="button" class="btn ai" data-act="sl-do-plano" data-id="${esc(p.id)}">${ico("spark")}Gerar slides</button><button type="button" class="btn" data-act="baixar-plano" data-id="${esc(p.id)}">${ico("dl")}Baixar (.html)</button><button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
 function dlgAvaliacao(a) {
@@ -813,6 +814,137 @@ document.addEventListener("click", async e => {
   else if (act === "mat-abrir") { const m = S.materiais.find(x => x.id === b.dataset.id); if (m) { S.matAtual = JSON.parse(JSON.stringify(m)); render(); setTimeout(() => document.getElementById("matResultado")?.scrollIntoView({ behavior: "smooth" }), 50); } }
   else if (act === "mat-apagar") { if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar"; return; } if (S.matAtual?.id === b.dataset.id) S.matAtual = null; await apagar("materiais", b.dataset.id); toast("Material apagado"); }
 });
+
+/* ---------- Slides com IA ---------- */
+const SL_ROTULO = { capa: "", objetivo: "Objetivo da aula", conteudo: "", pergunta: "Pergunta para a turma", atividade: "Atividade", resumo: "Para lembrar" };
+S.slForm = { planoId: "", tema: "", serie: "", disciplina: "", quantidade: 10, observacoes: "" };
+S.slAtual = null; S.slStatus = ""; S.slBusy = false; S.slShow = -1;
+let slCtl = null;
+
+function slideHTML(s, d, i) {
+  const t = s.tipo || "conteudo", rot = SL_ROTULO[t] || "";
+  if (t === "capa") return `<div class="sl capa"><div class="sl-in"><div class="sl-t">${esc(s.titulo || d.titulo)}</div>${(s.topicos || []).length ? `<div class="sl-sub">${esc(s.topicos.join(" · "))}</div>` : `<div class="sl-sub">${esc([d.serie, d.disciplina].filter(Boolean).join(" · "))}</div>`}</div></div>`;
+  return `<div class="sl ${t}"><div class="sl-in">${rot ? `<div class="sl-rot">${rot}</div>` : ""}<div class="sl-t">${esc(s.titulo)}</div>
+    ${(s.topicos || []).length ? `<ul>${s.topicos.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${s.destaque ? `<div class="sl-dest">${esc(s.destaque)}</div>` : ""}<div class="sl-n">${i + 1}</div></div></div>`;
+}
+
+function vSlides() {
+  const f = S.slForm, d = S.slAtual;
+  const salvos = S.slides.slice().sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
+  return `<div class="page-head"><div><h1>Slides da aula</h1><p class="muted">A Manu monta a apresentação a partir do seu plano de aula ou de um tema. Baixe em PowerPoint e edite no PowerPoint, Google Apresentações ou Canva.</p></div></div>
+  ${!cap.ia ? `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic no servidor.</span></div>` : ""}
+  <section class="panel">
+    <div class="field"><label for="sPlano">Usar um plano de aula (opcional)</label><select class="input" id="sPlano"><option value="">Sem plano: só o tema</option>${S.planos.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(p => `<option value="${esc(p.id)}" ${f.planoId === p.id ? "selected" : ""}>${esc(p.titulo)} · ${esc(turma(p.turmaId)?.nome || "")} · ${fmtData(p.data)}</option>`).join("")}</select></div>
+    <div class="grid2" style="grid-template-columns:minmax(0,3fr) minmax(0,1fr)"><div class="field"><label for="sTema">Tema da aula</label><input class="input" id="sTema" value="${esc(f.tema)}" placeholder="Ex.: Sistema solar, Frações equivalentes"></div>
+      <div class="field"><label for="sQtd">Slides</label><input class="input" id="sQtd" type="number" min="5" max="20" value="${esc(f.quantidade)}"></div></div>
+    <div class="grid3"><div class="field"><label for="sSerie">Série ou etapa</label><input class="input" id="sSerie" value="${esc(f.serie)}" placeholder="Ex.: 4º ano EF"></div>
+      <div class="field"><label for="sDisc">Componente</label><input class="input" id="sDisc" value="${esc(f.disciplina)}" placeholder="Ex.: Ciências"></div>
+      <div class="field"><label for="sObs">Pedido extra (opcional)</label><input class="input" id="sObs" value="${esc(f.observacoes)}" placeholder="Ex.: incluir um jogo de perguntas"></div></div>
+    <div class="toolbar"><button class="btn ai" data-act="sl-gerar" ${S.slBusy || !cap.ia ? "disabled" : ""}>${ico("spark")}${S.slBusy ? "Gerando…" : "Gerar slides"}</button>${S.slBusy ? `<button class="btn ghost sm" data-act="sl-parar">Parar</button>` : ""}<span class="ai-status">${esc(S.slStatus)}</span></div>
+  </section>
+  ${d ? `<section class="panel" id="slResultado">
+    <div class="panel-head"><div><span class="eyebrow">${d.slides.length} slides${d.bncc ? " · " + esc(d.bncc) : ""}</span><h2>${esc(d.titulo)}</h2></div>
+      <div class="toolbar"><button class="btn" data-act="sl-apresentar">Apresentar</button><button class="btn primary" data-act="sl-pptx">${ico("dl")}Baixar PowerPoint</button>${S.slides.some(x => x.id === d.id) ? `<span class="chip ok">Salvo</span>` : `<button class="btn" data-act="sl-salvar">Salvar</button>`}</div></div>
+    <div class="deck">${d.slides.map((s, i) => `<figure class="deck-item">${slideHTML(s, d, i)}${s.notas ? `<figcaption><b>Fala do professor:</b> ${esc(s.notas)}</figcaption>` : ""}</figure>`).join("")}</div>
+  </section>` : ""}
+  <section class="panel"><h2>Minhas apresentações</h2>
+    ${salvos.length ? `<div class="list">${salvos.map(x => `<div class="row"><div class="grow"><div class="title">${esc(x.titulo)}</div><div class="small muted">${x.slides.length} slides · ${esc(x.serie || "")} · ${fmtData((x.criadoEm || "").slice(0, 10))}</div></div><button class="btn sm" data-act="sl-abrir" data-id="${esc(x.id)}">Abrir</button><button class="btn sm ghost danger" data-act="sl-apagar" data-id="${esc(x.id)}">Apagar</button></div>`).join("")}</div>` : `<p class="muted">As apresentações que você salvar aparecem aqui.</p>`}
+  </section>
+  ${d && S.slShow >= 0 ? `<div class="show" role="dialog" aria-label="Apresentação"><div class="show-sl">${slideHTML(d.slides[S.slShow], d, S.slShow)}</div>
+    <div class="show-bar"><button class="btn sm" data-act="sl-ant" ${S.slShow === 0 ? "disabled" : ""}>Anterior</button><span class="num">${S.slShow + 1} / ${d.slides.length}</span><button class="btn sm" data-act="sl-prox" ${S.slShow === d.slides.length - 1 ? "disabled" : ""}>Próximo</button><button class="btn sm" data-act="sl-fechar">Sair (Esc)</button></div></div>` : ""}`;
+}
+
+function textoPlano(p) {
+  return [`Título: ${p.titulo}`, p.duracao && `Duração: ${p.duracao}`, p.bncc && `BNCC: ${p.bncc}`, p.objetivos && `Objetivos: ${p.objetivos}`, p.conteudo && `Conteúdos: ${p.conteudo}`, p.metodologia && `Metodologia: ${p.metodologia}`, p.recursos && `Recursos: ${p.recursos}`, p.avaliacao && `Avaliação: ${p.avaliacao}`].filter(Boolean).join("\n").slice(0, 7500);
+}
+async function gerarSlides() {
+  const f = S.slForm;
+  if (f.tema.trim().length < 2) { S.slStatus = "Escreva o tema da aula primeiro."; render(); return; }
+  S.slBusy = true; S.slStatus = "A Manu está montando os slides… pode levar até um minuto."; render();
+  slCtl = new AbortController();
+  try {
+    const p = S.planos.find(x => x.id === f.planoId);
+    const d = await iaJSON({ tipo: "slides", tema: f.tema, serie: f.serie, disciplina: f.disciplina, quantidade: Math.max(5, Math.min(20, Number(f.quantidade) || 10)), observacoes: f.observacoes, plano: p ? textoPlano(p) : undefined }, slCtl.signal);
+    if (!d || !Array.isArray(d.slides) || !d.slides.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
+    d.slides = d.slides.filter(s => s && (s.titulo || (s.topicos || []).length)).map(s => ({ tipo: SL_ROTULO[s.tipo] !== undefined ? s.tipo : "conteudo", titulo: String(s.titulo || ""), topicos: Array.isArray(s.topicos) ? s.topicos.map(String).slice(0, 6) : [], destaque: String(s.destaque || ""), notas: String(s.notas || "") }));
+    S.slAtual = { titulo: String(d.titulo || f.tema), slides: d.slides, bncc: String(d.bncc || ""), id: uid(), tema: f.tema, serie: f.serie, disciplina: f.disciplina, planoId: f.planoId, criadoEm: new Date().toISOString() };
+    S.slStatus = "Pronto. Confira os slides e baixe o PowerPoint.";
+  } catch (e) { S.slStatus = iaErro(e); }
+  S.slBusy = false; slCtl = null; render(); atualizarUso();
+  setTimeout(() => document.getElementById("slResultado")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+}
+
+async function carregarPptx() {
+  if (window.PptxGenJS) return;
+  await new Promise((ok, erro) => { const s = document.createElement("script"); s.src = "/vendor/pptxgen-3.12.0.bundle.js"; s.onload = ok; s.onerror = erro; document.head.appendChild(s); });
+}
+async function baixarPptx(d) {
+  try { await carregarPptx(); } catch (_) { toast("Não foi possível preparar o PowerPoint. Verifique a internet e tente de novo."); return; }
+  const C = { teal: "0B7C8A", tealEsc: "075E69", ink: "1F3140", muted: "556676", soft: "E3F5F6", rosa: "FDE8F0", rosaInk: "A8205A", ouro: "FDF0DC", ouroInk: "8A5208", branco: "FFFFFF" };
+  const F = "Arial";
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_WIDE"; pptx.title = d.titulo; pptx.author = S.nome || "Manu Professor";
+  d.slides.forEach((s, i) => {
+    const sl = pptx.addSlide(), t = s.tipo;
+    if (t === "capa") {
+      sl.background = { color: C.teal };
+      sl.addText(s.titulo || d.titulo, { x: 0.8, y: 2.3, w: 11.7, h: 1.8, fontFace: F, fontSize: 44, bold: true, color: C.branco, valign: "bottom" });
+      const sub = (s.topicos || []).length ? s.topicos.join(" · ") : [d.serie, d.disciplina].filter(Boolean).join(" · ");
+      if (sub) sl.addText(sub, { x: 0.8, y: 4.2, w: 11.7, h: 0.8, fontFace: F, fontSize: 22, color: C.soft });
+    } else if (t === "pergunta") {
+      sl.background = { color: C.soft };
+      sl.addText(SL_ROTULO.pergunta.toUpperCase(), { x: 0.8, y: 0.6, w: 11.7, h: 0.5, fontFace: F, fontSize: 16, bold: true, color: C.tealEsc, charSpacing: 2 });
+      sl.addText(s.titulo, { x: 0.8, y: 1.6, w: 11.7, h: 2.6, fontFace: F, fontSize: 40, bold: true, color: C.ink, align: "center", valign: "middle" });
+      if ((s.topicos || []).length) sl.addText(s.topicos.map(x => ({ text: x, options: { bullet: true } })), { x: 1.5, y: 4.4, w: 10.3, h: 2.4, fontFace: F, fontSize: 22, color: C.ink, paraSpaceAfter: 8 });
+    } else {
+      sl.background = { color: C.branco };
+      const fundo = t === "atividade" ? C.rosa : t === "resumo" ? C.ouro : null, rotCor = t === "atividade" ? C.rosaInk : t === "resumo" ? C.ouroInk : C.teal;
+      if (fundo) sl.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 2.0, fill: { color: fundo }, line: { color: fundo } });
+      let y = 0.45;
+      if (SL_ROTULO[t]) { sl.addText(SL_ROTULO[t].toUpperCase(), { x: 0.7, y, w: 11.9, h: 0.4, fontFace: F, fontSize: 14, bold: true, color: rotCor, charSpacing: 2 }); y += 0.4; }
+      sl.addText(s.titulo, { x: 0.7, y, w: 11.9, h: 0.9, fontFace: F, fontSize: 32, bold: true, color: C.ink, valign: "middle" });
+      const temDest = !!s.destaque;
+      if ((s.topicos || []).length) sl.addText(s.topicos.map(x => ({ text: x, options: { bullet: { indent: 24 } } })), { x: 0.8, y: 2.25, w: 11.7, h: temDest ? 3.4 : 4.6, fontFace: F, fontSize: 24, color: C.ink, valign: "top", paraSpaceAfter: 12 });
+      if (temDest) sl.addText(s.destaque, { x: 0.8, y: 5.8, w: 11.7, h: 1.0, fontFace: F, fontSize: 22, bold: true, color: C.tealEsc, fill: { color: C.soft }, rectRadius: 0.15, shape: pptx.ShapeType.roundRect, margin: 14 });
+      sl.addText(String(i + 1), { x: 12.2, y: 6.95, w: 0.8, h: 0.4, fontFace: F, fontSize: 12, color: C.muted, align: "right" });
+    }
+    if (s.notas) sl.addNotes(s.notas);
+  });
+  await pptx.writeFile({ fileName: slug(d.titulo) + ".pptx" });
+}
+
+document.addEventListener("input", e => {
+  const mapa = { sTema: "tema", sSerie: "serie", sDisc: "disciplina", sQtd: "quantidade", sObs: "observacoes" };
+  if (mapa[e.target.id]) S.slForm[mapa[e.target.id]] = e.target.value;
+});
+document.addEventListener("change", e => {
+  if (e.target.id !== "sPlano") return;
+  const f = S.slForm; f.planoId = e.target.value; const p = S.planos.find(x => x.id === f.planoId);
+  if (p) { const t = turma(p.turmaId); f.tema = p.titulo; if (t) { f.serie = t.serie || f.serie; f.disciplina = t.disciplina || f.disciplina; } }
+  render();
+});
+document.addEventListener("keydown", e => {
+  if (S.slShow < 0 || !S.slAtual) return;
+  if (e.key === "Escape") { S.slShow = -1; render(); }
+  else if ((e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") && S.slShow < S.slAtual.slides.length - 1) { e.preventDefault(); S.slShow++; render(); }
+  else if ((e.key === "ArrowLeft" || e.key === "PageUp") && S.slShow > 0) { e.preventDefault(); S.slShow--; render(); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='sl-']"); if (!b) return;
+  const act = b.dataset.act, d = S.slAtual;
+  if (act === "sl-gerar") gerarSlides();
+  else if (act === "sl-parar") slCtl?.abort();
+  else if (act === "sl-pptx" && d) { b.disabled = true; await baixarPptx(d); b.disabled = false; }
+  else if (act === "sl-salvar" && d) { await salvar("slides", JSON.parse(JSON.stringify(d))); toast("Apresentação salva"); }
+  else if (act === "sl-apresentar" && d) { S.slShow = 0; render(); document.documentElement.requestFullscreen?.().catch(() => {}); }
+  else if (act === "sl-prox" && d) { S.slShow = Math.min(d.slides.length - 1, S.slShow + 1); render(); }
+  else if (act === "sl-ant" && d) { S.slShow = Math.max(0, S.slShow - 1); render(); }
+  else if (act === "sl-fechar") { S.slShow = -1; render(); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); }
+  else if (act === "sl-abrir") { const x = S.slides.find(y => y.id === b.dataset.id); if (x) { S.slAtual = JSON.parse(JSON.stringify(x)); render(); setTimeout(() => document.getElementById("slResultado")?.scrollIntoView({ behavior: "smooth" }), 50); } }
+  else if (act === "sl-apagar") { if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar"; return; } if (S.slAtual?.id === b.dataset.id) S.slAtual = null; await apagar("slides", b.dataset.id); toast("Apresentação apagada"); }
+  else if (act === "sl-do-plano") { const p = S.planos.find(x => x.id === b.dataset.id); if (p) { const t = turma(p.turmaId); Object.assign(S.slForm, { planoId: p.id, tema: p.titulo, serie: t?.serie || "", disciplina: t?.disciplina || "" }); fechar(); location.hash = "slides"; } }
+});
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && S.slShow >= 0) { S.slShow = -1; render(); } });
 
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {
