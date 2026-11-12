@@ -413,3 +413,10 @@ td .grade{border-radius:8px;min-height:36px}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .seg{flex-wrap:wrap;max-width:100%}.seg button{white-space:nowrap}
 .grade-tempos tr.almoco th,.grade-tempos tr.almoco td{background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--ink)}
+.grupo-escola{margin-bottom:24px}
+.grupo-escola>h2{display:flex;align-items:center;gap:8px;font-size:1.1rem;margin:0 0 12px}
+.grupo-escola>h2 svg{width:20px;height:20px;color:var(--accent)}
+.grupo-escola>h2 small{font-weight:500;font-size:.85rem}
+.seg-escola button{font-weight:700}
+.cel-fora{font-size:.72rem;color:var(--muted);line-height:1.25}
+.aviso-pop{margin:4px 8px 6px;padding:6px 8px;border-radius:8px;background:#fef3c7;color:#92400e}

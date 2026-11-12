@@ -223,8 +223,8 @@ function renderNav() {
 function cabecalhoTurma() {
   const t = turmaAtual(); if (!t) return "";
   return `<div class="turma-head"><div class="turma-id"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><span class="eyebrow"><a href="#turmas">Turmas</a></span>
-      <h1>${esc(t.nome)}</h1><p class="muted">${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}${t.turno ? " · " + esc(t.turno) : ""} · ${(t.alunos || []).length} alunos</p></div></div>
-    <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(x.nome)} · ${esc(x.disciplina)}</option>`).join("")}</select>` : ""}
+      <h1>${esc(t.nome)}</h1><p class="muted">${variasEscolas() && escolaDe(t) ? `<b>${esc(escolaDe(t))}</b> · ` : ""}${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}${t.turno ? " · " + esc(t.turno) : ""} · ${(t.alunos || []).length} alunos</p></div></div>
+    <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(rotuloTurma(x))}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(bimSelecionado(t)) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${bimSelecionado(t) === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
   <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>`;
@@ -259,7 +259,7 @@ function agendaHoje() {
   if (!S.turmas.some(t => horarioDe(t).length)) return "";
   return `<section class="panel"><div class="panel-head"><h2>Suas aulas de hoje</h2><span class="small muted">${DIAS[ds] || "Domingo"}</span></div>
     ${aulas.length ? `<div class="agenda">${aulas.map(({ t, a }) => { const est = minutos(a.fim) <= mAgora ? "feita" : minutos(a.inicio) <= mAgora ? "agora" : "";
-      return `<a class="ag-item ${est}" href="${linkTurma(t.id, "chamada")}"><span class="num ag-h">${tempoDe(t, a) ? `<b>${tempoDe(t, a)}º tempo</b> ` : ""}${a.inicio}–${a.fim}</span><span class="dot" style="background:${esc(t.cor)}"></span><span class="ag-t"><b>${esc(t.nome)}</b><small>${esc(t.disciplina)}</small></span>${est === "agora" ? '<span class="chip acc">agora</span>' : est === "feita" ? '<span class="chip">encerrada</span>' : ""}</a>`; }).join("")}</div>`
+      return `<a class="ag-item ${est}" href="${linkTurma(t.id, "chamada")}"><span class="num ag-h">${tempoDe(t, a) ? `<b>${tempoDe(t, a)}º tempo</b> ` : ""}${a.inicio}–${a.fim}</span><span class="dot" style="background:${esc(t.cor)}"></span><span class="ag-t"><b>${esc(t.nome)}</b><small>${esc(t.disciplina)}${variasEscolas() && escolaDe(t) ? " · " + esc(escolaDe(t)) : ""}</small></span>${est === "agora" ? '<span class="chip acc">agora</span>' : est === "feita" ? '<span class="chip">encerrada</span>' : ""}</a>`; }).join("")}</div>`
       : `<p class="muted">Nenhuma aula no seu horário hoje.</p>`}</section>`;
 }
 function vInicio() {
@@ -340,11 +340,15 @@ function vResumoTurma() {
 function vTurmas() {
   const head = `<div class="page-head"><div><h1>Turmas</h1><p class="muted">Toque numa turma para abrir o painel com alunos, chamada, notas e as ferramentas de IA.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button></div></div>`;
   if (!S.turmas.length) return head + semTurma();
-  return head + `<div class="cards">${S.turmas.map(t => {
+  const cartoes = lista => `<div class="cards">${lista.map(t => {
     return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${[t.disciplina, t.serie, t.turno].filter(Boolean).map(esc).join(" · ")}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
       ${bimestresDe(t).length ? `<div class="card-bims">${bimestresDe(t).map(b => { const atual = hoje() >= b.inicio && hoje() <= b.fim; return `<a class="card-bim${atual ? " atual" : ""}" href="${linkTurma(t.id)}" data-bim="${b.num}" data-turma="${esc(t.id)}" title="${esc(b.nome)}: ${fmtData(b.inicio)} a ${fmtData(b.fim)}">${esc(b.nome.replace(/\s*(bimestre|trimestre)$/i, ""))}${/bimestre/i.test(b.nome) ? "<small>bim</small>" : /trimestre/i.test(b.nome) ? "<small>tri</small>" : ""}</a>`; }).join("")}</div>` : ""}
       <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
+  if (!variasEscolas()) return head + cartoes(S.turmas);
+  const semEsc = S.turmas.filter(t => !escolaDe(t));
+  return head + escolas().map(e => `<section class="grupo-escola"><h2>${ico("inicio")}${esc(e)} <small class="muted">${S.turmas.filter(t => escolaDe(t) === e).length} turmas</small></h2>${cartoes(S.turmas.filter(t => escolaDe(t) === e))}</section>`).join("")
+    + (semEsc.length ? `<section class="grupo-escola"><h2>Sem escola definida</h2>${cartoes(semEsc)}</section>` : "");
 }
 
 // botão de bimestre no cartão: abre a turma já naquele período
@@ -488,7 +492,12 @@ function abrirDlg(titulo, corpo, rodape) {
 }
 const fechar = () => { if (sampleCtl) sampleCtl.abort(); dlg.close(); };
 const val = id => { const el = dlg.querySelector("#" + id); return el ? el.value.trim() : ""; };
-const turmaOpts = sel => S.turmas.map(t => `<option value="${esc(t.id)}" ${sel === t.id ? "selected" : ""}>${esc(t.nome)} · ${esc(t.disciplina)}</option>`).join("");
+// Professor que dá aula em mais de uma escola: cada turma guarda a sua escola
+const escolaDe = t => (t && t.escola) || S.escola || "";
+const escolas = () => [...new Set(S.turmas.map(escolaDe).filter(Boolean))];
+const variasEscolas = () => escolas().length > 1;
+const rotuloTurma = t => `${t.nome} · ${t.disciplina}${variasEscolas() && escolaDe(t) ? " · " + escolaDe(t) : ""}`;
+const turmaOpts = sel => S.turmas.map(t => `<option value="${esc(t.id)}" ${sel === t.id ? "selected" : ""}>${esc(rotuloTurma(t))}</option>`).join("");
 
 // Séries da Educação Infantil ao Ensino Médio
 const SERIES = [
@@ -558,7 +567,11 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && dlg.open && !dlg.querySelector("#tnPop")?.hidden) { e.preventDefault(); abrirPopTurma(false); } });
 // fecha a lista ao tocar fora dela (no início do toque, para não brigar com o foco no campo)
-document.addEventListener("pointerdown", e => { if (dlg.open && dlg.querySelector("#tnPop") && !e.target.closest(".tn-campo, .tn-pop")) abrirPopTurma(false); });
+document.addEventListener("pointerdown", e => {
+  if (!dlg.open || !dlg.querySelector("#tnPop") || dlg.querySelector("#tnPop").hidden || e.target.closest(".tn-campo, .tn-pop")) return;
+  // num botão (ex.: Salvar turma), fecha só depois do clique, senão o botão sai do lugar e o clique se perde
+  if (e.target.closest("button")) document.addEventListener("click", () => abrirPopTurma(false), { once: true }); else abrirPopTurma(false);
+});
 
 function dlgTurma(t) {
   t = t || { id: uid(), nome: "", disciplina: "", serie: "", ano: String(new Date().getFullYear()), turno: "", cor: CORES[S.turmas.length % CORES.length], alunos: [] };
@@ -570,6 +583,7 @@ function dlgTurma(t) {
 <div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma">${SERIES.map(g => `<div class="tn-grupo"><b>${g.etapa}</b><div class="tn-ops">${g.itens.map(([nome, serie]) => `<button type="button" class="tn-op" data-act="tn-serie" data-nome="${esc(nome)}" data-serie="${esc(serie)}" data-etapa="${g.id}">${esc(nome)}</button>`).join("")}</div></div>`).join("")}
         <div class="tn-grupo"><b>Turma <span class="tn-dica">${S.turmas.some(x => x.id === t.id) ? "" : "· marque várias para criar todas de uma vez"}</span></b><div class="tn-ops">${["A", "B", "C", "D", "E", "F", "G", "Única"].map(l => `<button type="button" class="tn-op tn-letra" data-act="tn-letra" data-v="${l}">${l}</button>`).join("")}</div></div>
         <div class="tn-fim"><span class="small muted">Ou digite o nome que quiser.</span><button type="button" class="btn sm primary" data-act="tn-ok">Pronto</button></div></div>
+    <div class="field"><label for="tEscola">Escola</label><input class="input" id="tEscola" value="${esc(escolaDe(t))}" placeholder="Nome da escola desta turma" list="tEscLista" autocomplete="off"><datalist id="tEscLista">${[...new Set([S.escola, ...escolas()].filter(Boolean))].map(e => `<option value="${esc(e)}">`).join("")}</datalist><small class="muted">Dá aula em mais de uma escola? Escreva aqui a escola desta turma. Pode ter, por exemplo, um 7º ano A em cada escola.</small></div>
     <div class="grid3"><div class="field"><label for="tSerie">Série / etapa</label><input class="input" id="tSerie" value="${esc(t.serie)}" placeholder="7º ano EF"></div>
     <div class="field"><label for="tAno">Ano letivo</label><input class="input" id="tAno" value="${esc(t.ano)}"></div>
     <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${[...TURNOS, ...(t.turno && !TURNOS.includes(t.turno) ? [t.turno] : [])].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>
@@ -1389,7 +1403,7 @@ async function pastaDrive(nome, pai, token) {
   const id = lista.files?.[0]?.id || (await gFetch("https://www.googleapis.com/drive/v3/files?fields=id", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: nome, mimeType: PASTA, ...(pai ? { parents: [pai] } : {}) }) })).id;
   return gPastas[chave] = id;
 }
-const nomePastaTurma = t => t ? `${t.nome} · ${t.disciplina}`.replace(/[\\/]/g, "-") : "Sem turma";
+const nomePastaTurma = t => t ? `${t.nome} · ${t.disciplina}${t.escola && t.escola !== S.escola ? " · " + t.escola : ""}`.replace(/[\\/]/g, "-") : "Sem turma";
 async function pastaDaTurma(turmaId, sub, token) {
   const raiz = await pastaDrive("Manu Professor", null, token);
   const pt = await pastaDrive(nomePastaTurma(turma(turmaId)), raiz, token);
@@ -1872,10 +1886,16 @@ const val2 = id => { const el = document.getElementById(id); return el ? el.valu
 // Meu horário: a semana do professor, com todas as turmas
 const TURNO_SIN = { Manhã: "Matutino", Tarde: "Vespertino", Noite: "Noturno" }, ORDEM_TURNO = ["Matutino", "Vespertino", "Noturno", "Integral"];
 const turnoGrupo = t => TURNO_SIN[t.turno] || t.turno || "";
-function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(["Matutino", "Vespertino", "Noturno", "Integral", ...S.turmas.map(turnoGrupo)])].sort((a, b) => o(a) - o(b)); }
+function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(["Matutino", "Vespertino", "Noturno", "Integral", ...S.turmas.filter(daEscolaHor).map(turnoGrupo)])].sort((a, b) => o(a) - o(b)); }
+function escolaHor() { const es = escolas(); return es.includes(S.horEscola) ? S.horEscola : es[0] || ""; }
+const daEscolaHor = t => !variasEscolas() || escolaDe(t) === escolaHor();
 function turnoHor() { const gs = gruposTurno(); return gs.includes(S.horTurno) ? S.horTurno : gs.find(x => turmasDoTurno(x).length) || gs[0]; }
-function gradeTurno(tn) { const t = S.turmas.find(x => turnoGrupo(x) === tn); return t ? gradeDe(t) : gradeDe({ turno: tn }); }
-const turmasDoTurno = tn => S.turmas.filter(t => turnoGrupo(t) === tn);
+function gradeTurno(tn) { const t = turmasDoTurno(tn)[0]; return t ? gradeDe(t) : gradeDe({ turno: tn }); }
+const turmasDoTurno = tn => S.turmas.filter(t => daEscolaHor(t) && turnoGrupo(t) === tn);
+function ocupadaFora(tn, d, k) { // aula em outra escola (ou outro turno) que bate com este horário
+  const x = horaDoTempo(gradeTurno(tn), k), meus = new Set(turmasDoTurno(tn).map(t => t.id));
+  return S.turmas.find(o => !meus.has(o.id) && horarioDe(o).some(b => b.dia === d && minutos(x.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(x.fim))) || null;
+}
 const naCelula = (tn, d, k) => turmasDoTurno(tn).filter(t => horarioDe(t).some(a => a.dia === d && tempoDe(t, a) === k));
 function vHorario() {
   if (!S.turmas.length) return `<div class="page-head"><div><h1>Meu horário</h1></div></div>` + semTurma("Crie suas turmas e depois monte aqui o horário da semana.");
@@ -1884,12 +1904,13 @@ function vHorario() {
   for (let k = 1; k <= g.tempos; k++) {
     const x = horaDoTempo(g, k);
     linhas.push(`<tr><th class="tp"><b>${k}º tempo</b><small class="num">${x.inicio}–${x.fim}</small></th>${dias.map(d => { const ts = naCelula(tn, d, k), aberto = S.horPop && S.horPop.d === d && S.horPop.k === k;
-      return `<td class="${hj === d ? "hoje" : ""}"><button type="button" class="cel${ts.length ? " on" : ""}${ts.length > 1 ? " choque" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-haspopup="true" aria-expanded="${aberto}" aria-label="${DIAS[d]}, ${k}º tempo${ts.length ? ": " + ts.map(t => esc(t.nome)).join(", ") : ", vago"}">${ts.length ? ts.map(t => `<span class="cel-turma" style="--c:${esc(t.cor || "#0f766e")}"><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}</small></span>`).join("") : `<span class="mais">+</span>`}</button></td>`; }).join("")}</tr>`);
+      return `<td class="${hj === d ? "hoje" : ""}"><button type="button" class="cel${ts.length ? " on" : ""}${ts.length > 1 ? " choque" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-haspopup="true" aria-expanded="${aberto}" aria-label="${DIAS[d]}, ${k}º tempo${ts.length ? ": " + ts.map(t => esc(t.nome)).join(", ") : ", vago"}">${ts.length ? ts.map(t => `<span class="cel-turma" style="--c:${esc(t.cor || "#0f766e")}"><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}</small></span>`).join("") : (fo => fo ? `<span class="cel-fora">Ocupado: ${esc(fo.nome)}${variasEscolas() && escolaDe(fo) !== escolaHor() ? "<br>" + esc(escolaDe(fo)) : " · " + esc(fo.turno || "")}</span>` : `<span class="mais">+</span>`)(ocupadaFora(tn, d, k))}</button></td>`; }).join("")}</tr>`);
     if (g.recreioApos === k && g.recreio > 0 && k < g.tempos) linhas.push(`<tr class="recreio"><th class="tp"><b>Recreio</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.recreio)}</small></th><td colspan="${dias.length}">Intervalo de ${g.recreio} minutos</td></tr>`);
     if (g.almocoApos === k && g.almoco > 0 && k < g.tempos) linhas.push(`<tr class="recreio almoco"><th class="tp"><b>Almoço</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.almoco)}</small></th><td colspan="${dias.length}">Intervalo de almoço · ${g.almoco} minutos</td></tr>`);
   }
   const tot = turmasDoTurno(tn).map(t => ({ t, n: horarioDe(t).filter(a => tempoDe(t, a)).length }));
   return `<div class="page-head"><div><h1>Meu horário</h1><p class="muted">Toque num tempo e escolha a turma. Cada tempo tem ${g.duracao} minutos${g.recreioApos ? `, com recreio de ${g.recreio} minutos depois do ${g.recreioApos}º tempo` : ""}${g.almocoApos && g.almocoApos < g.tempos ? ` e almoço depois do ${g.almocoApos}º tempo` : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
+  ${variasEscolas() ? `<div class="seg seg-escola" role="tablist" aria-label="Escola">${escolas().map(e => `<button type="button" role="tab" class="${e === escolaHor() ? "on" : ""}" aria-selected="${e === escolaHor()}" data-act="hor-escola" data-v="${esc(e)}">${esc(e)}</button>`).join("")}</div>` : ""}
   ${gs.length ? `<div class="seg" role="tablist" aria-label="Turno">${gs.map(x => `<button type="button" role="tab" class="${x === tn ? "on" : ""}" aria-selected="${x === tn}" data-act="hor-turno" data-v="${esc(x)}">${esc(x || "Sem turno")}${turmasDoTurno(x).length ? "" : ' <small class="muted">(vazio)</small>'}</button>`).join("")}</div>` : ""}
   <div class="table-wrap"><table class="grade-tempos"><thead><tr><th></th>${dias.map(d => `<th class="${hj === d ? "hoje" : ""}">${DIAS[d]}</th>`).join("")}</tr></thead><tbody>${linhas.join("")}</tbody></table></div>
   <div class="hor-tot">${tot.map(({ t, n }) => `<a href="${linkTurma(t.id, "resumo")}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)} · ${esc(t.disciplina)} <b class="num">${n}</b> ${n === 1 ? "tempo" : "tempos"}/semana</a>`).join("")}</div>
@@ -1898,7 +1919,8 @@ function vHorario() {
 function popHorario(tn) {
   const { d, k } = S.horPop, ts = turmasDoTurno(tn), sel = naCelula(tn, d, k).map(t => t.id), x = horaDoTempo(gradeTurno(tn), k);
   return `<div class="hor-pop" id="horPop" role="dialog" aria-label="Escolher turma"><div class="hor-pop-tit"><b>${DIAS[d]}, ${k}º tempo</b><small class="num muted">${x.inicio}–${x.fim}</small></div>
-    ${ts.length ? "" : `<p class="small muted" style="margin:6px 8px">Você ainda não tem turma no turno ${esc(tn || "sem turno").toLowerCase()}.</p><button type="button" class="hor-op" data-act="nova-turma" data-turno="${esc(tn)}">${ico("plus")}<span><b>Criar turma</b></span></button>`}
+    ${(fo => fo ? `<p class="small aviso-pop">Neste horário você já tem ${esc(fo.nome)}${escolaDe(fo) ? " na " + esc(escolaDe(fo)) : ""}.</p>` : "")(naCelula(tn, d, k).length ? null : ocupadaFora(tn, d, k))}
+    ${ts.length ? "" : `<p class="small muted" style="margin:6px 8px">Você ainda não tem turma no turno ${esc(tn || "sem turno").toLowerCase()}${variasEscolas() ? " nesta escola" : ""}.</p><button type="button" class="hor-op" data-act="nova-turma" data-turno="${esc(tn)}" data-escola="${esc(escolaHor())}">${ico("plus")}<span><b>Criar turma</b></span></button>`}
     ${ts.map(t => `<button type="button" class="hor-op${sel.includes(t.id) ? " on" : ""}" data-act="hor-escolher" data-turma="${esc(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span><span><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}${t.serie ? " · " + esc(t.serie) : ""}</small></span>${sel.includes(t.id) ? "✓" : ""}</button>`).join("")}
     ${sel.length ? `<button type="button" class="hor-op vago" data-act="hor-escolher" data-turma="">Deixar vago</button>` : ""}</div>`;
 }
@@ -1932,8 +1954,9 @@ function dlgGrade() {
 }
 const comTempos = t => horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar'],[data-act='hor-escolher'],[data-act='hor-turno']"); if (!b) return;
+  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar'],[data-act='hor-escolher'],[data-act='hor-turno'],[data-act='hor-escola']"); if (!b) return;
   const act = b.dataset.act, tn = turnoHor();
+  if (act === "hor-escola") { S.horEscola = b.dataset.v; S.horTurno = null; S.horPop = null; render(); return; }
   if (act === "hor-turno") { S.horTurno = b.dataset.v; S.horPop = null; render(); return; }
   if (act === "hor-config") { S.horPop = null; dlgGrade(); return; }
   if (act === "hor-grade-salvar") {
@@ -1974,13 +1997,13 @@ document.addEventListener("click", async e => {
   switch (act) {
     case "fechar": fechar(); break;
     case "ir": if (id) irTurma(id, b.dataset.view); else location.hash = b.dataset.view; break;
-    case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } setTimeout(() => abrirPopTurma(true), 30); break;
+    case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } if (b.dataset.escola) { const e = document.getElementById("tEscola"); if (e) e.value = b.dataset.escola; } setTimeout(() => abrirPopTurma(true), 30); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
       const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");
       if (!S.turmas.some(x => x.id === dlg._obj.id) && ls.length > 1 && val("tNome") === nomeComposto()) {
         if (!val("tDisc")) { toast("Preencha a disciplina."); return; }
-        const base = S.turmas.length, criadas = ls.map((l, i) => ({ id: uid(), nome: `${dlg._tn.nome} ${l}`, disciplina: val("tDisc"), serie: val("tSerie"), ano: val("tAno"), turno: dlg._tn.turnos?.[l] || val("tTurno") || "", cor: CORES[(base + i) % CORES.length], alunos: [], bimestres: bimestresPadrao(val("tAno")) }));
+        const base = S.turmas.length, criadas = ls.map((l, i) => ({ id: uid(), nome: `${dlg._tn.nome} ${l}`, disciplina: val("tDisc"), serie: val("tSerie"), ano: val("tAno"), turno: dlg._tn.turnos?.[l] || val("tTurno") || "", escola: val("tEscola"), cor: CORES[(base + i) % CORES.length], alunos: [], bimestres: bimestresPadrao(val("tAno")) }));
         fechar();
         for (const o of criadas) await salvar("turmas", o);
         toast(`${criadas.length} turmas criadas: ${criadas.map(o => o.nome.split(" ").pop()).join(", ")}`);
@@ -1989,7 +2012,7 @@ document.addEventListener("click", async e => {
       }
       const o = dlg._obj; o.nome = val("tNome"); o.disciplina = val("tDisc");
       if (!o.nome || !o.disciplina) { toast("Preencha o nome da turma e a disciplina."); return; }
-      o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno");
+      o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno"); o.escola = val("tEscola");
       o.cor = (dlg.querySelector('input[name="tCor"]:checked') || {}).value || o.cor;
       o.alunos = o.alunos || [];
       if (!bimestresDe(o).length) o.bimestres = bimestresPadrao(o.ano);
