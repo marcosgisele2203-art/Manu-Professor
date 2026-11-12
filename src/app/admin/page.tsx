@@ -19,7 +19,7 @@ export default async function Admin() {
   const mes = inicioDoMes();
   const semana = new Date(Date.now() - 7 * 864e5);
   const [profs, usoMes, usoTotal, porTipo, turmas, novos] = await Promise.all([
-    prisma.professor.findMany({ orderBy: { criadoEm: "desc" }, select: { id: true, nome: true, email: true, escola: true, criadoEm: true, limiteIA: true, bloqueado: true } }),
+    prisma.professor.findMany({ orderBy: { criadoEm: "desc" }, select: { id: true, nome: true, email: true, escola: true, escolas: true, criadoEm: true, limiteIA: true, bloqueado: true } }),
     prisma.usoIA.groupBy({ by: ["professorId"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
     prisma.usoIA.aggregate({ _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
     prisma.usoIA.groupBy({ by: ["tipo"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
@@ -59,11 +59,11 @@ export default async function Admin() {
       <section className="panel">
         <div className="panel-head"><h2>Professores</h2><span className="small muted">Deixe o limite vazio para usar o padrão ({padrao}).</span></div>
         <div className="table-wrap"><table>
-          <thead><tr><th>Professor</th><th>Escola</th><th>Cadastro</th><th className="c">Turmas</th><th className="c">IA no mês</th><th className="c">Custo no mês</th><th>Limite mensal</th><th>Acesso à IA</th></tr></thead>
+          <thead><tr><th>Professor</th><th>Escolas</th><th>Cadastro</th><th className="c">Turmas</th><th className="c">IA no mês</th><th className="c">Custo no mês</th><th>Limite mensal</th><th>Acesso à IA</th></tr></thead>
           <tbody>{profs.map((p) => { const u = uso.get(p.id); const lim = p.limiteIA ?? padrao; const usados = u?._count ?? 0;
             return (<tr key={p.id} id={"p-" + p.id}>
               <td><div style={{ fontWeight: 600 }}>{p.nome}</div><div className="small muted">{p.email}</div></td>
-              <td>{p.escola || <span className="muted">—</span>}</td>
+              <td>{(p.escolas.length ? p.escolas : p.escola ? [p.escola] : []).map((e) => <div key={e} className="small">{e}</div>)}{!p.escolas.length && !p.escola && <span className="muted">—</span>}</td>
               <td className="num">{data(p.criadoEm)}</td>
               <td className="c num">{nTurmas.get(p.id) ?? 0}</td>
               <td className="c num"><span className={"chip " + (usados >= lim ? "bad" : usados >= lim * 0.8 ? "warn" : "")}>{usados} de {lim}</span></td>
