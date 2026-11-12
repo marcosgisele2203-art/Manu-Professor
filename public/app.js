@@ -30,6 +30,7 @@ const I = {
   drive: '<path d="M8 3h8l6 11-4 7H6l-4-7z"/><path d="M8 3l6 11H2M16 3 10 14l-4 7M22 14H10"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   horario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2M8 17.5h2"/>',
+  lixo: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   spark: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',
@@ -403,9 +404,9 @@ function vTurmas() {
   const head = `<div class="page-head"><div><h1>Turmas</h1><p class="muted">Toque numa turma para abrir o painel com alunos, chamada, notas e as ferramentas de IA.</p></div><div class="toolbar"><a class="btn" href="#perfil">Minhas escolas e disciplinas</a><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button></div></div>`;
   if (!S.turmas.length) return head + semTurma();
   const cartoes = lista => `<div class="cards">${lista.map(t => {
-    return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${[t.disciplina, t.serie, t.turno].filter(Boolean).map(esc).join(" · ")}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
+    return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${[t.disciplina, t.serie, t.turno].filter(Boolean).map(esc).join(" · ")}</p></div></div><div class="card-top-acoes">${t.exemplo ? '<span class="chip">exemplo</span>' : ""}<button class="card-excluir" data-act="excluir-turma" data-id="${esc(t.id)}" aria-label="Excluir ${esc(t.nome)}" title="Excluir turma">${ico("lixo")}</button></div></div>
       ${bimestresDe(t).length ? `<div class="card-bims">${bimestresDe(t).map(b => { const atual = hoje() >= b.inicio && hoje() <= b.fim; return `<a class="card-bim${atual ? " atual" : ""}" href="${linkTurma(t.id)}" data-bim="${b.num}" data-turma="${esc(t.id)}" title="${esc(b.nome)}: ${fmtData(b.inicio)} a ${fmtData(b.fim)}">${esc(b.nome.replace(/\s*(bimestre|trimestre)$/i, ""))}${/bimestre/i.test(b.nome) ? "<small>bim</small>" : /trimestre/i.test(b.nome) ? "<small>tri</small>" : ""}</a>`; }).join("")}</div>` : ""}
-      <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}<button class="btn sm ghost card-excluir" data-act="excluir-turma" data-id="${esc(t.id)}" aria-label="Excluir ${esc(t.nome)}" title="Excluir turma">Excluir</button></div></article>`;
+      <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
   if (!variasEscolas()) return head + cartoes(S.turmas);
   const semEsc = S.turmas.filter(t => !escolaDe(t));

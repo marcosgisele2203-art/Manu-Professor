@@ -441,4 +441,8 @@ td .grade{border-radius:8px;min-height:36px}
 .bim-det>summary::before{content:"▸";color:var(--accent);font-weight:700}
 .bim-det[open]>summary::before{content:"▾"}
 .bim-det>.bim-extras{padding:0 14px 14px}
-.card-acoes .card-excluir{margin-left:auto;color:var(--danger,#b42318)}
+.card-top-acoes{display:flex;align-items:center;gap:4px;flex:none}
+.card-excluir{display:inline-grid;place-items:center;width:34px;height:34px;border:0;border-radius:10px;background:none;color:var(--muted);cursor:pointer}
+.card-excluir svg{width:18px;height:18px}
+.card-excluir:hover,.card-excluir:focus-visible{background:#fde8e6;color:#b42318}
+.card-turma .card-acoes{flex-wrap:wrap}
