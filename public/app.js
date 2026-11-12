@@ -405,7 +405,7 @@ function vTurmas() {
   const cartoes = lista => `<div class="cards">${lista.map(t => {
     return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${[t.disciplina, t.serie, t.turno].filter(Boolean).map(esc).join(" · ")}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
       ${bimestresDe(t).length ? `<div class="card-bims">${bimestresDe(t).map(b => { const atual = hoje() >= b.inicio && hoje() <= b.fim; return `<a class="card-bim${atual ? " atual" : ""}" href="${linkTurma(t.id)}" data-bim="${b.num}" data-turma="${esc(t.id)}" title="${esc(b.nome)}: ${fmtData(b.inicio)} a ${fmtData(b.fim)}">${esc(b.nome.replace(/\s*(bimestre|trimestre)$/i, ""))}${/bimestre/i.test(b.nome) ? "<small>bim</small>" : /trimestre/i.test(b.nome) ? "<small>tri</small>" : ""}</a>`; }).join("")}</div>` : ""}
-      <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
+      <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}<button class="btn sm ghost card-excluir" data-act="excluir-turma" data-id="${esc(t.id)}" aria-label="Excluir ${esc(t.nome)}" title="Excluir turma">Excluir</button></div></article>`;
   }).join("")}</div>`;
   if (!variasEscolas()) return head + cartoes(S.turmas);
   const semEsc = S.turmas.filter(t => !escolaDe(t));
@@ -669,6 +669,17 @@ function escolherEscolaDlg(nome) {
   i.value = nome; if (!sel) return;
   const tem = [...sel.options].some(o => o.value === nome); sel.value = tem ? nome : "__nova"; i.hidden = tem;
 }
+function dlgExcluirTurma(tid) {
+  const t = turma(tid); if (!t) return; dlg._excluir = tid;
+  const n = col => S[col].filter(x => x.turmaId === tid).length;
+  const itens = [[(t.alunos || []).length, "alunos"], [n("chamadas"), "chamadas"], [n("avaliacoes"), "avaliações e notas"], [n("planos"), "planos de aula"], [n("atividades"), "atividades"], [n("provas"), "provas"], [n("materiais"), "materiais"], [n("slides"), "slides"]].filter(x => x[0]);
+  abrirDlg(`Excluir ${esc(t.nome)}?`, `<p><b>${esc(rotuloTurma(t))}</b></p>
+    ${itens.length ? `<p>Também serão apagados desta turma:</p><ul>${itens.map(([q, o]) => `<li><b class="num">${q}</b> ${o}</li>`).join("")}</ul>` : `<p class="muted">A turma está vazia.</p>`}
+    <p class="small muted">As questões do banco não são apagadas. Arquivos já salvos no seu Google Drive continuam lá. ${S.admin ? "" : "Se excluir por engano, peça ao administrador para recuperar pelo backup diário."}</p>
+    <label class="check" style="border:0"><input type="checkbox" id="exConf"><span>Entendo que a turma e tudo dela serão apagados</span></label>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn danger" data-act="excluir-turma-ok" disabled id="exOk">Excluir turma</button>`);
+}
+document.addEventListener("change", e => { if (e.target.id === "exConf") document.getElementById("exOk").disabled = !e.target.checked; });
 function dlgTurma(t) {
   t = t || { id: uid(), nome: "", disciplina: (S.disciplinas || []).length === 1 ? S.disciplinas[0] : "", serie: "", ano: String(new Date().getFullYear()), turno: "", cor: CORES[S.turmas.length % CORES.length], alunos: [] };
   dlg._obj = t; dlg._tn = {};
@@ -2218,11 +2229,15 @@ document.addEventListener("click", async e => {
       const nova = !S.turmas.some(x => x.id === o.id);
       lembrarNoPerfil(o.escola, o.disciplina);
       fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); pastaAutomatica(o.id); if (nova) irTurma(o.id, "alunos"); break; }
-    case "apagar-turma": {
-      if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar turma e tudo dela"; return; }
-      const tid = dlg._obj.id; fechar();
-      for (const col of ["chamadas", "avaliacoes", "atividades", "planos"]) for (const x of S[col].filter(x => x.turmaId === tid)) await apagar(col, x.id);
-      await apagar("turmas", tid); toast("Turma apagada"); break; }
+    case "apagar-turma": dlgExcluirTurma(dlg._obj.id); break;
+    case "excluir-turma": dlgExcluirTurma(id); break;
+    case "excluir-turma-ok": {
+      const tid = dlg._excluir, tt = turma(tid); if (!tt || !document.getElementById("exConf")?.checked) return;
+      fechar();
+      for (const col of COLS) if (col !== "turmas") for (const x of S[col].filter(x => x.turmaId === tid)) await apagar(col, x.id);
+      await apagar("turmas", tid);
+      if (S.turmaSel === tid) S.turmaSel = null;
+      toast(`${tt.nome} excluída`); if (S.dentroTurma) location.hash = "turmas"; break; }
     case "seed": {
       if (S.mode !== "live") return; b.disabled = true;
       const sfx = uid().slice(0, 6); const ex = JSON.parse(JSON.stringify(exemplo()).replace(/"(ex(?:6a|8b|pl\d+|av\d+|at\d+|q\d+|pr\d+))(_|")/g, (m, id, fim) => `"${id}-${sfx}${fim}`)); for (const col of COLS) for (const o of ex[col]) await salvar(col, o);

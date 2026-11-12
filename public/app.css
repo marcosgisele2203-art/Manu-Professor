@@ -441,3 +441,4 @@ td .grade{border-radius:8px;min-height:36px}
 .bim-det>summary::before{content:"▸";color:var(--accent);font-weight:700}
 .bim-det[open]>summary::before{content:"▾"}
 .bim-det>.bim-extras{padding:0 14px 14px}
+.card-acoes .card-excluir{margin-left:auto;color:var(--danger,#b42318)}
