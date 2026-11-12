@@ -518,3 +518,10 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .ci-h{font-size:.95rem;margin:14px 0 6px}
 .ci-evs{display:grid;gap:4px;max-height:42vh;overflow:auto;padding-right:4px}
 .ci-evs .cal-ev{padding:6px 8px;align-items:flex-start}
+/* Recuperação e situação do ano */
+.rec-aviso{border-color:#f2d58a;background:#fffaf0;display:grid;gap:10px}
+.rec-tit{display:flex;gap:10px;align-items:flex-start}.rec-tit svg{width:22px;height:22px;color:#9a6700;flex:none}.rec-tit b{display:block}
+.sit-ano{display:grid;gap:12px}.sit-ano h2{margin:0}
+.sit-g{display:grid;gap:6px}.sit-g>b{font-size:.92rem}.sit-g>b .num{font-weight:800}
+.sit-g>div{display:flex;flex-wrap:wrap;gap:6px}
+.sit-g.bad>b{color:#b42318}.sit-g.warn>b{color:#9a6700}.sit-g.ok>b{color:#1d7a46}
