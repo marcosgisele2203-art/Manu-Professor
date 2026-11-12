@@ -251,3 +251,8 @@ td .grade{border-radius:8px;min-height:36px}
 .cor-wrap{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:12px;align-items:start}
 .cor-foto{width:100%;border-radius:8px;border:1px solid var(--line)}
 @media (max-width:760px){.cor-wrap{grid-template-columns:minmax(0,1fr)}}
+.q-img{display:block;max-width:100%;max-height:420px;margin:8px 0;border-radius:6px;background:#fff}
+.enem-txt{white-space:pre-wrap;line-height:1.55}
+.enem-intro{margin:8px 0 4px}
+.enem-alts{margin:4px 0 6px;padding-left:24px}.enem-alts li{margin:3px 0}.enem-alts li.correct{color:var(--ok);font-weight:600}
+.eyebrow a{color:inherit}

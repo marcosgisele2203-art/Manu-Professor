@@ -54,3 +54,10 @@ model Registro {
   @@unique([professorId, colecao, id])
   @@index([professorId, colecao])
 }
+
+// Cópia local das questões do Enem de cada ano (fonte: API pública enem.dev, dados do INEP)
+model EnemProva {
+  ano          Int      @id
+  questoes     Json
+  atualizadoEm DateTime @updatedAt
+}

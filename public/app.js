@@ -168,7 +168,7 @@ function render() {
   const v = $("#view");
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
-  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   const banner = "";
   v.innerHTML = banner + fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
@@ -325,7 +325,9 @@ const TIPO = { multipla: "Múltipla escolha", vf: "Verdadeiro ou falso", aberta:
 function questaoHTML(q, idx, gabarito = true) {
   const letras = "ABCDE";
   return `<div class="q">${idx != null ? `<b>${idx}.</b> ` : ""}<span style="white-space:pre-wrap">${esc(q.enunciado)}</span>
-    ${q.tipo !== "aberta" && q.alternativas?.length ? `<ol type="A">${q.alternativas.map((alt, i) => `<li class="${gabarito && i === q.correta ? "correct" : ""}">${esc(alt)}</li>`).join("")}</ol>` : ""}
+    ${(q.imagens || []).filter(u => /^https:\/\//.test(u)).map(u => `<img class="q-img" src="${esc(u)}" alt="Figura da questão">`).join("")}
+    ${q.tipo !== "aberta" && q.alternativas?.length ? `<ol type="A">${q.alternativas.map((alt, i) => `<li class="${gabarito && i === q.correta ? "correct" : ""}">${esc(alt)}${q.altImgs?.[i] && /^https:\/\//.test(q.altImgs[i]) ? `<img class="q-img" src="${esc(q.altImgs[i])}" alt="Alternativa">` : ""}</li>`).join("")}</ol>` : ""}
+    ${q.fonte ? `<p class="small muted fonte">Fonte: ${esc(q.fonte)}</p>` : ""}
     ${gabarito && q.tipo === "aberta" && q.resposta ? `<p class="small" style="color:var(--ok)"><b>Resposta esperada:</b> ${esc(q.resposta)}</p>` : ""}
     ${gabarito && q.tipo !== "aberta" && q.correta != null ? `<p class="small" style="color:var(--ok)"><b>Gabarito:</b> ${letras[q.correta] || ""}</p>` : ""}</div>`;
 }
@@ -333,8 +335,8 @@ function vQuestoes() {
   const f = S.filtroQ;
   const discs = [...new Set(S.questoes.map(q => q.disciplina).filter(Boolean))].sort();
   const lista = S.questoes.filter(q => (!f.disc || q.disciplina === f.disc) && (!f.dif || q.dificuldade === f.dif) && (!f.txt || (q.enunciado + " " + q.tema).toLowerCase().includes(f.txt.toLowerCase())));
-  const head = `<div class="page-head"><div><h1>Banco de questões</h1><p class="muted">${S.questoes.length} questões guardadas para montar provas.</p></div><div class="toolbar"><button class="btn" data-act="nova-questao">${ico("plus")}Nova questão</button><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
-  if (!S.questoes.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Seu banco está vazio</h3><p>Peça à Manu questões sobre um tema, escolha as que gostar e guarde aqui.</p><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div>`;
+  const head = `<div class="page-head"><div><h1>Banco de questões</h1><p class="muted">${S.questoes.length} questões guardadas para montar provas.</p></div><div class="toolbar"><button class="btn" data-act="nova-questao">${ico("plus")}Nova questão</button><a class="btn" href="#enem">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
+  if (!S.questoes.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Seu banco está vazio</h3><p>Peça à Manu questões sobre um tema ou pegue questões oficiais do Enem.</p><div class="toolbar" style="justify-content:center"><a class="btn" href="#enem">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
   return head + `<section class="panel"><div class="toolbar">
       <div class="field" style="flex:1;min-width:180px"><label for="fTxt">Buscar</label><input class="input" type="search" id="fTxt" value="${esc(f.txt)}" placeholder="Tema ou trecho do enunciado"></div>
       <div class="field"><label for="fDisc">Disciplina</label><select class="input" id="fDisc"><option value="">Todas</option>${discs.map(d => `<option ${f.disc === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
@@ -767,6 +769,7 @@ const CSS_FOLHA = `.folha{font-family:Arial,Helvetica,sans-serif;color:#111;back
 .folha .caca td.achou{background:#ffe08a}
 .folha .banco{display:flex;flex-wrap:wrap;gap:6px 12px;margin-bottom:10px}.folha .banco span{border:1px solid #999;border-radius:4px;padding:1px 8px}
 .folha .quadro{border:1.5px dashed #888;border-radius:10px;height:150px;margin-top:6px}
+.folha .q-img{display:block;max-width:100%;max-height:9cm;margin:6px 0}.folha .fonte{font-size:8.5pt;color:#666;margin:2px 0 0}
 .folha .mapa-wrap{margin:8px 0}.folha svg.mapa{width:100%;height:auto;display:block}.folha .so-docx{display:none}
 .folha .sec{margin:0 0 10px;break-inside:avoid}.folha .sec h3{font-size:12.5pt;margin:0 0 3px;color:#0b7c8a;text-transform:none;letter-spacing:0}.folha h3.rev{font-size:13pt;margin:14px 0 6px;color:#111}
 .folha.ampliado{font-size:18pt;line-height:1.6}.folha.ampliado h1{font-size:24pt}.folha.ampliado .cab{font-size:14pt;grid-template-columns:1fr}.folha.ampliado .linhas div{height:38px}.folha.ampliado .cruz td,.folha.ampliado .caca td{width:38px;height:38px;font-size:18pt}
@@ -1041,6 +1044,7 @@ async function htmlParaDocx(html, estilo) {
       if (n.nodeType === 3) { const t = n.textContent.replace(/\s+/g, " "); if (t.trim() || out.length) out.push(new D.TextRun({ text: t, font: fonte, size: fmt.size || tam, bold: fmt.bold, italics: fmt.it, color: fmt.cor, superScript: fmt.sup })); }
       else if (n.nodeType === 1 && !BLOCO.has(n.tagName)) {
         if (n.tagName === "BR") out.push(new D.TextRun({ break: 1 }));
+        else if (n.tagName === "IMG") out.push(new D.TextRun({ text: " [figura: veja a versão impressa] ", font: fonte, size: 18, italics: true, color: "666666" }));
         else out.push(...runs(n, { ...fmt, bold: fmt.bold || /^(B|STRONG)$/.test(n.tagName), it: fmt.it || /^(I|EM)$/.test(n.tagName), sup: n.tagName === "SUP", size: n.tagName === "SUP" ? 14 : fmt.size, cor: n.classList.contains("nl") ? "666666" : fmt.cor }));
       }
     });
@@ -1353,6 +1357,56 @@ document.addEventListener("click", async e => {
   renderCorrecao();
 });
 
+/* ---------- Banco de questões do Enem (dados do INEP via enem.dev) ---------- */
+const AREA_CURTA = { linguagens: "Linguagens", "ciencias-humanas": "Ciências Humanas", "ciencias-natureza": "Ciências da Natureza", matematica: "Matemática" };
+S.enemF = { ano: 2023, area: "", busca: "", pagina: 0 }; S.enemRes = null; S.enemBusy = false; S.enemErro = "";
+const urlOk = u => typeof u === "string" && /^https:\/\//.test(u);
+function jaGuardada(ano, q) { return S.questoes.some(x => x.enem && x.enem.ano === ano && x.enem.i === q.i && (x.enem.lingua || null) === (q.lingua || null)); }
+function vEnem() {
+  const f = S.enemF, r = S.enemRes;
+  const anos = Array.from({ length: 15 }, (_, i) => 2023 - i);
+  return `<div class="page-head"><div><span class="eyebrow"><a href="#questoes">Banco de questões</a> / Enem</span><h1>Questões do Enem</h1><p class="muted">Provas oficiais de 2009 a 2023, publicadas pelo INEP. Guarde as que quiser no seu banco para usar nas provas.</p></div></div>
+  <section class="panel"><form class="toolbar" id="enemForm" style="align-items:flex-end">
+    <div class="field"><label for="eAno">Ano</label><select class="input" id="eAno">${anos.map(a => `<option ${f.ano === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+    <div class="field"><label for="eArea">Área</label><select class="input" id="eArea"><option value="">Todas</option>${Object.entries(AREA_CURTA).map(([k, v]) => `<option value="${k}" ${f.area === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+    <div class="field" style="flex:1;min-width:200px"><label for="eBusca">Palavra-chave (opcional)</label><input class="input" id="eBusca" type="search" value="${esc(f.busca)}" placeholder="Ex.: porcentagem, fotossíntese, modernismo"></div>
+    <button class="btn primary" type="submit" ${S.enemBusy ? "disabled" : ""}>${S.enemBusy ? "Buscando…" : "Buscar"}</button></form>
+    ${S.enemBusy ? `<p class="muted small">Buscando as questões do Enem ${f.ano}. A primeira busca de cada ano pode levar até 30 segundos; as próximas são instantâneas.</p>` : ""}
+    ${S.enemErro ? `<p class="auth-erro">${esc(S.enemErro)}</p>` : ""}
+  </section>
+  ${r ? `<section class="panel"><div class="panel-head"><h2>${r.total} ${r.total === 1 ? "questão" : "questões"} · Enem ${r.ano}</h2>
+    ${r.total > r.porPagina ? `<div class="toolbar"><button class="btn sm" data-act="enem-pag" data-d="-1" ${r.pagina === 0 ? "disabled" : ""}>Anterior</button><span class="small num">Página ${r.pagina + 1} de ${Math.ceil(r.total / r.porPagina)}</span><button class="btn sm" data-act="enem-pag" data-d="1" ${(r.pagina + 1) * r.porPagina >= r.total ? "disabled" : ""}>Próxima</button></div>` : ""}</div>
+    ${r.questoes.length ? `<div class="list">${r.questoes.map((q, k) => `<article class="row enem-q" style="align-items:flex-start"><div class="grow">
+      <div class="toolbar" style="margin-bottom:6px"><span class="chip acc">Enem ${r.ano} · questão ${q.i}</span><span class="chip">${esc(AREA_CURTA[q.area] || q.area)}</span>${q.lingua ? `<span class="chip">${q.lingua === "ingles" ? "Inglês" : "Espanhol"}</span>` : ""}</div>
+      ${q.texto ? `<div class="enem-txt">${esc(q.texto)}</div>` : ""}${(q.imagens || []).filter(urlOk).map(u => `<img class="q-img" src="${esc(u)}" alt="Figura da questão ${q.i}" loading="lazy">`).join("")}
+      ${q.intro ? `<p class="enem-intro"><b>${esc(q.intro)}</b></p>` : ""}
+      <ol type="A" class="enem-alts">${q.alts.map(a => `<li class="${a.l === q.certa ? "correct" : ""}">${esc(a.t)}${urlOk(a.img) ? `<img class="q-img" src="${esc(a.img)}" alt="Alternativa ${a.l}" loading="lazy">` : ""}</li>`).join("")}</ol>
+      <p class="small" style="color:var(--ok)"><b>Gabarito:</b> ${esc(q.certa)}</p></div>
+      ${jaGuardada(r.ano, q) ? `<span class="chip ok">No seu banco</span>` : `<button class="btn sm primary" data-act="enem-guardar" data-k="${k}">Guardar no meu banco</button>`}</article>`).join("")}</div>`
+      : `<p class="muted">Nenhuma questão encontrada com esses filtros. Tente outra palavra ou outra área.</p>`}
+  </section>` : `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Escolha o ano e a área</h3><p>As questões aparecem com texto, imagens, alternativas e gabarito oficiais.</p></div>`}
+  <p class="small muted">Questões do Exame Nacional do Ensino Médio, elaboradas e publicadas pelo INEP/MEC. Organização dos dados: projeto aberto enem.dev.</p>`;
+}
+async function buscarEnem() {
+  const f = S.enemF; S.enemBusy = true; S.enemErro = ""; render();
+  try { S.enemRes = await api("GET", `/api/enem?ano=${f.ano}&area=${encodeURIComponent(f.area)}&busca=${encodeURIComponent(f.busca)}&pagina=${f.pagina}`); }
+  catch (e) { S.enemErro = (e && e.message) || "Não foi possível buscar agora. Tente de novo."; }
+  S.enemBusy = false; render(); window.scrollTo(0, 0);
+}
+document.addEventListener("submit", e => { if (e.target.id !== "enemForm") return; e.preventDefault(); const f = S.enemF; f.ano = Number($("#eAno").value); f.area = $("#eArea").value; f.busca = $("#eBusca").value.trim(); f.pagina = 0; buscarEnem(); });
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='enem-']"); if (!b) return;
+  if (b.dataset.act === "enem-pag") { S.enemF.pagina = Math.max(0, S.enemF.pagina + Number(b.dataset.d)); buscarEnem(); return; }
+  const r = S.enemRes, q = r && r.questoes[Number(b.dataset.k)]; if (!q) return;
+  const letras = q.alts.map(a => a.l);
+  const nova = { id: uid(), disciplina: AREA_CURTA[q.area] || q.area, tema: "Enem " + r.ano, serie: "Ensino Médio", tipo: "multipla", dificuldade: "media",
+    enunciado: [q.texto, q.intro].filter(Boolean).join("\n\n"), imagens: (q.imagens || []).filter(urlOk),
+    alternativas: q.alts.map(a => a.t || "(alternativa em imagem)"), altImgs: q.alts.map(a => urlOk(a.img) ? a.img : null),
+    correta: Math.max(0, letras.indexOf(q.certa)), resposta: "", bncc: "",
+    fonte: `Enem ${r.ano}, questão ${q.i}${q.lingua ? (q.lingua === "ingles" ? " (inglês)" : " (espanhol)") : ""} · INEP/MEC`, enem: { ano: r.ano, i: q.i, lingua: q.lingua || null } };
+  b.disabled = true; await salvar("questoes", nova); toast("Questão guardada no seu banco");
+});
+
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
@@ -1475,7 +1529,7 @@ document.addEventListener("keydown", e => {
 });
 dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); });
 
-function rota() { const h = location.hash.slice(1); S.view = VIEWS.some(v => v[0] === h) ? h : "inicio"; render(); window.scrollTo(0, 0); }
+function rota() { const h = location.hash.slice(1); S.view = VIEWS.some(v => v[0] === h) || h === "enem" ? h : "inicio"; render(); window.scrollTo(0, 0); }
 window.addEventListener("hashchange", rota);
-S.view = VIEWS.some(v => v[0] === location.hash.slice(1)) ? location.hash.slice(1) : "inicio";
+S.view = VIEWS.some(v => v[0] === location.hash.slice(1)) || location.hash === "#enem" ? location.hash.slice(1) : "inicio";
 iniciar();
