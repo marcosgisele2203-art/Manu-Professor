@@ -248,3 +248,6 @@ td .grade{border-radius:8px;min-height:36px}
 .auth-ou::before,.auth-ou::after{content:"";flex:1;height:1px;background:var(--line)}
 .auth-pendente{display:flex;flex-direction:column;gap:10px;padding:16px;border:1.5px solid var(--accent);border-radius:12px;background:var(--accent-soft)}
 .auth-pendente>span{font-size:.9rem;color:var(--accent-soft-ink);overflow-wrap:anywhere}
+.cor-wrap{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:12px;align-items:start}
+.cor-foto{width:100%;border-radius:8px;border:1px solid var(--line)}
+@media (max-width:760px){.cor-wrap{grid-template-columns:minmax(0,1fr)}}

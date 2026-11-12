@@ -347,7 +347,7 @@ function vQuestoes() {
 function vProvas() {
   const head = `<div class="page-head"><div><h1>Provas</h1><p class="muted">Monte provas com questões do banco e baixe com gabarito.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-prova">${ico("plus")}Nova prova</button></div></div>`;
   if (!S.provas.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhuma prova montada</h3><p>${S.questoes.length ? "Escolha questões do seu banco para montar a primeira." : "Primeiro guarde algumas questões no banco, depois monte a prova."}</p><button class="btn primary" data-act="${S.questoes.length ? "nova-prova" : "ir"}" data-view="questoes">${S.questoes.length ? "Nova prova" : "Ir ao banco de questões"}</button></div>`;
-  return head + `<div class="cards">${S.provas.map(p => { const t = turma(p.turmaId); return `<article class="card"><span class="eyebrow">${fmtData(p.data)} · ${esc(t?.nome || "Sem turma")}</span><h3>${esc(p.titulo)}</h3><p class="small muted">${(p.questaoIds || []).length} questões</p><div class="toolbar"><button class="btn sm" data-act="ver-prova" data-id="${esc(p.id)}">Visualizar</button><button class="btn sm ghost" data-act="editar-prova" data-id="${esc(p.id)}">Editar</button></div></article>`; }).join("")}</div>`;
+  return head + `<div class="cards">${S.provas.map(p => { const t = turma(p.turmaId); return `<article class="card"><span class="eyebrow">${fmtData(p.data)} · ${esc(t?.nome || "Sem turma")}</span><h3>${esc(p.titulo)}</h3><p class="small muted">${(p.questaoIds || []).length} questões</p><div class="toolbar"><button class="btn sm" data-act="ver-prova" data-id="${esc(p.id)}">Visualizar</button><button class="btn sm ghost" data-act="editar-prova" data-id="${esc(p.id)}">Editar</button><button class="btn sm ghost" data-act="corrigir-foto" data-id="${esc(p.id)}">Corrigir por foto</button></div>${p.correcoes && Object.keys(p.correcoes).length ? `<span class="small muted">${Object.keys(p.correcoes).length} de ${(t?.alunos || []).length} corrigidas</span>` : ""}</article>`; }).join("")}</div>`;
 }
 
 /* ----- Assistente ----- */
@@ -498,7 +498,7 @@ function provaDoc(p, gabarito) {
 }
 function dlgVerProva(p, gab) {
   abrirDlg(esc(p.titulo), `<div class="toolbar"><button type="button" class="btn sm ${gab ? "" : "primary"}" data-act="ver-prova" data-id="${esc(p.id)}">Versão do aluno</button><button type="button" class="btn sm ${gab ? "primary" : ""}" data-act="ver-prova-gab" data-id="${esc(p.id)}">Com gabarito</button></div>${provaDoc(p, gab)}`,
-    `${botoesExport(`data-prova="${esc(p.id)}" data-gab="${gab ? 1 : 0}"`)}<button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+    `<button type="button" class="btn" data-act="folha-respostas" data-id="${esc(p.id)}">Folha de respostas</button><button type="button" class="btn ai" data-act="corrigir-foto" data-id="${esc(p.id)}">${ico("spark")}Corrigir por foto</button>${botoesExport(`data-prova="${esc(p.id)}" data-gab="${gab ? 1 : 0}"`)}<button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
 /* ---------- IA ---------- */
@@ -1241,6 +1241,116 @@ document.addEventListener("click", e => {
     : d.slides ? { slides: S.slAtual }
     : d.turma ? { turma: turma(d.turma) } : null;
   if (alvo && Object.values(alvo)[0]) exportar(alvo, d.fmt, b);
+});
+
+/* ---------- Correção por foto ---------- */
+// Questões objetivas da prova, na numeração da prova impressa
+function objetivas(p) {
+  return (p.questaoIds || []).map((id, i) => ({ q: S.questoes.find(x => x.id === id), n: i + 1 })).filter(x => x.q)
+    .filter(x => x.q.tipo !== "aberta" && (x.q.alternativas || []).length >= 2)
+    .map(x => { const vf = x.q.tipo === "vf"; const opcoes = vf ? "VF" : "ABCDE".slice(0, Math.min(5, x.q.alternativas.length));
+      return { n: x.n, opcoes, certa: x.q.correta == null ? null : opcoes[x.q.correta] || null }; });
+}
+function folhaRespostasHTML(p) {
+  const t = turma(p.turmaId), obj = objetivas(p);
+  const metade = Math.ceil(obj.length / 2), cols = [obj.slice(0, metade), obj.slice(metade)];
+  return `<div class="cab"><div>Escola: ________________________________</div><div>Data: ____/____/______</div><div>Nome: ____________________________________</div><div>Turma: ${t ? esc(t.nome) : "_______"}</div></div>
+    <h1>Folha de respostas · ${esc(p.titulo)}</h1><p class="instr">Pinte totalmente UMA bolinha por questão, com caneta azul ou preta. Não rasure. As questões dissertativas são respondidas na prova.</p>
+    <div class="fr"><span class="mk tl"></span><span class="mk tr"></span><span class="mk bl"></span><span class="mk br"></span>
+    <div class="fr-cols">${cols.map(c => `<div class="fr-col">${c.map(o => `<div class="fr-q"><b>${String(o.n).padStart(2, "0")}</b>${[...o.opcoes].map(l => `<span class="bol">${l}</span>`).join("")}</div>`).join("")}</div>`).join("")}</div></div>`;
+}
+const CSS_FR = `.folha .fr{position:relative;border:1.5px solid #111;border-radius:6px;padding:26px 30px;margin-top:10px}
+.folha .fr .mk{position:absolute;width:16px;height:16px;background:#111}.folha .fr .tl{top:6px;left:6px}.folha .fr .tr{top:6px;right:6px}.folha .fr .bl{bottom:6px;left:6px}.folha .fr .br{bottom:6px;right:6px}
+.folha .fr-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 40px}.folha .fr-q{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dotted #bbb;break-inside:avoid}
+.folha .fr-q b{width:30px;font-size:14pt}.folha .bol{width:26px;height:26px;border:1.6px solid #111;border-radius:50%;display:inline-grid;place-items:center;font-size:10pt;font-weight:700;color:#555}`;
+document.head.insertAdjacentHTML("beforeend", `<style>${CSS_FR}</style>`);
+
+async function prepararFoto(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 1568 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+
+function dlgCorrigir(p) {
+  const t = turma(p.turmaId);
+  if (!t || !(t.alunos || []).length) { toast("Associe a prova a uma turma com alunos para corrigir por foto."); return; }
+  const obj = objetivas(p);
+  if (!obj.length) { toast("Esta prova não tem questões de múltipla escolha ou V/F para corrigir por foto."); return; }
+  const ja = S.avaliacoes.find(a => a.turmaId === t.id && a.provaId === p.id);
+  dlg._cor = { provaId: p.id, alunoId: (t.alunos.find(a => !p.correcoes?.[a.id]) || t.alunos[0]).id, foto: "", leitura: null, marcadas: {}, avalId: ja ? ja.id : "nova", nota: "", status: "" };
+  renderCorrecao();
+}
+function renderCorrecao() {
+  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), t = turma(p.turmaId), obj = objetivas(p);
+  const abertas = (p.questaoIds || []).length - obj.length;
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id);
+  let corpo = `<div class="grid2"><div class="field"><label for="cAluno">Aluno</label><select class="input" id="cAluno">${t.alunos.map(a => `<option value="${esc(a.id)}" ${a.id === c.alunoId ? "selected" : ""}>${esc(a.nome)}${p.correcoes?.[a.id] ? " ✓ corrigida (" + fmtNota(p.correcoes[a.id].nota) + ")" : ""}</option>`).join("")}</select></div>
+    <div class="field"><label for="cFoto">Foto da folha de respostas</label><input class="input" id="cFoto" type="file" accept="image/*" capture="environment"></div></div>
+    <p class="small muted">Fotografe a folha inteira, de cima, com boa luz, mostrando os quatro quadradinhos pretos dos cantos.</p>`;
+  if (c.foto) corpo += `<div class="cor-wrap"><img class="cor-foto" src="${c.foto}" alt="Foto da folha de respostas">
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-corrigir" ${cap.ia ? "" : "disabled"}>${ico("spark")}${c.leitura ? "Ler de novo" : "Ler respostas"}</button><span class="ai-status" id="iaStatus">${esc(c.status || "A Manu lê as bolinhas marcadas. Você confere antes de lançar.")}</span></div></div></div>`;
+  if (c.leitura) {
+    const acertos = obj.filter(o => o.certa && c.marcadas[o.n] === o.certa).length;
+    const duvidas = obj.filter(o => !c.marcadas[o.n]).length;
+    if (c.nota === "") c.nota = String(Math.round(acertos / obj.length * 100) / 10).replace(".", ",");
+    corpo += `${c.leitura.observacao ? `<div class="banner"><span>${esc(c.leitura.observacao)}</span></div>` : ""}
+      ${c.leitura.nome ? `<p class="small">Nome lido na folha: <b>${esc(c.leitura.nome)}</b></p>` : ""}
+      <div class="table-wrap"><table><thead><tr><th class="c">Questão</th><th class="c">Marcada</th><th class="c">Gabarito</th><th class="c">Resultado</th></tr></thead><tbody>
+      ${obj.map(o => { const m = c.marcadas[o.n] || ""; const ok = m && m === o.certa;
+        return `<tr><td class="c num">${o.n}</td><td class="c"><select class="input cor-sel" data-n="${o.n}" aria-label="Resposta marcada na questão ${o.n}" style="width:auto;min-height:34px;padding:2px 8px"><option value="">—</option>${[...o.opcoes].map(l => `<option ${m === l ? "selected" : ""}>${l}</option>`).join("")}</select></td><td class="c num">${o.certa || "?"}</td><td class="c">${!m ? '<span class="chip warn">conferir</span>' : ok ? '<span class="chip ok">certa</span>' : '<span class="chip bad">errada</span>'}</td></tr>`; }).join("")}
+      </tbody></table></div>
+      <p><b class="num">${acertos} de ${obj.length}</b> questões objetivas certas${duvidas ? ` · <span style="color:var(--warn)">${duvidas} para conferir na foto</span>` : ""}.${abertas ? ` Esta prova tem ${abertas} questão(ões) dissertativa(s), fora da correção automática: ajuste a nota se precisar.` : ""}</p>
+      <div class="grid2"><div class="field"><label for="cNota">Nota (0 a 10)</label><input class="input" id="cNota" inputmode="decimal" value="${esc(c.nota)}"></div>
+      <div class="field"><label for="cAval">Lançar na avaliação</label><select class="input" id="cAval"><option value="nova" ${c.avalId === "nova" ? "selected" : ""}>Nova avaliação: ${esc(p.titulo)}</option>${avs.map(a => `<option value="${esc(a.id)}" ${c.avalId === a.id ? "selected" : ""}>${esc(a.nome)}</option>`).join("")}</select></div></div>`;
+  }
+  abrirDlg("Corrigir por foto · " + esc(p.titulo), corpo, `<button type="button" class="btn" data-act="fechar">Fechar</button>${c.leitura ? `<button type="button" class="btn primary" data-act="cor-lancar">Lançar nota e ir para o próximo</button>` : ""}`);
+}
+async function lerFolha() {
+  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), obj = objetivas(p);
+  await comIA(async (signal, st) => {
+    const [cab, dados] = c.foto.split(",");
+    const r = await iaJSON({ tipo: "correcao", imagem: dados, mime: cab.includes("png") ? "image/png" : "image/jpeg", questoes: obj.map(o => ({ n: o.n, opcoes: o.opcoes })) }, signal);
+    if (!r || typeof r.respostas !== "object") throw { message: "Não consegui ler a folha. Tire outra foto, mais de perto e com boa luz." };
+    c.leitura = r; c.marcadas = {}; c.nota = "";
+    obj.forEach(o => { const v = r.respostas[String(o.n)]; if (typeof v === "string" && o.opcoes.includes(v.toUpperCase())) c.marcadas[o.n] = v.toUpperCase(); });
+    st.textContent = c.status = "Leitura feita. Confira as marcações com a foto antes de lançar.";
+  });
+  const stEl = dlg.querySelector("#iaStatus"); if (stEl) c.status = stEl.textContent;
+  renderCorrecao();
+}
+document.addEventListener("change", async e => {
+  const c = dlg._cor; if (!c || !dlg.open) return;
+  const el = e.target;
+  if (el.id === "cAluno") { c.alunoId = el.value; c.foto = ""; c.leitura = null; c.marcadas = {}; c.nota = ""; c.status = ""; renderCorrecao(); }
+  else if (el.id === "cFoto" && el.files[0]) { try { c.foto = await prepararFoto(el.files[0]); c.leitura = null; c.marcadas = {}; c.nota = ""; c.status = ""; renderCorrecao(); } catch (_) { toast("Não consegui abrir essa imagem. Tente uma foto em JPG ou PNG."); } }
+  else if (el.classList.contains("cor-sel")) { c.marcadas[el.dataset.n] = el.value; c.nota = ""; renderCorrecao(); }
+  else if (el.id === "cAval") c.avalId = el.value;
+});
+document.addEventListener("input", e => { if (e.target.id === "cNota" && dlg._cor) dlg._cor.nota = e.target.value; });
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act='ia-corrigir'],[data-act='cor-lancar'],[data-act='folha-respostas'],[data-act='corrigir-foto']"); if (!b) return;
+  const act = b.dataset.act;
+  if (act === "folha-respostas") { const p = S.provas.find(x => x.id === b.dataset.id); if (!objetivas(p).length) { toast("Esta prova não tem questões objetivas."); return; } imprimir(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Folha de respostas</title><style>@page{size:A4;margin:14mm}body{margin:0}${CSS_FOLHA}${CSS_FR}</style></head><body><div class="folha">${folhaRespostasHTML(p)}</div></body></html>`); return; }
+  if (act === "corrigir-foto") { dlgCorrigir(S.provas.find(x => x.id === b.dataset.id)); return; }
+  if (act === "ia-corrigir") { lerFolha(); return; }
+  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), t = turma(p.turmaId);
+  const nota = Number(String(c.nota).replace(",", "."));
+  if (!(nota >= 0 && nota <= 10)) { toast("A nota deve ser um número de 0 a 10."); return; }
+  let av = c.avalId === "nova" ? null : JSON.parse(JSON.stringify(S.avaliacoes.find(a => a.id === c.avalId) || null));
+  if (!av) { av = { id: uid(), turmaId: t.id, nome: p.titulo, peso: 1, data: p.data || hoje(), bimestre: "1", provaId: p.id, notas: {} }; c.avalId = av.id; }
+  av.notas = av.notas || {}; av.notas[c.alunoId] = Math.round(nota * 10) / 10;
+  await salvar("avaliacoes", av);
+  const pr = JSON.parse(JSON.stringify(p)); pr.correcoes = pr.correcoes || {};
+  pr.correcoes[c.alunoId] = { respostas: c.marcadas, nota: av.notas[c.alunoId], em: new Date().toISOString() };
+  await salvar("provas", pr);
+  const aluno = t.alunos.find(a => a.id === c.alunoId);
+  toast(`Nota de ${aluno ? aluno.nome.split(" ")[0] : "aluno"} lançada: ${fmtNota(av.notas[c.alunoId])}`);
+  const prox = t.alunos.find(a => !pr.correcoes[a.id]);
+  if (!prox) { fechar(); toast("Todas as provas da turma foram corrigidas"); return; }
+  Object.assign(c, { alunoId: prox.id, foto: "", leitura: null, marcadas: {}, nota: "", status: "" });
+  renderCorrecao();
 });
 
 /* ---------- ações ---------- */
