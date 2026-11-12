@@ -1770,6 +1770,107 @@ function chipsPeriodo(t) {
   return `<div class="periodos" role="group" aria-label="Período">${bs.map(b => `<button type="button" class="per" data-act="bim-sel" data-v="${b.num}" aria-pressed="${sel === String(b.num)}">${esc(b.nome)}</button>`).join("")}<button type="button" class="per" data-act="bim-sel" data-v="" aria-pressed="${sel === ""}">Ano todo</button></div>`;
 }
 
+/* Habilidades, recursos e tecnologia de cada bimestre */
+const RECURSOS = [["Na sala", ["Livro didático", "Quadro", "Material impresso", "Material concreto", "Jogos de tabuleiro ou cartas", "Cartazes", "Biblioteca"]],
+  ["Tecnologia", ["Projetor ou TV", "Computador do professor", "Caixa de som", "Laboratório de informática", "Chromebooks ou tablets", "Celular dos alunos", "Internet na sala", "Lousa digital", "Kit de robótica"]]];
+const TEC = new Set(RECURSOS[1][1]);
+S.bimAberto = {};
+document.addEventListener("toggle", e => { const d = e.target; if (d.classList && d.classList.contains("bim-det")) S.bimAberto[d.dataset.chave] = d.open; }, true);
+const habsDe = b => Array.isArray(b.habs) ? b.habs : [];
+const textoHab = h => (h.codigo ? h.codigo + " – " : "") + h.descricao;
+function lerHab(txt) { const m = String(txt).trim().match(/^((?:EI|EF|EM)\d{2}[A-Z]{2,4}\d{2,3})\s*[-–:.)]?\s*(.*)$/i); return m ? { codigo: m[1].toUpperCase(), descricao: m[2].trim() } : { codigo: "", descricao: String(txt).trim() }; }
+async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)), nb = bimPorNum(nt, num); fn(nb, nt); await salvar("turmas", nt); if (msg) toast(msg); }
+function bimExtras(b) {
+  const hs = habsDe(b), rec = b.recursos || [], ids = b.ideiasTec || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
+  const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
+  const aberto = S.bimAberto[chave] ?? (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim));
+  return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b>Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia</span></summary><div class="bim-extras">
+    <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div>
+      ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
+      <form class="perfil-add" data-form="bim-hab" data-num="${b.num}"><input class="input" name="hab" placeholder="Ex.: EF07MA01 – Resolver problemas com números naturais" maxlength="400" aria-label="Nova habilidade"><button class="btn sm" type="submit">${ico("plus")}Adicionar</button></form></div>
+    <div class="bim-box"><div class="bim-box-h"><h3>O que vou usar nas aulas</h3></div>
+      ${RECURSOS.map(([g, xs]) => `<div class="rec-grupo"><span class="small muted">${g}</span><div class="chips-esc">${xs.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="${rec.includes(x)}">${rec.includes(x) ? "✓ " : ""}${esc(x)}</button>`).join("")}</div></div>`).join("")}
+      ${outros.length ? `<div class="chips-esc">${outros.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="true">✓ ${esc(x)} ×</button>`).join("")}</div>` : ""}
+      <form class="perfil-add" data-form="bim-rec" data-num="${b.num}" style="margin-top:8px"><input class="input" name="rec" placeholder="Outro recurso. Ex.: horta da escola" maxlength="80" aria-label="Outro recurso"><button class="btn sm" type="submit">${ico("plus")}Adicionar</button></form></div>
+    <div class="bim-box bim-tec"><div class="bim-box-h"><div><h3>Tecnologia nas aulas</h3><p class="small muted">Ideias ligadas às habilidades e aos recursos marcados, com pelo menos uma sem internet.</p></div><button class="btn ai sm" data-act="bim-tec-ia" data-num="${b.num}">${ico("spark")}${ids.length ? "Mais ideias com IA" : "Ideias com IA"}</button></div>
+      ${ids.length ? `<div class="tec-ideias">${ids.map((x, i) => `<article class="tec-ideia"><div class="tec-tags">${x.eixo ? `<span class="chip">${esc(x.eixo)}</span>` : ""}${x.precisa ? `<span class="chip acc">${esc(x.precisa)}</span>` : ""}${x.habilidade ? `<span class="bncc">${esc(x.habilidade)}</span>` : ""}</div>
+        <h4>${esc(x.titulo)}</h4>${x.objetivo ? `<p class="small">${esc(x.objetivo)}</p>` : ""}${x.ferramentas ? `<p class="small"><b>Usa:</b> ${esc(x.ferramentas)}</p>` : ""}
+        ${(x.passos || []).length ? `<ol class="small">${x.passos.map(p => `<li>${esc(p)}</li>`).join("")}</ol>` : ""}
+        <p class="small muted">${x.duracao ? esc(x.duracao) : ""}${x.avaliacao ? ` · Avaliação: ${esc(x.avaliacao)}` : ""}</p>
+        <div class="toolbar"><button class="btn sm primary" data-act="bim-tec-plano" data-num="${b.num}" data-i="${i}">Virar plano de aula</button><button class="btn sm ghost" data-act="bim-tec-rem" data-num="${b.num}" data-i="${i}">Tirar</button></div></article>`).join("")}</div>` : ""}</div>
+  </div></details>`;
+}
+function dlgHabIA(num) {
+  const t = turmaAtual(), b = bimPorNum(t, num); dlg._bim = num; dlg._habs = [];
+  abrirDlg(`Habilidades do ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}</p>
+    <div class="field"><label for="hbCont">Conteúdos do bimestre (opcional)</label><textarea class="input" id="hbCont" rows="3" placeholder="Ex.: frações e números decimais. Se deixar vazio, a Manu segue o esperado para a série.">${esc(b.conteudos || "")}</textarea></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-habs">${ico("spark")}Sugerir habilidades</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Confira os códigos antes de usar.</span></div></div>
+    <div id="hbLista"></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-hab-salvar" disabled id="hbOk">Adicionar marcadas</button>`);
+}
+async function iaHabs() {
+  const t = turmaAtual(), bs = bimestresDe(t), b = bimPorNum(t, dlg._bim);
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "habilidades", periodo: b.nome, numero: Math.max(1, bs.indexOf(b) + 1), total: Math.max(1, bs.length), conteudos: val("hbCont") || undefined, turma: turmaIA(t.id) }, signal);
+    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").toUpperCase().slice(0, 20), descricao: String(h.descricao || "").slice(0, 380) })).filter(h => h.descricao);
+    if (!hs.length) throw { message: "A resposta veio vazia. Tente de novo." };
+    const ja = new Set(habsDe(b).map(h => h.codigo).filter(Boolean));
+    dlg._habs = hs;
+    document.getElementById("hbLista").innerHTML = `<div class="list">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="hbSel" value="${i}" ${ja.has(h.codigo) ? "disabled" : "checked"}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${ja.has(h.codigo) ? ' <span class="small muted">(já está)</span>' : ""}</span></label>`).join("")}</div>`;
+    document.getElementById("hbOk").disabled = false; st.textContent = "Marque as que vai usar.";
+  });
+}
+function dlgTecIA(num) {
+  const t = turmaAtual(), b = bimPorNum(t, num); dlg._bim = num;
+  const tec = (b.recursos || []).filter(x => TEC.has(x));
+  abrirDlg(`Tecnologia no ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)} · ${habsDe(b).length || (b.plano?.habilidades || []).length} habilidades · ${tec.length ? "tecnologia marcada: " + tec.map(esc).join(", ") : "nenhuma tecnologia marcada (a Manu vai sugerir atividades sem equipamento)"}</p>
+    <div class="grid2"><div class="field"><label for="tcQtd">Quantas ideias</label><select class="input" id="tcQtd">${[3, 4, 5, 6].map(n => `<option ${n === 4 ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+    <div class="field"><label for="tcObs">Algo a considerar (opcional)</label><input class="input" id="tcObs" placeholder="Ex.: só 10 computadores; internet fraca; turma agitada"></div></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-tec">${ico("spark")}Gerar ideias</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">As ideias ficam guardadas no bimestre.</span></div></div>`,
+    `<button type="button" class="btn" data-act="fechar">Fechar</button>`);
+}
+async function iaTec() {
+  const t = turmaAtual(), b = bimPorNum(t, dlg._bim);
+  const habs = habsDe(b).length ? habsDe(b).map(textoHab) : (b.plano?.habilidades || []);
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "tecnologia", periodo: b.nome, habilidades: habs.slice(0, 25).map(x => String(x).slice(0, 400)), recursos: (b.recursos || []).slice(0, 40), quantidade: Number(val("tcQtd")) || 4, observacoes: val("tcObs") || undefined, turma: turmaIA(t.id) }, signal);
+    const ids = (r && Array.isArray(r.ideias) ? r.ideias : []).map(x => ({ id: uid(), titulo: String(x.titulo || "Atividade").slice(0, 160), eixo: String(x.eixo || "").slice(0, 60), habilidade: String(x.habilidade || "").slice(0, 40), precisa: String(x.precisa || "").slice(0, 60),
+      ferramentas: String(x.ferramentas || "").slice(0, 300), objetivo: String(x.objetivo || "").slice(0, 400), passos: (Array.isArray(x.passos) ? x.passos : []).slice(0, 8).map(p => String(p).slice(0, 300)), duracao: String(x.duracao || "").slice(0, 80), avaliacao: String(x.avaliacao || "").slice(0, 300) }));
+    if (!ids.length) throw { message: "A resposta veio vazia. Tente de novo." };
+    await mudarBim(b.num, nb => { nb.ideiasTec = [...(nb.ideiasTec || []), ...ids].slice(-20); });
+    st.textContent = "Pronto."; fechar(); toast(`${ids.length} ideias de tecnologia no ${b.nome}`);
+    setTimeout(() => document.querySelector(`#bim-${b.num} .bim-tec`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  });
+}
+document.addEventListener("submit", async e => {
+  const f = e.target.closest("[data-form='bim-hab'],[data-form='bim-rec']"); if (!f) return; e.preventDefault();
+  const num = Number(f.dataset.num), v = (f.elements.hab || f.elements.rec).value.trim(); if (!v) return;
+  if (f.dataset.form === "bim-hab") await mudarBim(num, nb => { nb.habs = [...habsDe(nb), lerHab(v)]; }, "Habilidade adicionada");
+  else await mudarBim(num, nb => { const rc = nb.recursos || []; if (!rc.includes(v)) nb.recursos = [...rc, v]; }, "Recurso adicionado");
+  document.querySelector(`[data-form='${f.dataset.form}'][data-num='${num}'] input`)?.focus();
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='bim-hab'],[data-act='bim-rec'],[data-act^='bim-tec'],[data-act='ia-habs'],[data-act='ia-tec']"); if (!b) return;
+  const act = b.dataset.act, num = Number(b.dataset.num || dlg._bim), t = turmaAtual(); if (!t) return;
+  if (act === "bim-hab-ia") return dlgHabIA(num);
+  if (act === "ia-habs") return iaHabs();
+  if (act === "bim-tec-ia") return dlgTecIA(num);
+  if (act === "ia-tec") return iaTec();
+  if (act === "bim-hab-salvar") {
+    const sel = [...dlg.querySelectorAll('input[name="hbSel"]:checked')].map(x => dlg._habs[Number(x.value)]); fechar();
+    if (sel.length) await mudarBim(num, nb => { nb.habs = [...habsDe(nb), ...sel]; }, `${sel.length} habilidades adicionadas`);
+    return;
+  }
+  if (act === "bim-hab-rem") return mudarBim(num, nb => { nb.habs = habsDe(nb).filter((_, i) => i !== Number(b.dataset.i)); });
+  if (act === "bim-rec") return mudarBim(num, nb => { const rc = nb.recursos || [], v = b.dataset.v; nb.recursos = rc.includes(v) ? rc.filter(x => x !== v) : [...rc, v]; });
+  if (act === "bim-tec-rem") return mudarBim(num, nb => { nb.ideiasTec = (nb.ideiasTec || []).filter((_, i) => i !== Number(b.dataset.i)); });
+  if (act === "bim-tec-plano") {
+    const bi = bimPorNum(t, num), x = (bi.ideiasTec || [])[Number(b.dataset.i)]; if (!x) return;
+    const dia = hoje() < bi.inicio ? bi.inicio : hoje() > bi.fim ? bi.inicio : hoje();
+    dlgPlano({ id: uid(), turmaId: t.id, data: dia, titulo: x.titulo, duracao: x.duracao || "1 aula de 50 min", bncc: x.habilidade, objetivos: x.objetivo, conteudo: [x.eixo && "Tecnologia: " + x.eixo, x.ferramentas].filter(Boolean).join(" · "),
+      metodologia: (x.passos || []).map((p, i) => `${i + 1}. ${p}`).join("\n"), recursos: [x.ferramentas, x.precisa].filter(Boolean).join(" · "), avaliacao: x.avaliacao, status: "planejado" });
+  }
+});
 function vBimestres() {
   const t = turmaAtual(), bs = bimestresDe(t);
   const head = `<div class="page-head"><div><h1>Bimestres</h1><p class="muted">Divida o ano letivo da turma em períodos. As notas, a frequência e o planejamento passam a ser organizados por período.</p></div>${bs.length ? `<div class="toolbar"><button class="btn" data-act="bim-editar">Editar períodos</button></div>` : ""}</div>`;
@@ -1792,6 +1893,7 @@ function vBimestres() {
     return `<section class="panel bim-card" id="bim-${b.num}">
       <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
       <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
+      ${bimExtras(b)}
       ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
         ${(pl.semanas || []).map((s, i) => `<tr><td class="num"><b>${i + 1}</b><div class="small muted">${esc(sem[i]?.rotulo || "")}</div></td><td><b>${esc(s.tema)}</b></td><td class="small">${esc(s.habilidades || "")}</td><td class="small">${esc(s.objetivos || "")}</td><td class="small">${esc(s.atividades || "")}</td><td class="small">${esc(s.avaliacao || "")}</td><td>${criados.has(i + 1) ? '<span class="chip ok">plano criado</span>' : ""}</td></tr>`).join("")}
@@ -1817,7 +1919,8 @@ async function iaBimestre() {
   const t = turmaAtual(), b = bimPorNum(t, dlg._bim), sem = semanasDo(b);
   const aulas = Math.max(1, Math.min(20, parseInt(val("biAulas")) || 2)), cont = val("biCont");
   await comIA(async (signal, st) => {
-    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: cont || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id) }, signal);
+    const extras = [habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHab).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
+    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id) }, signal);
     if (!r || !Array.isArray(r.semanas) || !r.semanas.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const nt = JSON.parse(JSON.stringify(t)); nt.aulasSemana = aulas;
     const nb = bimPorNum(nt, b.num); nb.conteudos = cont;

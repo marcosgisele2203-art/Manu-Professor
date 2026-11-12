@@ -417,3 +417,27 @@ td .grade{border-radius:8px;min-height:36px}
 .link-btn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:6px 0;text-decoration:underline}
 .suggest .btn{white-space:normal;text-align:left;height:auto;min-height:36px;padding-block:6px;max-width:100%}
 .cel-turma small.cel-esc{font-weight:600;color:var(--ink);opacity:.7;margin-top:1px}
+/* Bimestre: habilidades, recursos e tecnologia */
+.bim-extras{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.bim-box{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.bim-box h3{margin:0;font-size:1rem}
+.bim-box-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.bim-box-h p{margin:2px 0 0}
+.bim-tec{grid-column:1/-1}
+.bim-habs{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.bim-habs li{display:flex;align-items:flex-start;gap:8px;font-size:.88rem;line-height:1.35}
+.bim-habs li>span:nth-of-type(2),.bim-habs li>span:only-of-type{flex:1;min-width:0}
+.bim-habs li .btn{margin-left:auto;flex:none}
+.rec-grupo{display:grid;gap:4px}
+.tec-ideias{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.tec-ideia{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.tec-ideia h4{margin:0;font-size:.98rem}.tec-ideia p{margin:0}.tec-ideia ol{margin:0;padding-left:18px;display:grid;gap:2px}
+.tec-ideia .toolbar{margin-top:auto;padding-top:4px}
+.tec-tags{display:flex;flex-wrap:wrap;gap:4px}
+@media (max-width:860px){.bim-extras{grid-template-columns:1fr}}
+.bim-det{border:1px solid var(--line);border-radius:14px;padding:0}
+.bim-det>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:12px 14px;list-style:none}
+.bim-det>summary::-webkit-details-marker{display:none}
+.bim-det>summary::before{content:"▸";color:var(--accent);font-weight:700}
+.bim-det[open]>summary::before{content:"▾"}
+.bim-det>.bim-extras{padding:0 14px 14px}
