@@ -8,7 +8,7 @@ const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d
 const fmtData = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
 const fmtDataLonga = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) : "—";
 const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides"];
+const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides", "calendario"];
 const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
 const MEDIA_MIN = 6, FREQ_MIN = 75;
 
@@ -29,6 +29,7 @@ const I = {
   slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/>',
   drive: '<path d="M8 3h8l6 11-4 7H6l-4-7z"/><path d="M8 3l6 11H2M16 3 10 14l-4 7M22 14H10"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 14.5l2 2 4-4"/>',
   horario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2M8 17.5h2"/>',
   resumo: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   alunos: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
@@ -42,14 +43,14 @@ const I = {
 };
 const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
 
-const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
+const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["calendario", "Calendário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
 const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Diário"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
 const lk = v => S.dentroTurma && turmaAtual() ? linkTurma(turmaAtual().id, v) : "#" + v;
-const NAV_PRINCIPAL = ["inicio", "turmas", "horario"];
+const NAV_PRINCIPAL = ["inicio", "turmas", "horario", "calendario"];
 const ABAS_TOPO = ["resumo", "alunos", "bimestres", "chamada", "notas", "provas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
@@ -125,7 +126,7 @@ function exemplo() {
     { id: "exq4", disciplina: "Ciências", tema: "Sistema circulatório", serie: "8º ano EF", tipo: "vf", dificuldade: "facil", enunciado: "As artérias levam o sangue do coração para o resto do corpo.", alternativas: ["Verdadeiro", "Falso"], correta: 0, resposta: "", bncc: "EF08CI08", exemplo: true }
   ];
   const provas = [{ id: "expr1", titulo: "Avaliação — Frações", turmaId: t1.id, data: addDias(d0, 8), instrucoes: "Leia com atenção. Use caneta azul ou preta. Duração: 50 minutos.", questaoIds: ["exq1", "exq2", "exq3"], exemplo: true }];
-  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [], slides: [] };
+  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [], slides: [], calendario: [] };
 }
 
 /* ---------- camada de dados ---------- */
@@ -277,7 +278,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>${S.erroRede ? "Sem internet" : "Não foi possível carregar seus dados"}</h3><p>${S.erroRede ? "Este aparelho ainda não tem uma cópia dos seus dados. Abra o sistema uma vez com internet; depois ele funciona mesmo sem conexão." : "Verifique a internet e recarregue a página."}</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -414,11 +415,96 @@ document.addEventListener("click", async e => {
   }
 });
 
+/* ----- Calendário escolar ----- */
+// Páscoa (algoritmo de Meeus) para os feriados móveis
+function pascoa(ano) {
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+function feriadosNacionais(ano) {
+  const p = pascoa(ano), f = (md, nome, tipo = "feriado") => ({ id: `nac-${ano}-${md}`, data: `${ano}-${md}`, nome, tipo, nacional: true });
+  const m = (n, nome, tipo = "feriado") => { const d = addDias(p, n); return { id: `nac-${d}`, data: d, nome, tipo, nacional: true }; };
+  return [f("01-01", "Confraternização Universal"), m(-48, "Carnaval", "sem-aula"), m(-47, "Carnaval", "sem-aula"), m(-2, "Sexta-feira Santa"), f("04-21", "Tiradentes"), f("05-01", "Dia do Trabalho"),
+    m(60, "Corpus Christi", "sem-aula"), f("09-07", "Independência do Brasil"), f("10-12", "Nossa Senhora Aparecida"), f("11-02", "Finados"), f("11-15", "Proclamação da República"), f("11-20", "Dia da Consciência Negra"), f("12-25", "Natal")];
+}
+const TIPOS_CAL = { feriado: "Feriado", recesso: "Recesso / férias", "sem-aula": "Sem aula", evento: "Evento (tem aula)", "com-aula": "Tem aula" };
+// eventos de um ano: nacionais (podem ser desmarcados) + os que o professor cadastrou
+let _calMemo = {};
+function eventosDoAno(ano) {
+  const chave = ano + ":" + JSON.stringify(S.calendario || []).length;
+  if (_calMemo[chave]) return _calMemo[chave];
+  if (Object.keys(_calMemo).length > 20) _calMemo = {};
+  return (_calMemo[chave] = eventosDoAnoCalc(ano));
+}
+function eventosDoAnoCalc(ano) {
+  const meus = (S.calendario || []).filter(e => (e.data || "").slice(0, 4) === String(ano) || (e.fim || "").slice(0, 4) === String(ano));
+  const nac = feriadosNacionais(ano).map(n => { const o = meus.find(e => e.id === "ajuste-" + n.id); return o ? { ...n, tipo: o.tipo, ajuste: true } : n; });
+  return [...nac, ...meus.filter(e => !String(e.id).startsWith("ajuste-"))].sort((a, b) => a.data.localeCompare(b.data));
+}
+// dia sem aula para uma escola ("" = vale para todas)? devolve o evento ou null
+function semAula(data, escola) {
+  for (const e of eventosDoAno(Number(data.slice(0, 4)))) {
+    if (!["feriado", "recesso", "sem-aula"].includes(e.tipo)) continue;
+    if (e.escola && escola && e.escola !== escola) continue;
+    if (data >= e.data && data <= (e.fim || e.data)) return e;
+  }
+  return null;
+}
+S.calAno = new Date().getFullYear();
+function diasLetivos(escola, ano) {
+  // do início do 1º período ao fim do último, nas turmas desta escola
+  const ts = S.turmas.filter(t => (!escola || escolaDe(t) === escola) && String(t.ano || ano) === String(ano)), bs = ts.flatMap(t => bimestresDe(t));
+  if (!bs.length) return null;
+  const ini = bs.map(b => b.inicio).sort()[0], fim = bs.map(b => b.fim).sort().pop();
+  let n = 0; for (let d = ini; d <= fim; d = addDias(d, 1)) if (diaSemana(d) <= 5 && !semAula(d, escola)) n++;
+  return { n, ini, fim };
+}
+function vCalendario() {
+  const ano = S.calAno, evs = eventosDoAno(ano), es = escolas();
+  const letivos = (es.length ? es : [""]).map(e => ({ e, r: diasLetivos(e, ano) })).filter(x => x.r);
+  const porMes = {}; evs.forEach(e => (porMes[e.data.slice(5, 7)] ||= []).push(e));
+  const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  return `<div class="page-head"><div><h1>Calendário escolar</h1><p class="muted">Feriados, recessos e dias sem aula ficam fora do diário e das aulas previstas. Os feriados nacionais já estão aqui.</p></div>
+    <div class="toolbar"><button class="btn sm ghost" data-act="cal-ano" data-v="-1" aria-label="Ano anterior">‹</button><b class="num" style="font-size:1.2rem">${ano}</b><button class="btn sm ghost" data-act="cal-ano" data-v="1" aria-label="Próximo ano">›</button></div></div>
+  ${letivos.length ? `<div class="stats">${letivos.map(({ e, r }) => `<div class="stat"><span class="eyebrow">Dias letivos${e ? " · " + esc(e) : ""}</span><span class="v num" style="color:${r.n < 200 ? "var(--warn)" : "inherit"}">${r.n}</span><span class="small muted">${r.n >= 200 ? "cumpre os 200 dias" : `faltam ${200 - r.n} para os 200 dias`} · ${fmtData(r.ini)} a ${fmtData(r.fim)}</span></div>`).join("")}</div>` : ""}
+  <section class="panel"><div class="panel-head"><h2>Adicionar ao calendário</h2></div>
+    <form class="cal-form" id="calForm">
+      <div class="field"><label for="cNome">O que é</label><input class="input" id="cNome" required maxlength="120" placeholder="Ex.: Aniversário da cidade, recesso de julho, conselho de classe"></div>
+      <div class="field"><label for="cTipo">Tipo</label><select class="input" id="cTipo">${["feriado", "recesso", "sem-aula", "evento"].map(k => `<option value="${k}">${TIPOS_CAL[k]}</option>`).join("")}</select></div>
+      <div class="field"><label for="cIni">Data</label><input class="input" type="date" id="cIni" required value="${hoje().slice(0, 4) === String(ano) ? hoje() : ano + "-01-01"}"></div>
+      <div class="field"><label for="cFim">Até (se for mais de um dia)</label><input class="input" type="date" id="cFim"></div>
+      ${es.length > 1 ? `<div class="field"><label for="cEsc">Vale para</label><select class="input" id="cEsc"><option value="">Todas as escolas</option>${es.map(e => `<option>${esc(e)}</option>`).join("")}</select></div>` : ""}
+      <button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form></section>
+  ${Object.keys(porMes).sort().map(mm => `<section class="panel cal-mes"><h2>${MESES[Number(mm) - 1]}</h2><ul class="cal-lista">${porMes[mm].map(e => `<li class="cal-ev ${e.tipo}${e.ajuste && e.tipo === "com-aula" ? " riscado" : ""}">
+      <span class="cal-data num">${e.data.slice(8)}${e.fim && e.fim !== e.data ? `–${fmtData(e.fim)}` : ""}</span>
+      <span class="cal-nome"><b>${esc(e.nome)}</b><small>${TIPOS_CAL[e.tipo] || e.tipo}${e.nacional ? " · nacional" : ""}${e.escola ? " · " + esc(e.escola) : ""}${DIAS[diaSemana(e.data)] ? " · " + DIAS[diaSemana(e.data)].toLowerCase() : " · domingo"}</small></span>
+      ${e.nacional && diaSemana(e.data) >= 6 ? "" : e.nacional ? `<button class="btn sm ghost" data-act="cal-nac" data-id="${esc(e.id)}" data-data="${e.data}" data-tipo="${e.tipo === "com-aula" ? "" : "com-aula"}">${e.tipo === "com-aula" ? "Voltar a ser sem aula" : "Teve aula neste dia"}</button>`
+        : `<button class="btn sm ghost" data-act="cal-rem" data-id="${esc(e.id)}" aria-label="Tirar ${esc(e.nome)}">×</button>`}</li>`).join("")}</ul></section>`).join("")}`;
+}
+document.addEventListener("submit", async e => {
+  if (e.target.id !== "calForm") return; e.preventDefault();
+  const ini = val2("cIni"), fim = val2("cFim"), nome = val2("cNome").trim();
+  if (!nome || !ini) return;
+  if (fim && fim < ini) { toast("A data final precisa ser depois da inicial."); return; }
+  await salvar("calendario", { id: uid(), nome, tipo: val2("cTipo"), data: ini, fim: fim && fim !== ini ? fim : "", escola: val2("cEsc") || "" });
+  toast("Adicionado ao calendário");
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='cal-']"); if (!b) return;
+  if (b.dataset.act === "cal-ano") { S.calAno += Number(b.dataset.v); render(); return; }
+  if (b.dataset.act === "cal-rem") return apagar("calendario", b.dataset.id);
+  if (b.dataset.act === "cal-nac") { const id = "ajuste-" + b.dataset.id; if (b.dataset.tipo) await salvar("calendario", { id, tipo: b.dataset.tipo, data: b.dataset.data }); else await apagar("calendario", id); }
+});
+
 /* ----- Início ----- */
 function agendaHoje() {
   const d0 = hoje(), ds = diaSemana(d0), mAgora = new Date().getHours() * 60 + new Date().getMinutes();
-  const aulas = S.turmas.flatMap(t => horarioDe(t).filter(a => a.dia === ds).map(a => ({ t, a }))).sort((x, y) => x.a.inicio.localeCompare(y.a.inicio));
+  const aulas = S.turmas.filter(t => !semAula(d0, escolaDe(t))).flatMap(t => horarioDe(t).filter(a => a.dia === ds).map(a => ({ t, a }))).sort((x, y) => x.a.inicio.localeCompare(y.a.inicio));
   if (!S.turmas.some(t => horarioDe(t).length)) return "";
+  const fer = semAula(d0, "");
+  if (fer && !aulas.length) return `<section class="panel"><div class="panel-head"><h2>Hoje não tem aula</h2><span class="small muted">${DIAS[ds] || "Domingo"}</span></div><p class="muted">${esc(fer.nome)}. Bom descanso!</p></section>`;
   return `<section class="panel"><div class="panel-head"><h2>Suas aulas de hoje</h2><span class="small muted">${DIAS[ds] || "Domingo"}</span></div>
     ${aulas.length ? `<div class="agenda">${aulas.map(({ t, a }) => { const est = minutos(a.fim) <= mAgora ? "feita" : minutos(a.inicio) <= mAgora ? "agora" : "";
       return `<a class="ag-item ${est}" href="${linkTurma(t.id, "chamada")}"><span class="num ag-h">${tempoDe(t, a) ? `<b>${tempoDe(t, a)}º tempo</b> ` : ""}${a.inicio}–${a.fim}</span><span class="dot" style="background:${esc(t.cor)}"></span><span class="ag-t"><b>${esc(t.nome)}</b><small>${esc(t.disciplina)}${variasEscolas() && escolaDe(t) ? " · " + esc(escolaDe(t)) : ""}</small></span>${est === "agora" ? '<span class="chip acc">agora</span>' : est === "feita" ? '<span class="chip">encerrada</span>' : ""}</a>`; }).join("")}</div>`
@@ -534,7 +620,7 @@ document.addEventListener("click", e => { const c = e.target.closest(".card-turm
 // dias de aula da turma num período: pelo horário (Meu horário); sem horário, dias úteis
 function diasDeAula(t, ini, fim) {
   const ds = new Set(horarioDe(t).map(a => a.dia)), out = [];
-  for (let d = ini; d <= fim; d = addDias(d, 1)) { const w = diaSemana(d); if (ds.size ? ds.has(w) : w <= 5) out.push(d); }
+  for (let d = ini; d <= fim; d = addDias(d, 1)) { const w = diaSemana(d); if ((ds.size ? ds.has(w) : w <= 5) && !semAula(d, escolaDe(t))) out.push(d); }
   return out;
 }
 const chamadaDe = (t, data) => S.chamadas.find(c => c.id === t.id + "_" + data);
@@ -605,6 +691,7 @@ function vChamada() {
       <div class="d-cab-tit"><h2>${esc(fmtDataLonga(data))}</h2><span class="small muted">${esc(temposDoDia(t, data) || "Dia fora do horário cadastrado")}${foraDoPeriodo ? " · fora do bimestre escolhido" : ""}</span></div>
       <button type="button" class="btn sm ghost" data-act="d-prox" aria-label="Próxima aula">›</button>
       <label class="btn sm ghost d-outro">Outro dia<input type="date" id="chData" value="${esc(data)}"></label></div>
+    ${(x => x ? `<div class="d-status meio">Sem aula neste dia: ${esc(x.nome)}${x.nacional ? " (feriado nacional)" : ""}. Se houve aula, registre normalmente.</div>` : "")(semAula(data, escolaDe(t)))}
     <div class="d-status ${st}">${st === "ok" ? "✓ Aula registrada" : st === "meio" ? (Object.keys(pres).length ? "Falta escrever o que foi trabalhado" : "Falta a frequência") : data > hoje() ? "Aula ainda não aconteceu" : "Aula ainda não registrada"}</div>
     <div class="d-passo"><div class="d-passo-h"><span class="d-n">1</span><div><h3>Quem faltou?</h3><p class="small muted">Toque no nome de quem faltou. Os outros ficam como presentes.</p></div>
       <div class="d-cont"><span class="chip ok num">${al.length - nF - nJ} presente${al.length - nF - nJ === 1 ? "" : "s"}</span>${nF ? `<span class="chip bad num">${nF} falta${nF > 1 ? "s" : ""}</span>` : ""}${nJ ? `<span class="chip warn num">${nJ} justificada${nJ > 1 ? "s" : ""}</span>` : ""}</div></div>
@@ -2186,7 +2273,8 @@ async function iaBimestre() {
   const t = turmaAtual(), b = bimPorNum(t, dlg._bim), sem = semanasDo(b);
   const aulas = Math.max(1, Math.min(20, parseInt(val("biAulas")) || 2)), cont = val("biCont");
   await comIA(async (signal, st) => {
-    const extras = [habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHab).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
+    const fer = []; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) { const x = semAula(d, escolaDe(t)); if (x && diaSemana(d) <= 5) fer.push(`${fmtData(d)} (${x.nome})`); }
+    const extras = [fer.length ? "Dias sem aula no período: " + fer.join(", ") + "." : "", habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHab).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
     const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id) }, signal);
     if (!r || !Array.isArray(r.semanas) || !r.semanas.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const nt = JSON.parse(JSON.stringify(t)); nt.aulasSemana = aulas;
@@ -2321,7 +2409,7 @@ const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(
 const diaSemana = iso => { const d = new Date(iso + "T12:00:00").getDay(); return d === 0 ? 7 : d; }; // 1 = segunda
 function aulasPrevistas(t, b) { // dias de aula previstos no período, pelo horário da turma
   const h = horarioDe(t); if (!h.length) return null;
-  let n = 0; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) if (h.some(x => x.dia === diaSemana(d))) n++;
+  let n = 0; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) if (h.some(x => x.dia === diaSemana(d)) && !semAula(d, escolaDe(t))) n++;
   return n;
 }
 function proximaAula(t) {

@@ -500,3 +500,17 @@ td .grade{border-radius:8px;min-height:36px}
 @media (max-width:600px){.d-cont{margin-left:42px;width:100%}.d-outro{order:5}}
 /* Sem internet */
 body.sem-rede #syncState{color:#9a6700;font-weight:700}
+/* Calendário escolar */
+.cal-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+.cal-form:has(#cEsc){grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr)) auto}
+@media (max-width:900px){.cal-form,.cal-form:has(#cEsc){grid-template-columns:1fr 1fr}.cal-form .field:first-child{grid-column:1/-1}}
+.cal-mes h2{font-size:1.05rem;margin:0 0 8px}
+.cal-lista{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.cal-ev{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);border-left:4px solid #b42318}
+.cal-ev.recesso{border-left-color:#3d5a98}.cal-ev.sem-aula{border-left-color:#b08900}.cal-ev.evento{border-left-color:var(--accent)}.cal-ev.com-aula{border-left-color:var(--line);opacity:.7}
+.cal-data{min-width:64px;font-weight:800;font-size:1.05rem}
+.cal-nome{flex:1;min-width:0;display:flex;flex-direction:column}.cal-nome small{color:var(--muted);font-size:.8rem}
+.cal-ev.riscado .cal-nome b{text-decoration:line-through}
+.cal-ev .btn{flex:none}
+.cal-ev{flex-wrap:wrap;min-width:0}.cal-nome b{overflow-wrap:anywhere}
+@media (max-width:600px){.cal-ev .btn{margin-left:76px}.cal-data{min-width:52px}}
