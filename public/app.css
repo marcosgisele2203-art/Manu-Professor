@@ -514,3 +514,7 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .cal-ev .btn{flex:none}
 .cal-ev{flex-wrap:wrap;min-width:0}.cal-nome b{overflow-wrap:anywhere}
 @media (max-width:600px){.cal-ev .btn{margin-left:76px}.cal-data{min-width:52px}}
+.cal-ev.sabado-letivo{border-left-color:#1d7a46}
+.ci-h{font-size:.95rem;margin:14px 0 6px}
+.ci-evs{display:grid;gap:4px;max-height:42vh;overflow:auto;padding-right:4px}
+.ci-evs .cal-ev{padding:6px 8px;align-items:flex-start}

@@ -429,7 +429,16 @@ function feriadosNacionais(ano) {
   return [f("01-01", "Confraternização Universal"), m(-48, "Carnaval", "sem-aula"), m(-47, "Carnaval", "sem-aula"), m(-2, "Sexta-feira Santa"), f("04-21", "Tiradentes"), f("05-01", "Dia do Trabalho"),
     m(60, "Corpus Christi", "sem-aula"), f("09-07", "Independência do Brasil"), f("10-12", "Nossa Senhora Aparecida"), f("11-02", "Finados"), f("11-15", "Proclamação da República"), f("11-20", "Dia da Consciência Negra"), f("12-25", "Natal")];
 }
-const TIPOS_CAL = { feriado: "Feriado", recesso: "Recesso / férias", "sem-aula": "Sem aula", evento: "Evento (tem aula)", "com-aula": "Tem aula" };
+const TIPOS_CAL = { feriado: "Feriado", recesso: "Recesso / férias", "sem-aula": "Sem aula", "sabado-letivo": "Sábado letivo", evento: "Evento (tem aula)", "com-aula": "Tem aula" };
+// sábados letivos de uma escola num período (contam como dia de aula)
+function sabadosLetivos(escola, ini, fim) {
+  const out = [];
+  for (const e of [...eventosDoAno(Number(ini.slice(0, 4))), ...(ini.slice(0, 4) !== fim.slice(0, 4) ? eventosDoAno(Number(fim.slice(0, 4))) : [])]) {
+    if (e.tipo !== "sabado-letivo" || (e.escola && escola && e.escola !== escola)) continue;
+    for (let d = e.data; d <= (e.fim || e.data); d = addDias(d, 1)) if (d >= ini && d <= fim) out.push(d);
+  }
+  return out;
+}
 // eventos de um ano: nacionais (podem ser desmarcados) + os que o professor cadastrou
 let _calMemo = {};
 function eventosDoAno(ano) {
@@ -459,6 +468,7 @@ function diasLetivos(escola, ano) {
   if (!bs.length) return null;
   const ini = bs.map(b => b.inicio).sort()[0], fim = bs.map(b => b.fim).sort().pop();
   let n = 0; for (let d = ini; d <= fim; d = addDias(d, 1)) if (diaSemana(d) <= 5 && !semAula(d, escola)) n++;
+  n += sabadosLetivos(escola, ini, fim).length;
   return { n, ini, fim };
 }
 function vCalendario() {
@@ -467,12 +477,12 @@ function vCalendario() {
   const porMes = {}; evs.forEach(e => (porMes[e.data.slice(5, 7)] ||= []).push(e));
   const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   return `<div class="page-head"><div><h1>Calendário escolar</h1><p class="muted">Feriados, recessos e dias sem aula ficam fora do diário e das aulas previstas. Os feriados nacionais já estão aqui.</p></div>
-    <div class="toolbar"><button class="btn sm ghost" data-act="cal-ano" data-v="-1" aria-label="Ano anterior">‹</button><b class="num" style="font-size:1.2rem">${ano}</b><button class="btn sm ghost" data-act="cal-ano" data-v="1" aria-label="Próximo ano">›</button></div></div>
+    <div class="toolbar"><button class="btn sm ghost" data-act="cal-ano" data-v="-1" aria-label="Ano anterior">‹</button><b class="num" style="font-size:1.2rem">${ano}</b><button class="btn sm ghost" data-act="cal-ano" data-v="1" aria-label="Próximo ano">›</button><button class="btn ai" data-act="cal-importar">${ico("spark")}Importar calendário da escola</button></div></div>
   ${letivos.length ? `<div class="stats">${letivos.map(({ e, r }) => `<div class="stat"><span class="eyebrow">Dias letivos${e ? " · " + esc(e) : ""}</span><span class="v num" style="color:${r.n < 200 ? "var(--warn)" : "inherit"}">${r.n}</span><span class="small muted">${r.n >= 200 ? "cumpre os 200 dias" : `faltam ${200 - r.n} para os 200 dias`} · ${fmtData(r.ini)} a ${fmtData(r.fim)}</span></div>`).join("")}</div>` : ""}
   <section class="panel"><div class="panel-head"><h2>Adicionar ao calendário</h2></div>
     <form class="cal-form" id="calForm">
       <div class="field"><label for="cNome">O que é</label><input class="input" id="cNome" required maxlength="120" placeholder="Ex.: Aniversário da cidade, recesso de julho, conselho de classe"></div>
-      <div class="field"><label for="cTipo">Tipo</label><select class="input" id="cTipo">${["feriado", "recesso", "sem-aula", "evento"].map(k => `<option value="${k}">${TIPOS_CAL[k]}</option>`).join("")}</select></div>
+      <div class="field"><label for="cTipo">Tipo</label><select class="input" id="cTipo">${["feriado", "recesso", "sem-aula", "sabado-letivo", "evento"].map(k => `<option value="${k}">${TIPOS_CAL[k]}</option>`).join("")}</select></div>
       <div class="field"><label for="cIni">Data</label><input class="input" type="date" id="cIni" required value="${hoje().slice(0, 4) === String(ano) ? hoje() : ano + "-01-01"}"></div>
       <div class="field"><label for="cFim">Até (se for mais de um dia)</label><input class="input" type="date" id="cFim"></div>
       ${es.length > 1 ? `<div class="field"><label for="cEsc">Vale para</label><select class="input" id="cEsc"><option value="">Todas as escolas</option>${es.map(e => `<option>${esc(e)}</option>`).join("")}</select></div>` : ""}
@@ -483,6 +493,64 @@ function vCalendario() {
       ${e.nacional && diaSemana(e.data) >= 6 ? "" : e.nacional ? `<button class="btn sm ghost" data-act="cal-nac" data-id="${esc(e.id)}" data-data="${e.data}" data-tipo="${e.tipo === "com-aula" ? "" : "com-aula"}">${e.tipo === "com-aula" ? "Voltar a ser sem aula" : "Teve aula neste dia"}</button>`
         : `<button class="btn sm ghost" data-act="cal-rem" data-id="${esc(e.id)}" aria-label="Tirar ${esc(e.nome)}">×</button>`}</li>`).join("")}</ul></section>`).join("")}`;
 }
+// Importar o calendário da escola (PDF ou foto): a Manu lê, o professor confere e salva
+function dlgImportarCal() {
+  const es = escolas();
+  abrirDlg("Importar calendário da escola", `<p class="small muted">Envie o calendário que a escola ou a secretaria entregou, em PDF ou foto. A Manu lê os feriados, recessos, sábados letivos e as datas dos bimestres. Você confere antes de salvar.</p>
+    <div class="grid2"><div class="field"><label for="ciEsc">Escola</label>${es.length ? `<select class="input" id="ciEsc">${es.map(e => `<option>${esc(e)}</option>`).join("")}</select>` : `<input class="input" id="ciEsc" placeholder="Nome da escola">`}</div>
+    <div class="field"><label for="ciAno">Ano</label><input class="input" id="ciAno" inputmode="numeric" value="${S.calAno}"></div></div>
+    <div class="field"><label for="ciArq">Arquivo do calendário</label><input class="input" type="file" id="ciArq" accept="application/pdf,image/*"></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-cal">${ico("spark")}Ler calendário</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto.</span></div></div>
+    <div id="ciRes"></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="cal-imp-salvar" id="ciOk" disabled>Salvar no calendário</button>`);
+}
+const lerBase64 = arq => new Promise((ok, erro) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(",")[1]); fr.onerror = erro; fr.readAsDataURL(arq); });
+async function iaCalendario() {
+  const arq = document.getElementById("ciArq").files[0], escola = val2("ciEsc").trim(), ano = Number(val2("ciAno")) || S.calAno;
+  if (!arq) { document.getElementById("iaStatus").textContent = "Escolha o arquivo do calendário."; return; }
+  if (arq.size > 6.5 * 1024 * 1024) { document.getElementById("iaStatus").textContent = "Arquivo grande demais (máximo 6 MB). Tente uma foto menor ou o PDF."; return; }
+  const mime = arq.type === "application/pdf" ? "application/pdf" : ["image/jpeg", "image/png", "image/webp"].includes(arq.type) ? arq.type : "";
+  if (!mime) { document.getElementById("iaStatus").textContent = "Use um PDF ou uma foto (JPG ou PNG)."; return; }
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "calendario", arquivo: await lerBase64(arq), mime, ano, escola: escola || undefined }, signal);
+    const okData = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
+    const per = (r?.periodos || []).filter(x => okData(x.inicio) && okData(x.fim) && x.fim >= x.inicio).map((x, i) => ({ num: i + 1, nome: String(x.nome || `${i + 1}º bimestre`).slice(0, 40), inicio: x.inicio, fim: x.fim }));
+    const nacionais = new Set(feriadosNacionais(ano).map(n => n.data));
+    const evs = (r?.eventos || []).filter(x => okData(x.data) && Object.keys(TIPOS_CAL).includes(x.tipo) && x.tipo !== "com-aula").map(x => ({ data: x.data, fim: okData(x.fim) && x.fim > x.data ? x.fim : "", nome: String(x.nome || "").slice(0, 120), tipo: x.tipo }))
+      // feriados nacionais já estão no sistema: não repete
+      .filter(x => !(x.tipo === "feriado" && !x.fim && nacionais.has(x.data)));
+    if (!per.length && !evs.length) throw { message: "Não consegui ler o calendário. Tente um PDF ou uma foto mais nítida." };
+    dlg._imp = { escola, ano, per, evs, total: r?.diasLetivos };
+    const ts = S.turmas.filter(t => !escola || escolaDe(t) === escola);
+    document.getElementById("ciRes").innerHTML = `${per.length ? `<h3 class="ci-h">Bimestres</h3><div class="list">${per.map(x => `<div class="row"><div class="grow title">${esc(x.nome)}</div><span class="chip num">${fmtData(x.inicio)} a ${fmtData(x.fim)}</span></div>`).join("")}</div>
+      ${ts.length ? `<label class="check" style="border:0"><input type="checkbox" id="ciBim" checked><span>Usar essas datas nos bimestres das ${ts.length} turmas ${escola ? "da " + esc(escola) : ""}</span></label>` : ""}` : ""}
+      <h3 class="ci-h">Dias do calendário <small class="muted">(desmarque o que não quiser)</small></h3>
+      <div class="ci-evs">${evs.map((x, i) => `<label class="check cal-ev ${x.tipo}"><input type="checkbox" name="ciEv" value="${i}" checked><span><b>${fmtData(x.data)}${x.fim ? " a " + fmtData(x.fim) : ""}</b> · ${esc(x.nome)} <small class="muted">${TIPOS_CAL[x.tipo]}</small></span></label>`).join("")}</div>
+      ${r?.diasLetivos ? `<p class="small muted">O calendário informa ${esc(String(r.diasLetivos))} dias letivos.</p>` : ""}`;
+    document.getElementById("ciOk").disabled = false; st.textContent = "Confira e salve.";
+  });
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act='cal-importar'],[data-act='ia-cal'],[data-act='cal-imp-salvar']"); if (!b) return;
+  if (b.dataset.act === "cal-importar") return dlgImportarCal();
+  if (b.dataset.act === "ia-cal") return iaCalendario();
+  const imp = dlg._imp; if (!imp) return;
+  const sel = [...dlg.querySelectorAll('input[name="ciEv"]:checked')].map(x => imp.evs[Number(x.value)]), usarBim = document.getElementById("ciBim")?.checked;
+  fechar();
+  // não duplica o que já foi importado antes para a mesma escola
+  const ja = new Set((S.calendario || []).map(x => [x.data, x.fim || "", x.nome, x.escola || ""].join("|")));
+  let n = 0;
+  for (const x of sel) { const k = [x.data, x.fim || "", x.nome, imp.escola].join("|"); if (ja.has(k)) continue; await salvar("calendario", { id: uid(), ...x, escola: imp.escola, origem: "importado" }); n++; }
+  let nt = 0;
+  if (usarBim && imp.per.length) for (const t of S.turmas.filter(t => !imp.escola || escolaDe(t) === imp.escola)) {
+    const c = JSON.parse(JSON.stringify(t)), velhos = bimestresDe(c);
+    c.bimestres = imp.per.map(p => ({ ...(velhos.find(v => v.num === p.num) || {}), ...p }));
+    c.tipoPeriodo = imp.per.length === 3 ? "trimestre" : "bimestre";
+    await salvar("turmas", c); nt++;
+  }
+  S.calAno = imp.ano; render();
+  toast(`${n} dias adicionados ao calendário${nt ? ` e datas dos bimestres atualizadas em ${nt} turmas` : ""}`);
+});
 document.addEventListener("submit", async e => {
   if (e.target.id !== "calForm") return; e.preventDefault();
   const ini = val2("cIni"), fim = val2("cFim"), nome = val2("cNome").trim();
@@ -621,7 +689,7 @@ document.addEventListener("click", e => { const c = e.target.closest(".card-turm
 function diasDeAula(t, ini, fim) {
   const ds = new Set(horarioDe(t).map(a => a.dia)), out = [];
   for (let d = ini; d <= fim; d = addDias(d, 1)) { const w = diaSemana(d); if ((ds.size ? ds.has(w) : w <= 5) && !semAula(d, escolaDe(t))) out.push(d); }
-  return out;
+  return [...new Set([...out, ...sabadosLetivos(escolaDe(t), ini, fim)])].sort();
 }
 const chamadaDe = (t, data) => S.chamadas.find(c => c.id === t.id + "_" + data);
 function statusAula(t, data) {
