@@ -323,15 +323,10 @@ function vResumoTurma() {
 
 /* ----- Turmas ----- */
 function vTurmas() {
-  const head = `<div class="page-head"><div><h1>Turmas</h1><p class="muted">Suas turmas, alunos e o resumo de cada uma.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button></div></div>`;
+  const head = `<div class="page-head"><div><h1>Turmas</h1><p class="muted">Toque numa turma para abrir o painel com alunos, chamada, notas e as ferramentas de IA.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button></div></div>`;
   if (!S.turmas.length) return head + semTurma();
   return head + `<div class="cards">${S.turmas.map(t => {
-    const al = t.alunos || []; const meds = al.map(a => mediaAluno(t, a.id)).filter(x => x !== null);
-    const fr = al.map(a => freqAluno(t, a.id)).filter(x => x !== null);
-    const mm = meds.length ? meds.reduce((a, b) => a + b, 0) / meds.length : null;
-    const fm = fr.length ? Math.round(fr.reduce((a, b) => a + b, 0) / fr.length) : null;
-    return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${esc(t.disciplina)} · ${esc(t.serie || "")}${t.turno ? " · " + esc(t.turno) : ""}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
-      <div class="grid3" style="gap:8px"><div><span class="eyebrow">Alunos</span><div class="num" style="font-size:1.2rem">${al.length}</div></div><div><span class="eyebrow">Média</span><div class="num" style="font-size:1.2rem">${fmtNota(mm)}</div></div><div><span class="eyebrow">Freq.</span><div class="num" style="font-size:1.2rem">${fm === null ? "—" : fm + "%"}</div></div></div>
+    return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${[t.disciplina, t.serie, t.turno].filter(Boolean).map(esc).join(" · ")}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
       <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
 }
