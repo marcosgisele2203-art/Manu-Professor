@@ -121,7 +121,7 @@ async function iniciar() {
   render();
   try {
     const eu = await api("GET", "/api/eu");
-    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || "";
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     S.mode = "live";
@@ -1115,6 +1115,16 @@ async function pastaDaTurma(turmaId, sub, token) {
   const pt = await pastaDrive(nomePastaTurma(turma(turmaId)), raiz, token);
   return { turma: pt, sub: sub ? await pastaDrive(sub, pt, token) : pt };
 }
+async function pastaAutomatica(turmaId) {
+  if (!S.googleConectado || !S.googleClientId) return;
+  try {
+    const r = await fetch("/api/google/token"); if (!r.ok) return;
+    const j = await r.json(); gToken = j.access_token; gTokenAte = Date.now() + (Number(j.expires_in || 3600) - 120) * 1000;
+    const p = await pastaDaTurma(turmaId, "", gToken);
+    for (const sub of ["Planos de aula", "Materiais", "Provas", "Slides", "Boletins"]) await pastaDrive(sub, p.turma, gToken);
+    toast("Pasta da turma criada no seu Google Drive");
+  } catch (_) {}
+}
 async function enviarDrive(nome, blob, tipo, turmaId, sub) {
   const [origem, destino, app] = MIME[tipo];
   let token;
@@ -1189,7 +1199,7 @@ document.addEventListener("click", async e => {
       const antigos = o.alunos || [];
       o.alunos = nomes.map(n => antigos.find(a => a.nome === n) || { id: uid(), nome: n });
       delete o.exemplo;
-      fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); break; }
+      fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); pastaAutomatica(o.id); break; }
     case "apagar-turma": {
       if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar turma e tudo dela"; return; }
       const tid = dlg._obj.id; fechar();
