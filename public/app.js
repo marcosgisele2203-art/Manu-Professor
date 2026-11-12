@@ -44,7 +44,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Diário"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
@@ -372,7 +372,7 @@ function vInicio() {
   if (!S.turmas.length) return `<div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(primeiroNome()) : ""}</h1></div></div></div>` + semTurma("Comece cadastrando uma turma. Depois você faz a chamada, lança notas e planeja aulas com ajuda da IA.");
   return `
   <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(primeiroNome()) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
-  <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Fazer chamada</a>` : ""}</div></div>
+  <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Diário de hoje</a>` : ""}</div></div>
   ${!(S.escolas || []).length || !(S.disciplinas || []).length || !(S.etapas || []).length ? `<a class="aviso-perfil" href="#perfil">${ico("turmas")}<span><b>Complete seu perfil</b><small>Cadastre suas escolas, as etapas (Fundamental, Médio…) e as disciplinas. Assim, ao criar uma turma, é só escolher.</small></span><span class="btn sm">Completar</span></a>` : ""}
   ${S.googleClientId && !S.googleConectado ? `<div class="aviso-perfil">${ico("drive")}<span><b>Conecte seu Google Drive</b><small>Para criar as pastas das suas turmas e salvar planos, provas e slides no seu Drive. Na tela do Google, <b>marque a caixinha do Google Drive</b> antes de clicar em Continuar.</small></span><button class="btn sm primary" data-act="conectar-drive">Conectar</button></div>` : ""}
   ${agendaHoje()}
@@ -414,7 +414,7 @@ function vResumoTurma() {
   const linhaHor = px ? `<a class="faixa-hor" href="#horario">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
     : `<a class="faixa-hor vazio" href="#horario"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
   return faixa + linhaHor + `<div class="atalhos">
-    <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
+    <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Diário de hoje feito" : "Registrar a aula de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}"><b>Lançar notas</b><span>Médias e boletim da turma</span></a>
     <a class="atalho" href="${linkTurma(t.id, "atividades")}"><b>Entregas</b><span>Quem entregou as atividades</span></a>
     <a class="atalho" href="${linkTurma(t.id, "provas")}"><b>Provas</b><span>Montar, imprimir e corrigir por foto</span></a>
@@ -467,31 +467,155 @@ document.addEventListener("click", e => { const b = e.target.closest(".card-bim[
 document.addEventListener("click", e => { const c = e.target.closest(".card-turma[data-abrir]"); if (!c || e.target.closest("a,button")) return; irTurma(c.dataset.abrir); });
 
 /* ----- Chamada ----- */
+/* ----- Diário de classe: uma tela por aula ----- */
+// dias de aula da turma num período: pelo horário (Meu horário); sem horário, dias úteis
+function diasDeAula(t, ini, fim) {
+  const ds = new Set(horarioDe(t).map(a => a.dia)), out = [];
+  for (let d = ini; d <= fim; d = addDias(d, 1)) { const w = diaSemana(d); if (ds.size ? ds.has(w) : w <= 5) out.push(d); }
+  return out;
+}
+const chamadaDe = (t, data) => S.chamadas.find(c => c.id === t.id + "_" + data);
+function statusAula(t, data) {
+  const c = chamadaDe(t, data), temP = c && Object.keys(c.presencas || {}).length, temC = c && (c.conteudo || "").trim();
+  if (temP && temC) return "ok"; if (temP || temC) return "meio"; return data < hoje() ? "pend" : data === hoje() ? "hoje" : "fut";
+}
+function periodoDiario(t) {
+  const b = bimSelecionado(t) ? bimPorNum(t, bimSelecionado(t)) : null;
+  if (b) return { b, ini: b.inicio, fim: b.fim };
+  return { b: null, ini: addDias(hoje(), -45), fim: addDias(hoje(), 14) };
+}
+function diasDoDiario(t) {
+  const { ini, fim } = periodoDiario(t);
+  const extras = S.chamadas.filter(c => c.turmaId === t.id && c.data >= ini && c.data <= fim).map(c => c.data);
+  return [...new Set([...diasDeAula(t, ini, fim), ...extras])].sort();
+}
+function temposDoDia(t, data) {
+  const w = diaSemana(data), hs = horarioDe(t).filter(a => a.dia === w);
+  if (!hs.length) return "";
+  const ks = hs.map(a => tempoDe(t, a)).filter(Boolean);
+  return `${ks.length ? ks.map(k => k + "º").join(" e ") + " tempo" : ""} · ${hs[0].inicio}–${hs[hs.length - 1].fim}`;
+}
+// sugestões de conteúdo: planejamento da semana, plano de aula do dia e a aula anterior
+function sugestoesConteudo(t, data) {
+  const out = [], b = bimDaData(t, data);
+  if (b && b.plano) { const i = semanasDo(b).findIndex(w => data >= w.inicio && data <= addDias(w.fim, 2)); const w = b.plano.semanas?.[i]; if (w && w.tema) out.push({ rot: "Planejamento da semana", txt: w.tema + (w.atividades ? " – " + w.atividades : ""), habs: String(w.habilidades || "").split(/[,;\s]+/).filter(x => /^(EI|EF|EM)\d/i.test(x)) }); }
+  for (const p of S.planos.filter(p => p.turmaId === t.id && p.data === data)) out.push({ rot: "Plano de aula do dia", txt: p.titulo + (p.conteudo && p.conteudo !== p.titulo ? " – " + p.conteudo : ""), habs: String(p.bncc || "").split(/[,;\s]+/).filter(x => /^(EI|EF|EM)\d/i.test(x)) });
+  const ant = S.chamadas.filter(c => c.turmaId === t.id && c.data < data && (c.conteudo || "").trim()).sort((a, c) => c.data.localeCompare(a.data))[0];
+  if (ant) out.push({ rot: `Igual à aula de ${fmtData(ant.data)}`, txt: ant.conteudo, habs: ant.habilidades || [] });
+  return out.slice(0, 3);
+}
+async function mudarAula(t, data, fn, msg) {
+  const al = t.alunos || [], cid = t.id + "_" + data;
+  const c = JSON.parse(JSON.stringify(chamadaDe(t, data) || { id: cid, turmaId: t.id, data, presencas: {}, conteudo: "" }));
+  // o professor só marca quem faltou: quem não foi marcado conta como presente
+  al.forEach(a => { if (!c.presencas[a.id]) c.presencas[a.id] = "P"; });
+  fn(c); c.atualizadoEm = new Date().toISOString();
+  await salvar("chamadas", c); if (msg) toast(msg);
+}
 function vChamada() {
   const t = turmaAtual();
-  const head = `<div class="page-head"><div><h1>Chamada</h1><p class="muted">Marque P (presente), F (falta) ou J (falta justificada). Salva sozinho.</p></div></div>`;
+  const head = `<div class="page-head"><div><h1>Diário de classe</h1><p class="muted">Escolha a aula, marque só quem faltou e escreva o que foi trabalhado. Tudo salva sozinho.</p></div><div class="toolbar"><button class="btn" data-act="d-imprimir">${ico("dl")}Imprimir diário</button></div></div>`;
   if (!t) return head + semTurma();
-  const id = t.id + "_" + S.chamadaData;
-  const ch = S.chamadas.find(c => c.id === id);
-  const pres = ch?.presencas || {};
-  const al = t.alunos || [];
-  const nP = al.filter(a => pres[a.id] === "P").length, nF = al.filter(a => pres[a.id] === "F").length, nJ = al.filter(a => pres[a.id] === "J").length;
-  const bimC = bimSelecionado(t), Bc = bimC ? bimPorNum(t, bimC) : null;
-  const hist = S.chamadas.filter(c => c.turmaId === t.id && (!Bc || (c.data >= Bc.inicio && c.data <= Bc.fim))).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 12);
-  return head + `
-  <section class="panel">
-    <div class="panel-head">
-      <div class="toolbar"><div class="field"><label for="chData">Data da aula</label><input class="input" type="date" id="chData" value="${esc(S.chamadaData)}"></div>
-      <div class="field" style="min-width:220px;flex:1"><label for="chConteudo">Conteúdo da aula (diário)</label><input class="input" type="text" id="chConteudo" value="${esc(ch?.conteudo || "")}" placeholder="Ex.: Frações equivalentes, p. 84"></div></div>
-      <div class="toolbar"><span class="chip ok num">${nP} P</span><span class="chip bad num">${nF} F</span><span class="chip warn num">${nJ} J</span><button class="btn sm" data-act="todos-presentes">Todos presentes</button></div>
-    </div>
-    ${al.length ? `<div class="list">${al.map((a, i) => `<div class="row"><span class="num muted small" style="width:22px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Frequência${Bc ? " no " + esc(Bc.nome) : ""}: ${freqAluno(t, a.id, bimC) ?? "—"}${freqAluno(t, a.id, bimC) !== null ? "%" : ""}</div></div>
-      <div class="pres" role="group" aria-label="Presença de ${esc(a.nome)}">${["P", "F", "J"].map(v => `<button data-act="marcar" data-aluno="${esc(a.id)}" data-v="${v}" aria-pressed="${pres[a.id] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>`
-      : `<p class="muted">Esta turma ainda não tem alunos. <a class="btn sm" href="${linkTurma(t.id, "alunos")}">Adicionar alunos</a></p>`}
-  </section>
-  <section class="panel"><h2>Aulas registradas</h2>
-    ${hist.length ? `<div class="list">${hist.map(c => { const v = Object.values(c.presencas || {}); return `<div class="row"><span class="chip num">${fmtData(c.data)}</span><div class="grow small">${esc(c.conteudo || "Sem conteúdo registrado")}</div><span class="small muted num">${v.filter(x => x !== "F").length}/${v.length} presentes</span><button class="btn sm ghost" data-act="abrir-chamada" data-data="${esc(c.data)}">Abrir</button></div>`; }).join("")}</div>` : `<p class="muted">Nenhuma chamada registrada nesta turma.</p>`}
+  const dias = diasDoDiario(t), data = S.chamadaData, c = chamadaDe(t, data), pres = c?.presencas || {}, al = t.alunos || [];
+  const { b } = periodoDiario(t), passados = dias.filter(d => d <= hoje()), feitas = passados.filter(d => statusAula(t, d) === "ok").length, pend = passados.filter(d => ["pend", "meio"].includes(statusAula(t, d)));
+  const ICO_ST = { ok: "✓", meio: "•", pend: "!", hoje: "", fut: "" };
+  const faixa = `<div class="d-faixa" id="dFaixa" role="list" aria-label="Aulas">${[...new Set([...dias, data])].sort().map(d => { const st = statusAula(t, d); return `<button type="button" role="listitem" class="d-dia ${st}${d === data ? " sel" : ""}" data-act="d-dia" data-data="${d}" aria-current="${d === data}" title="${st === "ok" ? "Aula registrada" : st === "meio" ? "Falta completar" : st === "pend" ? "Aula sem registro" : ""}"><small>${DIAS[diaSemana(d)]?.slice(0, 3) || ""}</small><b>${d.slice(8)}/${d.slice(5, 7)}</b><i>${ICO_ST[st]}</i></button>`; }).join("")}</div>`;
+  const fechamento = `<section class="panel d-fech"><div class="d-fech-num"><b class="num">${feitas}</b><span>de ${passados.length} aulas registradas${b ? " no " + esc(b.nome) : ""}</span></div>
+    <div class="d-fech-pend">${pend.length ? `<span class="small"><b>${pend.length}</b> ${pend.length === 1 ? "aula precisa" : "aulas precisam"} de registro:</span> ${pend.slice(-8).map(d => `<button class="chip ${statusAula(t, d) === "pend" ? "bad" : "warn"}" data-act="d-dia" data-data="${d}">${fmtData(d)}</button>`).join("")}${pend.length > 8 ? ` <span class="small muted">e mais ${pend.length - 8}</span>` : ""}` : `<span class="chip ok">Diário em dia</span>`}</div></section>`;
+  const ini = periodoDiario(t).ini, fim = periodoDiario(t).fim;
+  const foraDoPeriodo = data < ini || data > fim;
+  // 1. frequência
+  const nF = al.filter(a => pres[a.id] === "F").length, nJ = al.filter(a => pres[a.id] === "J").length;
+  const freq = al.length ? `<div class="d-alunos">${al.map((a, i) => { const v = pres[a.id] || "P"; return `<div class="d-aluno ${v}"><button type="button" class="d-nome" data-act="d-falta" data-aluno="${esc(a.id)}" aria-pressed="${v !== "P"}"><span class="num">${String(i + 1).padStart(2, "0")}</span><span class="nm">${esc(a.nome)}</span><span class="st">${v === "P" ? "Presente" : v === "F" ? "Faltou" : "Falta justificada"}</span></button>${v !== "P" ? `<button type="button" class="btn sm ghost" data-act="d-just" data-aluno="${esc(a.id)}">${v === "J" ? "Tirar justificativa" : "Justificar"}</button>` : ""}</div>`; }).join("")}</div>`
+    : `<p class="muted">Esta turma ainda não tem alunos. <a class="btn sm" href="${linkTurma(t.id, "alunos")}">Adicionar alunos</a></p>`;
+  // 2. conteúdo e habilidades
+  const sug = sugestoesConteudo(t, data), bimD = bimDaData(t, data);
+  const habsBim = [...new Map([...(bimD ? habsDe(bimD) : []).map(h => [h.codigo || h.descricao, h]), ...sug.flatMap(x => x.habs).map(cd => [cd.toUpperCase(), { codigo: cd.toUpperCase(), descricao: "" }])]).values()].filter(h => h.codigo);
+  const habsSel = new Set(c?.habilidades || []);
+  // 3. tecnologia
+  const tec = c?.tecnologia || null, recTec = bimD ? (bimD.recursos || []).filter(x => TEC.has(x)) : [], ideias = bimD ? (bimD.ideiasTec || []) : [];
+  const opTec = [...new Set([...recTec, ...ideias.map(x => x.titulo), ...(tec?.itens || [])])];
+  const st = statusAula(t, data);
+  return head + fechamento + `<section class="panel d-aula">
+    ${faixa}
+    <div class="d-cab"><button type="button" class="btn sm ghost" data-act="d-ant" aria-label="Aula anterior">‹</button>
+      <div class="d-cab-tit"><h2>${esc(fmtDataLonga(data))}</h2><span class="small muted">${esc(temposDoDia(t, data) || "Dia fora do horário cadastrado")}${foraDoPeriodo ? " · fora do bimestre escolhido" : ""}</span></div>
+      <button type="button" class="btn sm ghost" data-act="d-prox" aria-label="Próxima aula">›</button>
+      <label class="btn sm ghost d-outro">Outro dia<input type="date" id="chData" value="${esc(data)}"></label></div>
+    <div class="d-status ${st}">${st === "ok" ? "✓ Aula registrada" : st === "meio" ? (Object.keys(pres).length ? "Falta escrever o que foi trabalhado" : "Falta a frequência") : data > hoje() ? "Aula ainda não aconteceu" : "Aula ainda não registrada"}</div>
+    <div class="d-passo"><div class="d-passo-h"><span class="d-n">1</span><div><h3>Quem faltou?</h3><p class="small muted">Toque no nome de quem faltou. Os outros ficam como presentes.</p></div>
+      <div class="d-cont"><span class="chip ok num">${al.length - nF - nJ} presente${al.length - nF - nJ === 1 ? "" : "s"}</span>${nF ? `<span class="chip bad num">${nF} falta${nF > 1 ? "s" : ""}</span>` : ""}${nJ ? `<span class="chip warn num">${nJ} justificada${nJ > 1 ? "s" : ""}</span>` : ""}</div></div>
+      ${freq}${al.length && !c ? `<button class="btn sm" data-act="d-todos">Confirmar: todos presentes</button>` : ""}</div>
+    <div class="d-passo"><div class="d-passo-h"><span class="d-n">2</span><div><h3>O que foi trabalhado?</h3><p class="small muted">Escreva com suas palavras ou toque numa sugestão.</p></div></div>
+      ${sug.length ? `<div class="d-sug">${sug.map((x, i) => `<button type="button" class="d-sug-b" data-act="d-sug" data-i="${i}"><small>${esc(x.rot)}</small><span>${esc(x.txt.length > 140 ? x.txt.slice(0, 140) + "…" : x.txt)}</span></button>`).join("")}</div>` : ""}
+      <textarea class="input" id="chConteudo" rows="3" placeholder="Ex.: Frações equivalentes. Leitura da página 84 e exercícios 1 a 5.">${esc(c?.conteudo || "")}</textarea>
+      ${habsBim.length ? `<div class="d-sub"><span class="small muted">Habilidades da BNCC desta aula (opcional)</span><div class="chips-esc">${habsBim.map(h => `<button type="button" class="tn-op" data-act="d-hab" data-v="${esc(h.codigo)}" aria-pressed="${habsSel.has(h.codigo)}" title="${esc(h.descricao)}">${habsSel.has(h.codigo) ? "✓ " : ""}${esc(h.codigo)}</button>`).join("")}</div></div>` : ""}</div>
+    <div class="d-passo"><div class="d-passo-h"><span class="d-n">3</span><div><h3>Usou tecnologia nesta aula?</h3><p class="small muted">Fica no relatório de uso de tecnologia do bimestre.</p></div></div>
+      <div class="chips-esc"><button type="button" class="tn-op" data-act="d-tec" data-v="nao" aria-pressed="${tec && !tec.usou ? "true" : "false"}">Não</button><button type="button" class="tn-op" data-act="d-tec" data-v="sim" aria-pressed="${tec?.usou ? "true" : "false"}">Sim</button></div>
+      ${tec?.usou ? `<div class="d-sub"><span class="small muted">O que foi usado</span><div class="chips-esc">${[...opTec, ...[...TEC].filter(x => !opTec.includes(x))].slice(0, 16).map(x => `<button type="button" class="tn-op" data-act="d-tec-item" data-v="${esc(x)}" aria-pressed="${(tec.itens || []).includes(x)}">${(tec.itens || []).includes(x) ? "✓ " : ""}${esc(x)}</button>`).join("")}</div></div>` : ""}</div>
+    <div class="d-passo"><div class="d-passo-h"><span class="d-n">4</span><div><h3>Observações <span class="small muted">(opcional)</span></h3></div></div>
+      <textarea class="input" id="dObs" rows="2" placeholder="Ex.: aula encurtada por reunião; turma participou bem.">${esc(c?.observacao || "")}</textarea></div>
   </section>`;
+}
+// rola a faixa de dias até a aula escolhida
+const _rotaDiario = () => setTimeout(() => { const f = document.getElementById("dFaixa"), s = f && f.querySelector(".sel"); if (s) f.scrollLeft = s.offsetLeft - f.clientWidth / 2 + s.clientWidth / 2; }, 20);
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='d-']"); if (!b) return;
+  const t = turmaAtual(); if (!t) return;
+  const act = b.dataset.act, data = S.chamadaData;
+  if (act === "d-dia") { S.chamadaData = b.dataset.data; render(); _rotaDiario(); return; }
+  if (act === "d-ant" || act === "d-prox") { const ds = diasDoDiario(t), i = ds.indexOf(data); let n = act === "d-ant" ? (i < 0 ? ds.filter(d => d < data).pop() : ds[i - 1]) : (i < 0 ? ds.find(d => d > data) : ds[i + 1]); if (n) { S.chamadaData = n; render(); _rotaDiario(); } return; }
+  if (act === "d-imprimir") return imprimirDiario(t);
+  if (act === "d-falta") return mudarAula(t, data, c => { const v = c.presencas[b.dataset.aluno]; c.presencas[b.dataset.aluno] = v === "P" ? "F" : "P"; });
+  if (act === "d-just") return mudarAula(t, data, c => { const v = c.presencas[b.dataset.aluno]; c.presencas[b.dataset.aluno] = v === "J" ? "F" : "J"; });
+  if (act === "d-todos") return mudarAula(t, data, () => {}, "Frequência salva: todos presentes");
+  if (act === "d-sug") { const x = sugestoesConteudo(t, data)[Number(b.dataset.i)]; if (!x) return; return mudarAula(t, data, c => { c.conteudo = x.txt; c.habilidades = [...new Set([...(c.habilidades || []), ...x.habs.map(h => h.toUpperCase())])]; }, "Conteúdo preenchido"); }
+  if (act === "d-hab") return mudarAula(t, data, c => { const hs = c.habilidades || [], v = b.dataset.v; c.habilidades = hs.includes(v) ? hs.filter(x => x !== v) : [...hs, v]; });
+  if (act === "d-tec") return mudarAula(t, data, c => { c.tecnologia = b.dataset.v === "sim" ? { usou: true, itens: c.tecnologia?.itens || [] } : { usou: false, itens: [] }; });
+  if (act === "d-tec-item") return mudarAula(t, data, c => { const it = c.tecnologia?.itens || [], v = b.dataset.v; c.tecnologia = { usou: true, itens: it.includes(v) ? it.filter(x => x !== v) : [...it, v] }; });
+});
+document.addEventListener("change", async e => {
+  const t = turmaAtual(); if (!t || S.view !== "chamada") return;
+  if (e.target.id === "chConteudo") { const v = e.target.value.trim(); if (v !== (chamadaDe(t, S.chamadaData)?.conteudo || "")) await mudarAula(t, S.chamadaData, c => { c.conteudo = v; }, "Conteúdo salvo"); }
+  if (e.target.id === "dObs") { const v = e.target.value.trim(); if (v !== (chamadaDe(t, S.chamadaData)?.observacao || "")) await mudarAula(t, S.chamadaData, c => { c.observacao = v; }, "Observação salva"); }
+});
+
+// Diário do bimestre para imprimir ou salvar em PDF
+function imprimirDiario(t) {
+  const { b, ini, fim } = periodoDiario(t), al = t.alunos || [];
+  const aulas = S.chamadas.filter(c => c.turmaId === t.id && c.data >= ini && c.data <= fim).sort((a, c) => a.data.localeCompare(c.data));
+  if (!aulas.length) { toast("Ainda não há aulas registradas neste período."); return; }
+  const h = x => esc(x == null ? "" : String(x));
+  const blocos = []; for (let i = 0; i < aulas.length; i += 22) blocos.push(aulas.slice(i, i + 22));
+  const tabFreq = blocos.map(bl => `<table class="freq"><thead><tr><th class="n">Nº</th><th class="al">Aluno</th>${bl.map(c => `<th>${c.data.slice(8)}/${c.data.slice(5, 7)}</th>`).join("")}<th>Faltas</th><th>%</th></tr></thead><tbody>
+    ${al.map((a, i) => { const fs = aulas.filter(c => ["F"].includes(c.presencas?.[a.id])).length, tot = aulas.filter(c => c.presencas?.[a.id]).length, pct = tot ? Math.round((tot - fs) / tot * 100) : null;
+      return `<tr><td class="n">${i + 1}</td><td class="al">${h(a.nome)}</td>${bl.map(c => { const v = c.presencas?.[a.id] || ""; return `<td class="${v}">${v === "P" ? "•" : v}</td>`; }).join("")}<td>${fs}</td><td>${pct == null ? "—" : pct + "%"}</td></tr>`; }).join("")}</tbody></table>`).join("");
+  const reg = `<table class="reg"><thead><tr><th>Data</th><th>Conteúdo trabalhado</th><th>Habilidades</th><th>Tecnologia</th><th>Pres.</th></tr></thead><tbody>${aulas.map(c => { const v = Object.values(c.presencas || {}); return `<tr><td class="dt">${fmtData(c.data)}</td><td>${h(c.conteudo) || "<i>sem registro</i>"}${c.observacao ? `<div class="obs">Obs.: ${h(c.observacao)}</div>` : ""}</td><td>${h((c.habilidades || []).join(", "))}</td><td>${c.tecnologia?.usou ? h((c.tecnologia.itens || []).join(", ") || "Sim") : "—"}</td><td>${v.filter(x => x !== "F").length}/${v.length}</td></tr>`; }).join("")}</tbody></table>`;
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!b || String(a.bimestre) === String(b.num))).sort((a, c) => (a.data || "").localeCompare(c.data || ""));
+  const notas = avs.length ? `<h2>Avaliações e notas</h2><table class="freq"><thead><tr><th class="n">Nº</th><th class="al">Aluno</th>${avs.map(a => `<th>${h(a.nome)}<br><small>peso ${h(a.peso)}</small></th>`).join("")}<th>Média</th></tr></thead><tbody>${al.map((a, i) => `<tr><td class="n">${i + 1}</td><td class="al">${h(a.nome)}</td>${avs.map(x => `<td>${x.notas?.[a.id] == null ? "" : fmtNota(x.notas[a.id])}</td>`).join("")}<td><b>${fmtNota(mediaAluno(t, a.id, b ? b.num : undefined))}</b></td></tr>`).join("")}</tbody></table>` : "";
+  const comTec = aulas.filter(c => c.tecnologia?.usou), usos = {}; comTec.forEach(c => (c.tecnologia.itens || []).forEach(x => usos[x] = (usos[x] || 0) + 1));
+  const habsTodas = [...new Set(aulas.flatMap(c => c.habilidades || []))];
+  const resumo = `<h2>Resumo do período</h2><div class="res"><div><b>${aulas.length}</b><span>aulas registradas</span></div><div><b>${aulas.filter(c => (c.conteudo || "").trim()).length}</b><span>com conteúdo</span></div><div><b>${comTec.length}</b><span>aulas com tecnologia (${aulas.length ? Math.round(comTec.length / aulas.length * 100) : 0}%)</span></div><div><b>${habsTodas.length}</b><span>habilidades da BNCC trabalhadas</span></div></div>
+    ${comTec.length ? `<p><b>Tecnologia usada:</b> ${Object.entries(usos).sort((a, c) => c[1] - a[1]).map(([k, n]) => `${h(k)} (${n})`).join("; ") || "registrada sem detalhe"}.</p>` : ""}
+    ${habsTodas.length ? `<p><b>Habilidades:</b> ${h(habsTodas.join(", "))}.</p>` : ""}`;
+  const css = `@page{size:A4 landscape;margin:12mm}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:10.5px}h1{font-size:17px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;border-bottom:1px solid #999;padding-bottom:2px}
+    .cab{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 16px;border:1px solid #999;padding:8px;margin-bottom:8px}.cab b{display:block;font-size:9px;text-transform:uppercase;color:#555}
+    table{border-collapse:collapse;width:100%;margin-bottom:10px;page-break-inside:auto}th,td{border:1px solid #999;padding:2px 3px;text-align:center;vertical-align:top}th{background:#eee;font-size:9px}
+    .freq td.al,.freq th.al{text-align:left;white-space:nowrap}.freq td.F{color:#b42318;font-weight:bold}.freq td.J{color:#9a6700;font-weight:bold}.n{width:22px}
+    .reg td{text-align:left}.reg td.dt{white-space:nowrap}.obs{color:#555;font-style:italic;margin-top:2px}
+    .res{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}.res div{border:1px solid #999;padding:6px}.res b{font-size:16px;display:block}
+    .leg{font-size:9px;color:#444}.ass{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:40px}.ass div{border-top:1px solid #111;text-align:center;padding-top:4px}tr{page-break-inside:avoid}`;
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Diário ${h(t.nome)} ${h(b ? b.nome : "")}</title><style>${css}</style></head><body>
+    <h1>Diário de classe ${b ? "· " + h(b.nome) : ""}</h1>
+    <div class="cab"><div><b>Escola</b>${h(escolaDe(t) || "—")}</div><div><b>Professor(a)</b>${h(S.nome)}</div><div><b>Turma</b>${h(t.nome)}${t.turno ? " · " + h(t.turno) : ""}</div><div><b>Componente</b>${h(t.disciplina)}</div>
+      <div><b>Série</b>${h(t.serie || "—")}</div><div><b>Período</b>${fmtData(ini)} a ${fmtData(fim)}</div><div><b>Ano letivo</b>${h(t.ano || "")}</div><div><b>Alunos</b>${al.length}</div></div>
+    ${resumo}
+    <h2>Frequência</h2><p class="leg">• presente · F falta · J falta justificada</p>${tabFreq}
+    <h2>Registro das aulas</h2>${reg}
+    ${notas}
+    <div class="ass"><div>Professor(a)</div><div>Coordenação pedagógica</div></div>
+    <p class="leg">Gerado pelo Manu Professor em ${new Date().toLocaleDateString("pt-BR")}.</p></body></html>`;
+  imprimir(html);
 }
 
 /* ----- Notas ----- */
@@ -2379,8 +2503,7 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("change", async e => {
   const el = e.target;
-  if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); return; }
-  if (el.id === "chConteudo") { const t = turmaAtual(); const cid = t.id + "_" + S.chamadaData; const ch = JSON.parse(JSON.stringify(S.chamadas.find(c => c.id === cid) || { id: cid, turmaId: t.id, data: S.chamadaData, presencas: {}, conteudo: "" })); ch.conteudo = el.value.trim(); await salvar("chamadas", ch); toast("Conteúdo registrado"); return; }
+  if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); _rotaDiario(); return; }
   if (el.matches("input.grade")) {
     const a = JSON.parse(JSON.stringify(S.avaliacoes.find(x => x.id === el.dataset.av))); a.notas = a.notas || {};
     const raw = el.value.trim().replace(",", ".");
