@@ -408,10 +408,18 @@ function vTurmas() {
       ${bimestresDe(t).length ? `<div class="card-bims">${bimestresDe(t).map(b => { const atual = hoje() >= b.inicio && hoje() <= b.fim; return `<a class="card-bim${atual ? " atual" : ""}" href="${linkTurma(t.id)}" data-bim="${b.num}" data-turma="${esc(t.id)}" title="${esc(b.nome)}: ${fmtData(b.inicio)} a ${fmtData(b.fim)}">${esc(b.nome.replace(/\s*(bimestre|trimestre)$/i, ""))}${/bimestre/i.test(b.nome) ? "<small>bim</small>" : /trimestre/i.test(b.nome) ? "<small>tri</small>" : ""}</a>`; }).join("")}</div>` : ""}
       <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
-  if (!variasEscolas()) return head + cartoes(S.turmas);
+  // dentro de cada escola, separa por turno (Matutino, Vespertino, Noturno, Integral)
+  const porTurno = lista => {
+    const ordem = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; };
+    const tns = [...new Set(lista.map(turnoGrupo))].sort((a, b) => ordem(a) - ordem(b));
+    if (tns.length < 2 && tns[0]) return `<h3 class="grupo-turno">${esc(tns[0])} <small class="muted">${lista.length} turma${lista.length === 1 ? "" : "s"}</small></h3>` + cartoes(lista);
+    if (tns.length < 2) return cartoes(lista);
+    return tns.map(tn => { const l = lista.filter(t => turnoGrupo(t) === tn); return `<h3 class="grupo-turno">${esc(tn || "Sem turno")} <small class="muted">${l.length} turma${l.length === 1 ? "" : "s"}</small></h3>` + cartoes(l); }).join("");
+  };
+  if (!variasEscolas()) return head + porTurno(S.turmas);
   const semEsc = S.turmas.filter(t => !escolaDe(t));
-  return head + escolas().map(e => `<section class="grupo-escola"><h2>${ico("inicio")}${esc(e)} <small class="muted">${S.turmas.filter(t => escolaDe(t) === e).length} turmas</small></h2>${cartoes(S.turmas.filter(t => escolaDe(t) === e))}</section>`).join("")
-    + (semEsc.length ? `<section class="grupo-escola"><h2>Sem escola definida</h2>${cartoes(semEsc)}</section>` : "");
+  return head + escolas().map(e => `<section class="grupo-escola"><h2>${ico("inicio")}${esc(e)} <small class="muted">${(n => `${n} turma${n === 1 ? "" : "s"}`)(S.turmas.filter(t => escolaDe(t) === e).length)}</small></h2>${porTurno(S.turmas.filter(t => escolaDe(t) === e))}</section>`).join("")
+    + (semEsc.length ? `<section class="grupo-escola"><h2>Sem escola definida</h2>${porTurno(semEsc)}</section>` : "");
 }
 
 // botão de bimestre no cartão: abre a turma já naquele período
