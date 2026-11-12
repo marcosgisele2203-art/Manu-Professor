@@ -12,7 +12,9 @@ model Professor {
   id        String   @id @default(cuid())
   nome      String
   email     String   @unique
-  senhaHash String
+  senhaHash String?  // vazio em contas criadas com "Continuar com Google"
+  googleSub String?
+  googleRefresh String? // permissão do Google Drive guardada (criptografada)
   escola    String?
   criadoEm  DateTime @default(now())
   aceitouTermosEm DateTime?
@@ -20,6 +22,8 @@ model Professor {
   bloqueado Boolean  @default(false)
   registros Registro[]
   usosIA    UsoIA[]
+
+  @@index([googleSub])
 }
 
 // Cada chamada à IA, para controlar o limite mensal e o custo

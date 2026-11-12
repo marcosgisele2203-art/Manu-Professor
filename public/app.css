@@ -242,3 +242,7 @@ td .grade{border-radius:8px;min-height:36px}
 .show-sl .sl{border:0;border-radius:4px}
 .show-bar{display:flex;gap:10px;align-items:center;color:#e8eef3}.show-bar .btn{color:#1f3140;background:#fff}
 .sl.atividade ul,.sl.resumo ul{margin-top:3cqw}
+.btn-google{background:#fff;color:#1f1f1f;border:1px solid #747775;gap:10px;min-height:48px;font-size:.95rem}
+.btn-google:hover{background:#f8faff;border-color:#747775}
+.auth-ou{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.8rem}
+.auth-ou::before,.auth-ou::after{content:"";flex:1;height:1px;background:var(--line)}

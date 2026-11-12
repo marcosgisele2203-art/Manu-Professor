@@ -23,7 +23,8 @@ export default function Privacidade() {
         <p>O conteúdo gerado pela IA é uma sugestão. O professor deve revisar tudo antes de usar com os alunos.</p>
 
         <h2>Google Drive</h2>
-        <p>Se você usar o botão de salvar no Google Drive, o Manu Professor pede permissão à sua conta Google apenas para criar arquivos no seu Drive (permissão &quot;drive.file&quot;). O sistema não lê, não altera e não apaga nenhum outro arquivo seu, e não guarda o acesso depois que você fecha a página.</p>
+        <p>Se você entrar com o Google, usamos apenas o seu nome e e-mail da conta Google para criar o seu cadastro.</p>
+        <p>Para salvar seus arquivos no Google Drive, o Manu Professor pede permissão apenas para criar arquivos no seu Drive (permissão &quot;drive.file&quot;). Ele cria a pasta &quot;Manu Professor&quot; com as pastas das suas turmas e não lê, não altera e não apaga nenhum outro arquivo seu. Quando você entra com o Google, essa permissão fica guardada de forma criptografada para que você não precise autorizar de novo. Você pode retirá-la a qualquer momento em myaccount.google.com, na parte de apps conectados à sua conta.</p>
 
         <h2>Responsabilidade do professor</h2>
         <p>Ao cadastrar alunos, o professor confirma que usa esses dados para fins pedagógicos, dentro das atribuições dele na escola, e que não cadastra informações além das necessárias (como dados de saúde ou laudos).</p>

@@ -1076,8 +1076,14 @@ async function boletimXlsx(t) {
 
 // Google Drive: o arquivo vai para o Drive do professor e abre convertido no app do Google
 let gToken = null, gTokenAte = 0;
+let gServidorSem = false;
 async function tokenGoogle() {
   if (gToken && Date.now() < gTokenAte) return gToken;
+  if (!gServidorSem) {
+    const r = await fetch("/api/google/token").catch(() => null);
+    if (r && r.ok) { const j = await r.json(); gToken = j.access_token; gTokenAte = Date.now() + (Number(j.expires_in || 3600) - 120) * 1000; return gToken; }
+    gServidorSem = true;
+  }
   await carregarScript("https://accounts.google.com/gsi/client");
   return new Promise((ok, erro) => {
     const cli = google.accounts.oauth2.initTokenClient({ client_id: S.googleClientId, scope: "https://www.googleapis.com/auth/drive.file",
