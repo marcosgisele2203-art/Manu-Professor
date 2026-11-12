@@ -366,6 +366,21 @@ function lembrarNoPerfil(escola, disc) { // escola ou disciplina nova digitada n
   if (disc && !(S.disciplinas || []).includes(disc)) d.disciplinas = [...(S.disciplinas || []), disc];
   if (Object.keys(d).length && S.mode === "live") salvarPerfil(d);
 }
+function dlgTirarEscola(v) {
+  const ts = S.turmas.filter(t => escolaDe(t) === v), outras = escolas().filter(e => e !== v);
+  if (!ts.length) { abrirDlg(`Tirar ${esc(v)}?`, `<p>Essa escola não tem turmas. Ela sai da sua lista de escolas.</p>`, `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn danger" data-act="perfil-tira-esc-ok" data-v="${esc(v)}">Tirar escola</button>`); return; }
+  abrirDlg(`Tirar ${esc(v)}?`, `<p><b>${esc(v)}</b> tem ${ts.length} ${ts.length === 1 ? "turma" : "turmas"}: ${ts.map(t => esc(t.nome)).join(", ")}.</p><p>O que fazer com ${ts.length === 1 ? "ela" : "elas"}?</p>
+    <label class="check" style="border:0"><input type="radio" name="teModo" value="mover" checked><span>Passar para outra escola (alunos, diário e notas continuam)</span></label>
+    <div class="field" style="margin-left:28px"><select class="input" id="teDest">${outras.map(e => `<option>${esc(e)}</option>`).join("")}<option value="__nova" ${outras.length ? "" : "selected"}>+ Outra escola…</option></select>
+      <input class="input" id="teNova" placeholder="Nome da escola. Ex.: EE Caetano Pinto" ${outras.length ? "hidden" : ""} style="margin-top:8px"></div>
+    <label class="check" style="border:0"><input type="radio" name="teModo" value="excluir"><span>Excluir ${ts.length === 1 ? "a turma" : "as turmas"} e tudo ${ts.length === 1 ? "dela" : "delas"} (eram só de teste)</span></label>
+    <label class="check" id="teConfBox" style="border:0;margin-left:28px" hidden><input type="checkbox" id="teConf"><span>Entendo que alunos, diário e notas dessas turmas serão apagados</span></label>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn danger" data-act="perfil-tira-esc-ok" data-v="${esc(v)}">Tirar escola</button>`);
+}
+document.addEventListener("change", e => {
+  if (e.target.id === "teDest") { const i = document.getElementById("teNova"); i.hidden = e.target.value !== "__nova"; if (!i.hidden) i.focus(); }
+  if (e.target.name === "teModo") document.getElementById("teConfBox").hidden = e.target.value !== "excluir";
+});
 function vPerfil() {
   const es = S.escolas || [], ds = S.disciplinas || [], et = S.etapas || [];
   const sug = [...new Set((et.length ? et : Object.keys(COMPONENTES)).flatMap(e => COMPONENTES[e] || []))].filter(c => !ds.includes(c));
@@ -422,12 +437,25 @@ document.addEventListener("click", async e => {
   if (b.dataset.act === "perfil-tira-disc") return salvarPerfil({ disciplinas: ds.filter(x => x !== v) }, "Disciplina retirada");
   if (b.dataset.act === "perfil-principal") { for (const t of S.turmas.filter(t => !t.escola && es[0])) { t.escola = es[0]; api("PUT", "/api/dados/turmas", t).catch(() => {}); } }
   if (b.dataset.act === "perfil-principal") return salvarPerfil({ escolas: [v, ...es.filter(x => x !== v)] }, `${v} agora é a principal`);
-  if (b.dataset.act === "perfil-tira-esc") {
-    const n = S.turmas.filter(t => escolaDe(t) === v).length;
-    if (n && b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = `Tirar? ${n} turma${n > 1 ? "s" : ""} continua${n > 1 ? "m" : ""} com ela`; return; }
-    // turmas sem escola definida ficavam na principal: guardam essa escola antes de ela sair
-    if (es[0] === v) for (const t of S.turmas.filter(t => !t.escola)) { t.escola = v; api("PUT", "/api/dados/turmas", t).catch(() => {}); }
-    return salvarPerfil({ escolas: es.filter(x => x !== v) }, "Escola retirada");
+  if (b.dataset.act === "perfil-tira-esc") return dlgTirarEscola(v);
+  if (b.dataset.act === "perfil-tira-esc-ok") {
+    const ts = S.turmas.filter(t => escolaDe(t) === v), modo = dlg.querySelector('input[name="teModo"]:checked')?.value;
+    let destino = val2("teDest") === "__nova" ? val2("teNova").trim() : val2("teDest");
+    if (ts.length && !modo) { toast("Escolha o que fazer com as turmas."); return; }
+    if (ts.length && modo === "mover" && !destino) { toast("Escolha para qual escola passar as turmas."); return; }
+    if (modo === "excluir" && !document.getElementById("teConf")?.checked) { toast("Marque a confirmação para excluir as turmas."); return; }
+    fechar();
+    // a escola principal muda antes, para as turmas não ficarem presas na escola retirada
+    const novas = es.filter(x => x !== v);
+    if (modo === "mover" && !novas.includes(destino)) novas.unshift(destino);
+    for (const t of ts) {
+      if (modo === "mover") { const c = JSON.parse(JSON.stringify(t)); c.escola = destino; await salvar("turmas", c); }
+      else { for (const col of COLS) if (col !== "turmas") for (const x of S[col].filter(x => x.turmaId === t.id)) await apagar(col, x.id); await apagar("turmas", t.id); }
+    }
+    for (const c of (S.calendario || []).filter(c => c.escola === v)) { if (modo === "mover") await salvar("calendario", { ...c, escola: destino }); else await apagar("calendario", c.id); }
+    // escolas das turmas que ficaram entram no perfil (ex.: Caetano Pinto)
+    for (const t of S.turmas) { const e = t.escola; if (e && e !== v && !novas.includes(e)) novas.push(e); }
+    return salvarPerfil({ escolas: novas.slice(0, 10) }, ts.length ? (modo === "mover" ? `${v} retirada. ${ts.length} ${ts.length === 1 ? "turma passou" : "turmas passaram"} para ${destino}.` : `${v} retirada com ${ts.length} ${ts.length === 1 ? "turma" : "turmas"}.`) : "Escola retirada");
   }
 });
 
