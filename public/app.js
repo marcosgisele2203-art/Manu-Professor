@@ -1868,23 +1868,17 @@ function tempoDe(t, a) { // horários antigos (sem número do tempo) são encaix
 const val2 = id => { const el = document.getElementById(id); return el ? el.value : ""; };
 function vHorario() {
   const t = turmaAtual(), g = gradeDe(t), h = horarioDe(t), dias = g.sabado ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
-  const marcado = (d, k) => h.find(a => a.dia === d && tempoDe(t, a) === k);
   const outra = (d, k) => { const x = horaDoTempo(g, k); for (const o of S.turmas) { if (o.id === t.id) continue; const b = horarioDe(o).find(b => b.dia === d && minutos(x.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(x.fim)); if (b) return o; } return null; };
-  const linhas = [];
-  for (let k = 1; k <= g.tempos; k++) {
-    const x = horaDoTempo(g, k);
-    linhas.push(`<tr><th class="tp"><b>${k}º tempo</b><small class="num">${x.inicio}–${x.fim}</small></th>${dias.map(d => { const m = marcado(d, k), o = !m && outra(d, k);
-      return `<td><button type="button" class="cel${m ? " on" : ""}${o ? " ocupada" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-pressed="${!!m}" aria-label="${DIAS[d]}, ${k}º tempo">${m ? `<b>${esc(t.nome)}</b>` : o ? `<span>${esc(o.nome)}</span>` : `<span class="mais">+</span>`}</button></td>`; }).join("")}</tr>`);
-    if (g.recreioApos === k && g.recreio > 0 && k < g.tempos) { const fimR = hhmm(minutos(x.fim) + g.recreio); linhas.push(`<tr class="recreio"><th class="tp"><b>Recreio</b><small class="num">${x.fim}–${fimR}</small></th><td colspan="${dias.length}">Intervalo de ${g.recreio} minutos</td></tr>`); }
-  }
+  const porDia = dias.map(d => ({ d, ks: [...new Set(h.filter(a => a.dia === d).map(a => tempoDe(t, a)).filter(Boolean))].sort((x, y) => x - y) })).filter(x => x.ks.length);
+  const lista = porDia.length ? `<div class="hor-lista">${porDia.map(({ d, ks }) => `<section class="panel hor-dia${diaSemana(hoje()) === d ? " hoje" : ""}"><h3>${DIAS[d]}${diaSemana(hoje()) === d ? ' <span class="chip">hoje</span>' : ""}</h3><ul>${ks.map(k => { const x = horaDoTempo(g, k), o = outra(d, k);
+      return `<li><b>${k}º tempo</b><span class="num muted">${x.inicio}–${x.fim}</span>${o ? `<small class="aviso">mesmo horário de ${esc(o.nome)}</small>` : ""}<button type="button" class="btn ghost sm" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-label="Tirar ${DIAS[d]}, ${k}º tempo" title="Tirar">×</button></li>`; }).join("")}</ul></section>`).join("")}</div>` : `<p class="muted">Nenhuma aula adicionada ainda. Escolha o dia e o tempo e toque em Adicionar.</p>`;
   const n = h.length;
-  return `<div class="page-head"><div><h1>Horário de aula</h1><p class="muted">${n ? `${n} ${n === 1 ? "tempo" : "tempos"} por semana nesta turma.` : "Toque nos tempos em que você dá aula nesta turma."} Os horários seguem a grade da escola${t.turno ? " no turno " + esc(t.turno).toLowerCase() : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
+  return `<div class="page-head"><div><h1>Horário de aula</h1><p class="muted">${n ? `${n} ${n === 1 ? "tempo" : "tempos"} por semana nesta turma.` : "Adicione os dias e tempos em que você dá aula nesta turma."} Os horários seguem a grade da escola${t.turno ? " no turno " + esc(t.turno).toLowerCase() : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
   <section class="panel"><form class="hor-simples" id="horAdd">
     <div class="field"><label for="hDia">Dia</label><select class="input" id="hDia">${dias.map(d => `<option value="${d}" ${S.horDia === d ? "selected" : ""}>${DIAS[d]}</option>`).join("")}</select></div>
     <div class="field"><label for="hTempo">Tempo</label><select class="input" id="hTempo">${Array.from({ length: g.tempos }, (_, i) => i + 1).map(k => { const x = horaDoTempo(g, k); return `<option value="${k}" ${S.horTempo === k ? "selected" : ""}>${k}º tempo (${x.inicio}–${x.fim})</option>`; }).join("")}</select></div>
     <button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form></section>
-  <div class="table-wrap"><table class="grade-tempos"><thead><tr><th></th>${dias.map(d => `<th class="${diaSemana(hoje()) === d ? "hoje" : ""}">${DIAS[d]}</th>`).join("")}</tr></thead><tbody>${linhas.join("")}</tbody></table></div>
-  <p class="small muted">Para tirar uma aula, toque nela na grade. Tempos com o nome de outra turma já estão ocupados por ela no seu horário.</p>`;
+  ${lista}`;
 }
 function dlgGrade() {
   const t = turmaAtual(), g = gradeDe(t);

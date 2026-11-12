@@ -382,3 +382,11 @@ td .grade{border-radius:8px;min-height:36px}
 .grade-tempos tr.recreio th,.grade-tempos tr.recreio td{background:color-mix(in srgb,var(--mark) 45%,var(--surface));color:var(--mark-ink);font-weight:600;font-size:.85rem}
 .hor-simples{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:12px;align-items:end}
 @media (max-width:560px){.hor-simples{grid-template-columns:1fr}}
+.hor-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
+.hor-dia h3{margin:0 0 8px;font-size:16px;display:flex;gap:8px;align-items:center}
+.hor-dia.hoje{border-color:var(--primary,#5b4bdb)}
+.hor-dia ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hor-dia li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line,#eee)}
+.hor-dia li:first-child{border-top:0}
+.hor-dia li button{margin-left:auto}
+.hor-dia .aviso{width:100%;color:#b45309}
