@@ -39,7 +39,27 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["chamada", "Chamada"], ["notas", "Notas"], ["planos", "Planejamento", true], ["atividades", "Atividades", true], ["provas", "Provas"], ["materiais", "Materiais", true], ["slides", "Slides", true]];
+const ABAS = [["resumo", "Resumo"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
+const ABAS_TOPO = ["resumo", "chamada", "notas", "provas"];
+// Ferramentas de IA da coluna esquerda do painel da turma
+const FERRAMENTAS_IA = [
+  { aba: "planos", nome: "Plano de aula", desc: "Alinhado à BNCC" },
+  { aba: "atividades", nome: "Atividade com entrega", desc: "Instruções e prazo" },
+  { grupo: "Materiais para imprimir" },
+  { aba: "materiais", sub: "lista", nome: "Lista de exercícios" },
+  { aba: "materiais", sub: "interpretacao", nome: "Interpretação de texto" },
+  { aba: "materiais", sub: "cruzadinha", nome: "Cruzadinha" },
+  { aba: "materiais", sub: "cacapalavras", nome: "Caça-palavras" },
+  { aba: "materiais", sub: "resumo", nome: "Resumo de estudo" },
+  { aba: "materiais", sub: "mapa", nome: "Mapa mental" },
+  { aba: "materiais", sub: "ludica", nome: "Atividade lúdica" },
+  { aba: "materiais", sub: "adaptar", nome: "Adaptar para inclusão" },
+  { grupo: "Aula e avaliação" },
+  { aba: "slides", nome: "Slides da aula", desc: "PowerPoint ou Google" },
+  { acao: "gerar-questoes", nome: "Questões para prova", desc: "Vão para o seu banco" },
+  { aba: "provas", nome: "Corrigir prova por foto", desc: "Folha de respostas" },
+  { href: "#assistente", nome: "Fale com a Manu", desc: "Tire dúvidas e peça ideias" },
+];
 const linkTurma = (id, aba = "resumo") => `#turma-${id}-${aba}`;
 const irTurma = (id, aba = "resumo") => { location.hash = linkTurma(id, aba); };
 
@@ -170,7 +190,7 @@ function render() {
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
   const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
-  v.innerHTML = (S.dentroTurma ? cabecalhoTurma() : "") + fn();
+  v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-layout">${colunaIA()}<div class="turma-conteudo">${fn()}</div></div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
@@ -189,8 +209,23 @@ function cabecalhoTurma() {
       <h1>${esc(t.nome)}</h1><p class="muted">${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}${t.turno ? " · " + esc(t.turno) : ""} · ${(t.alunos || []).length} alunos</p></div></div>
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(x.nome)} · ${esc(x.disciplina)}</option>`).join("")}</select>` : ""}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar e alunos</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
-  <nav class="abas" aria-label="Seções da turma">${ABAS.map(([k, n, ai]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k ? 'aria-current="page"' : ""}>${n}${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("")}</nav>`;
+  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>`;
 }
+function colunaIA() {
+  const t = turmaAtual();
+  return `<aside class="ia-lateral" aria-label="Criar com IA"><div class="ia-tit">${ico("spark")}<b>Criar com IA</b></div>${FERRAMENTAS_IA.map(f => {
+    if (f.grupo) return `<div class="ia-grupo">${f.grupo}</div>`;
+    const ativo = f.aba && S.view === f.aba && (!f.sub || S.matForm.subtipo === f.sub) && !(f.aba === "materiais" && !f.sub);
+    const attrs = f.acao ? `data-act="${f.acao}"` : f.href ? `href="${f.href}"` : `href="${linkTurma(t.id, f.aba)}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
+    const tag = f.acao ? "button" : "a";
+    return `<${tag} class="ia-item${f.sub ? " sub" : ""}" ${attrs} ${ativo ? 'aria-current="page"' : ""}><span>${f.nome}</span>${f.desc ? `<small>${f.desc}</small>` : ""}</${tag}>`;
+  }).join("")}</aside>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act='ia-mat']"); if (!b) return;
+  S.matForm.subtipo = b.dataset.v; S.matAtual = null; S.matStatus = "";
+  if (S.view === "materiais") { e.preventDefault(); render(); }
+});
 document.addEventListener("change", e => { if (e.target.id === "trocaTurma") irTurma(e.target.value, S.view); });
 try { S.turmaSel = localStorage.getItem("cp_turma"); } catch (_) {}
 
@@ -244,8 +279,7 @@ function vResumoTurma() {
   return `<div class="atalhos">
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}"><b>Lançar notas</b><span>Médias e boletim da turma</span></a>
-    <button class="atalho ai" data-act="novo-plano-ia"><b>${ico("spark")} Planejar aula com IA</b><span>Plano alinhado à BNCC</span></button>
-    <a class="atalho ai" href="${linkTurma(t.id, "materiais")}"><b>${ico("spark")} Criar material</b><span>Listas, resumos, mapas mentais</span></a>
+    <a class="atalho" href="${linkTurma(t.id, "atividades")}"><b>Entregas</b><span>Quem entregou as atividades</span></a>
     <a class="atalho" href="${linkTurma(t.id, "provas")}"><b>Provas</b><span>Montar, imprimir e corrigir por foto</span></a>
   </div>
   <div class="stats">
@@ -835,7 +869,8 @@ function vMateriais() {
   return `<div class="page-head"><div><h1>Materiais para imprimir</h1><p class="muted">Atividades prontas para imprimir e adaptações para inclusão, feitas pela Manu. Revise sempre antes de usar.</p></div></div>
   ${!cap.ia ? `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic no servidor.</span></div>` : ""}
   <section class="panel">
-    <div class="mat-tipos" role="radiogroup" aria-label="Tipo de material">${Object.entries(MAT_TIPOS).map(([k, [n, d]]) => `<button type="button" class="mat-tipo" role="radio" aria-checked="${f.subtipo === k}" data-act="mat-tipo" data-v="${k}"><b>${n}</b><span>${d}</span></button>`).join("")}</div>
+    ${S.dentroTurma ? `<div class="mat-escolhido">${ico("spark")}<div><b>${MAT_TIPOS[f.subtipo][0]}</b><span>${MAT_TIPOS[f.subtipo][1]} Troque o tipo na coluna Criar com IA.</span></div></div>`
+      : `<div class="mat-tipos" role="radiogroup" aria-label="Tipo de material">${Object.entries(MAT_TIPOS).map(([k, [n, d]]) => `<button type="button" class="mat-tipo" role="radio" aria-checked="${f.subtipo === k}" data-act="mat-tipo" data-v="${k}"><b>${n}</b><span>${d}</span></button>`).join("")}</div>`}
     <div class="grid3">
       <div class="field"><label for="mTurma">Turma (opcional)</label><select class="input" id="mTurma"><option value="">Sem turma</option>${S.turmas.map(t => `<option value="${esc(t.id)}" ${f.turmaId === t.id ? "selected" : ""}>${esc(t.nome)} · ${esc(t.disciplina)}</option>`).join("")}</select></div>
       <div class="field"><label for="mSerie">Série ou etapa</label><input class="input" id="mSerie" value="${esc(f.serie)}" placeholder="Ex.: 3º ano EF, Pré II, 1ª série EM"></div>
