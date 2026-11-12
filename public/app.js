@@ -145,6 +145,7 @@ async function iniciar() {
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     S.mode = "live";
+    for (const t of S.turmas.filter(x => !bimestresDe(x).length)) { t.bimestres = bimestresPadrao(t.ano); api("PUT", "/api/dados/turmas", t).catch(() => {}); }
     $("#syncState").textContent = "Tudo salvo";
   } catch (e) {
     if (e && e.code === "auth") return;
@@ -327,10 +328,13 @@ function vTurmas() {
   if (!S.turmas.length) return head + semTurma();
   return head + `<div class="cards">${S.turmas.map(t => {
     return `<article class="card card-turma" data-abrir="${esc(t.id)}"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3><a class="link-turma" href="${linkTurma(t.id)}">${esc(t.nome)}</a></h3><p class="small muted">${[t.disciplina, t.serie, t.turno].filter(Boolean).map(esc).join(" · ")}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
+      ${bimestresDe(t).length ? `<div class="card-bims">${bimestresDe(t).map(b => { const atual = hoje() >= b.inicio && hoje() <= b.fim; return `<a class="card-bim${atual ? " atual" : ""}" href="${linkTurma(t.id)}" data-bim="${b.num}" data-turma="${esc(t.id)}" title="${esc(b.nome)}: ${fmtData(b.inicio)} a ${fmtData(b.fim)}">${esc(b.nome.replace(/\s*(bimestre|trimestre)$/i, ""))}${/bimestre/i.test(b.nome) ? "<small>bim</small>" : /trimestre/i.test(b.nome) ? "<small>tri</small>" : ""}</a>`; }).join("")}</div>` : ""}
       <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
 }
 
+// botão de bimestre no cartão: abre a turma já naquele período
+document.addEventListener("click", e => { const b = e.target.closest(".card-bim[data-bim]"); if (!b) return; S.bimSel[b.dataset.turma] = String(b.dataset.bim); });
 // o cartão inteiro abre a turma (menos os botões dentro dele)
 document.addEventListener("click", e => { const c = e.target.closest(".card-turma[data-abrir]"); if (!c || e.target.closest("a,button")) return; irTurma(c.dataset.abrir); });
 
@@ -1606,6 +1610,10 @@ const MODELOS_PERIODO = {
   bimestre: [["1º bimestre", "02-02", "04-17"], ["2º bimestre", "04-20", "07-10"], ["3º bimestre", "07-27", "10-02"], ["4º bimestre", "10-05", "12-18"]],
   trimestre: [["1º trimestre", "02-02", "05-15"], ["2º trimestre", "05-18", "08-28"], ["3º trimestre", "08-31", "12-18"]]
 };
+function bimestresPadrao(ano, tipo = "bimestre") {
+  const a = /^\d{4}$/.test(String(ano || "")) ? String(ano) : String(new Date().getFullYear());
+  return MODELOS_PERIODO[tipo].map(([nome, i, f], k) => ({ num: k + 1, nome, inicio: a + "-" + i, fim: a + "-" + f }));
+}
 S.bimSel = {}; S.bimNovo = { tipo: "bimestre", ano: String(new Date().getFullYear()) };
 function semanasDo(b) {
   const out = []; const d = new Date(b.inicio + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
@@ -1629,14 +1637,14 @@ function chipsPeriodo(t) {
 
 function vBimestres() {
   const t = turmaAtual(), bs = bimestresDe(t);
-  const head = `<div class="page-head"><div><h1>Bimestres</h1><p class="muted">Divida o ano letivo da turma em períodos. As notas, a frequência e o planejamento passam a ser organizados por período.</p></div>${bs.length ? `<div class="toolbar"><button class="btn" data-act="bim-editar">Editar datas</button></div>` : ""}</div>`;
+  const head = `<div class="page-head"><div><h1>Bimestres</h1><p class="muted">Divida o ano letivo da turma em períodos. As notas, a frequência e o planejamento passam a ser organizados por período.</p></div>${bs.length ? `<div class="toolbar"><button class="btn" data-act="bim-editar">Editar períodos</button></div>` : ""}</div>`;
   if (!bs.length) {
     const n = S.bimNovo, mod = MODELOS_PERIODO[n.tipo];
     return head + `<section class="panel"><h2>Como o ano letivo é dividido?</h2>
       <div class="toolbar">${Object.keys(MODELOS_PERIODO).map(k => `<label class="per-op"><input type="radio" name="perTipo" value="${k}" ${n.tipo === k ? "checked" : ""}> ${k === "bimestre" ? "4 bimestres" : "3 trimestres"}</label>`).join("")}
         <div class="field" style="width:120px"><label for="perAno">Ano letivo</label><input class="input" id="perAno" inputmode="numeric" value="${esc(n.ano)}"></div></div>
       <div class="list">${mod.map(([nome, i, f]) => `<div class="row"><div class="grow title">${nome}</div><span class="chip num">${fmtData(n.ano + "-" + i)} a ${fmtData(n.ano + "-" + f)}</span></div>`).join("")}</div>
-      <p class="small muted">Essas são datas sugeridas. Depois de criar, ajuste pelo calendário da sua escola em Editar datas.</p>
+      <p class="small muted">Essas são datas sugeridas. Depois de criar, ajuste pelo calendário da sua escola em Editar períodos.</p>
       <div><button class="btn primary" data-act="bim-criar">Criar ${n.tipo === "bimestre" ? "bimestres" : "trimestres"}</button></div></section>`;
   }
   return head + bs.map(b => {
@@ -1687,11 +1695,21 @@ async function iaBimestre() {
   });
 }
 function dlgBimDatas() {
-  const t = turmaAtual();
-  abrirDlg("Datas dos períodos", `<p class="small muted">Use o calendário escolar da sua rede.</p>
-    ${bimestresDe(t).map(b => `<div class="grid3" style="align-items:end"><div class="field"><label for="bn${b.num}">Nome</label><input class="input" id="bn${b.num}" value="${esc(b.nome)}"></div><div class="field"><label for="bi${b.num}">Início</label><input class="input" type="date" id="bi${b.num}" value="${esc(b.inicio)}"></div><div class="field"><label for="bf${b.num}">Fim</label><input class="input" type="date" id="bf${b.num}" value="${esc(b.fim)}"></div></div>`).join("")}`,
-    `<button type="button" class="btn danger" data-act="bim-apagar" style="margin-right:auto">Apagar períodos</button><button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-salvar-datas">Salvar datas</button>`);
+  dlg._bims = JSON.parse(JSON.stringify(bimestresDe(turmaAtual())));
+  abrirDlg("Períodos da turma", `<p class="small muted">Ajuste pelo calendário da sua escola. Você pode renomear, mudar as datas, adicionar um período (ex.: Recuperação final) ou remover.</p><div id="bimRows"></div>
+    <div class="toolbar"><button type="button" class="btn sm" data-act="bim-add">${ico("plus")}Adicionar período</button><span class="small muted">Trocar o modelo:</span><button type="button" class="btn sm ghost" data-act="bim-modelo" data-v="bimestre">4 bimestres</button><button type="button" class="btn sm ghost" data-act="bim-modelo" data-v="trimestre">3 trimestres</button></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-salvar-datas">Salvar períodos</button>`);
+  renderBimRows();
 }
+function renderBimRows() {
+  const box = dlg.querySelector("#bimRows"); if (!box) return;
+  box.innerHTML = dlg._bims.length ? dlg._bims.map((b, i) => `<div class="bim-row"><div class="field"><label for="bn${i}">Nome</label><input class="input bim-in" data-i="${i}" data-k="nome" id="bn${i}" value="${esc(b.nome)}"></div>
+      <div class="field"><label for="bi${i}">Início</label><input class="input bim-in" type="date" data-i="${i}" data-k="inicio" id="bi${i}" value="${esc(b.inicio)}"></div>
+      <div class="field"><label for="bf${i}">Fim</label><input class="input bim-in" type="date" data-i="${i}" data-k="fim" id="bf${i}" value="${esc(b.fim)}"></div>
+      <button type="button" class="btn sm ghost danger" data-act="bim-rem" data-i="${i}" aria-label="Remover ${esc(b.nome)}">Remover</button></div>`).join("")
+    : `<p class="muted">Nenhum período. Adicione um ou escolha um modelo.</p>`;
+}
+document.addEventListener("input", e => { if (e.target.classList.contains("bim-in") && dlg._bims) dlg._bims[Number(e.target.dataset.i)][e.target.dataset.k] = e.target.value; });
 document.addEventListener("change", e => {
   if (e.target.name === "perTipo") { S.bimNovo.tipo = e.target.value; render(); }
   if (e.target.id === "perAno") { S.bimNovo.ano = e.target.value.replace(/\D/g, "").slice(0, 4); render(); }
@@ -1710,10 +1728,17 @@ document.addEventListener("click", async e => {
     nt.bimestres = MODELOS_PERIODO[S.bimNovo.tipo].map(([nome, i, f], k) => ({ num: k + 1, nome, inicio: ano + "-" + i, fim: ano + "-" + f }));
     delete S.bimSel[t.id]; await salvar("turmas", nt); toast("Períodos criados. Ajuste as datas se precisar."); return;
   }
+  if (act === "bim-add") {
+    const ult = dlg._bims[dlg._bims.length - 1], inicio = ult ? addDias(ult.fim, 1) : hoje();
+    dlg._bims.push({ num: Math.max(0, ...dlg._bims.map(x => x.num), ...bimestresDe(t).map(x => x.num)) + 1, nome: `Período ${dlg._bims.length + 1}`, inicio, fim: addDias(inicio, 30) });
+    renderBimRows(); dlg.querySelector(`#bn${dlg._bims.length - 1}`)?.select(); return;
+  }
+  if (act === "bim-rem") { dlg._bims.splice(Number(b.dataset.i), 1); renderBimRows(); return; }
+  if (act === "bim-modelo") { dlg._bims = bimestresPadrao(t.ano, b.dataset.v); renderBimRows(); return; }
   if (act === "bim-salvar-datas") {
-    const nt = JSON.parse(JSON.stringify(t));
-    for (const x of nt.bimestres) { x.nome = val("bn" + x.num) || x.nome; x.inicio = val("bi" + x.num) || x.inicio; x.fim = val("bf" + x.num) || x.fim; if (x.fim < x.inicio) { toast(`${x.nome}: o fim precisa ser depois do início.`); return; } }
-    fechar(); await salvar("turmas", nt); toast("Datas salvas"); return;
+    for (const x of dlg._bims) { x.nome = String(x.nome || "").trim() || "Período"; if (!x.inicio || !x.fim || x.fim < x.inicio) { toast(`${x.nome}: confira as datas, o fim precisa ser depois do início.`); return; } }
+    const nt = JSON.parse(JSON.stringify(t)); nt.bimestres = dlg._bims.slice().sort((a, c) => a.inicio.localeCompare(c.inicio));
+    fechar(); delete S.bimSel[t.id]; await salvar("turmas", nt); toast("Períodos salvos"); return;
   }
   if (act === "bim-apagar") {
     if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar períodos e planejamentos"; return; }
@@ -1798,7 +1823,7 @@ document.addEventListener("click", async e => {
       const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");
       if (!S.turmas.some(x => x.id === dlg._obj.id) && ls.length > 1 && val("tNome") === nomeComposto()) {
         if (!val("tDisc")) { toast("Preencha a disciplina."); return; }
-        const base = S.turmas.length, criadas = ls.map((l, i) => ({ id: uid(), nome: `${dlg._tn.nome} ${l}`, disciplina: val("tDisc"), serie: val("tSerie"), ano: val("tAno"), turno: dlg._tn.turnos?.[l] || val("tTurno") || "", cor: CORES[(base + i) % CORES.length], alunos: [] }));
+        const base = S.turmas.length, criadas = ls.map((l, i) => ({ id: uid(), nome: `${dlg._tn.nome} ${l}`, disciplina: val("tDisc"), serie: val("tSerie"), ano: val("tAno"), turno: dlg._tn.turnos?.[l] || val("tTurno") || "", cor: CORES[(base + i) % CORES.length], alunos: [], bimestres: bimestresPadrao(val("tAno")) }));
         fechar();
         for (const o of criadas) await salvar("turmas", o);
         toast(`${criadas.length} turmas criadas: ${criadas.map(o => o.nome.split(" ").pop()).join(", ")}`);
@@ -1810,6 +1835,7 @@ document.addEventListener("click", async e => {
       o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno");
       o.cor = (dlg.querySelector('input[name="tCor"]:checked') || {}).value || o.cor;
       o.alunos = o.alunos || [];
+      if (!bimestresDe(o).length) o.bimestres = bimestresPadrao(o.ano);
       delete o.exemplo;
       const nova = !S.turmas.some(x => x.id === o.id);
       fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); pastaAutomatica(o.id); if (nova) irTurma(o.id, "alunos"); break; }

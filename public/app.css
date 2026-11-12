@@ -338,3 +338,13 @@ td .grade{border-radius:8px;min-height:36px}
 .card-turma{cursor:pointer;transition:border-color .15s}
 .card-turma:hover{border-color:var(--accent)}
 .card-acoes{flex-wrap:nowrap}
+.card-bims{display:flex;gap:6px;flex-wrap:wrap}
+.card-bim{display:inline-flex;align-items:baseline;gap:3px;padding:5px 11px;border-radius:999px;border:1px solid var(--line-strong);color:var(--ink);text-decoration:none;font-weight:700;font-size:.85rem}
+.card-bim small{font-weight:500;color:var(--muted);font-size:.72rem}
+.card-bim:hover{border-color:var(--accent)}
+.card-bim.atual{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.card-bim.atual small{color:var(--accent-ink)}
+.bim-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+@media (max-width:760px){.bim-row{grid-template-columns:1fr 1fr}.bim-row .field:first-child{grid-column:1/-1}}
+.card-bims{flex-wrap:nowrap;gap:5px}
+.card-bim{padding:4px 9px;font-size:.8rem;flex:1;justify-content:center}
+#bimRows{display:flex;flex-direction:column;gap:12px}
