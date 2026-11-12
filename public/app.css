@@ -348,3 +348,22 @@ td .grade{border-radius:8px;min-height:36px}
 .card-bims{flex-wrap:nowrap;gap:5px}
 .card-bim{padding:4px 9px;font-size:.8rem;flex:1;justify-content:center}
 #bimRows{display:flex;flex-direction:column;gap:12px}
+
+/* Horário */
+.hor-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;align-items:end}
+.hor-grade{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.hor-dia{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);min-height:110px}
+.hor-dia>b{font-size:.9rem}
+.hor-dia.hoje{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.hor-aula{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 4px 4px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent-soft-ink);font-weight:600;font-size:.88rem}
+.hor-aula .btn{min-height:28px;padding:0 8px;color:var(--accent-soft-ink)}
+.faixa-hor{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none}
+.faixa-hor b{font-size:.95rem}.faixa-hor span{font-size:.88rem;color:var(--muted)}
+.faixa-hor.vazio{border-style:dashed}
+.agenda{display:flex;flex-direction:column;gap:6px}
+.ag-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);color:var(--ink);text-decoration:none}
+.ag-item:hover{border-color:var(--accent)}
+.ag-item.feita{opacity:.6}.ag-item.agora{border-color:var(--accent);background:var(--accent-soft)}
+.ag-h{font-weight:700;min-width:104px}.ag-t{display:flex;flex-direction:column;flex:1;min-width:0}.ag-t small{color:var(--muted)}
+@media (max-width:1000px){.hor-grade{grid-template-columns:repeat(3,minmax(0,1fr))}.hor-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.hor-grade{grid-template-columns:repeat(2,minmax(0,1fr))}}

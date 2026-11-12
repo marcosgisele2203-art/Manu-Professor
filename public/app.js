@@ -39,8 +39,8 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
-const ABAS_TOPO = ["resumo", "alunos", "bimestres", "chamada", "notas", "provas"];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["horario", "Horário"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
+const ABAS_TOPO = ["resumo", "alunos", "horario", "bimestres", "chamada", "notas", "provas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
   { aba: "planos", nome: "Plano de aula", desc: "Alinhado à BNCC" },
@@ -205,7 +205,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-layout">${colunaIA()}<div class="turma-conteudo">${fn()}</div></div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -252,6 +252,15 @@ function semTurma(msg) {
 }
 
 /* ----- Início ----- */
+function agendaHoje() {
+  const d0 = hoje(), ds = diaSemana(d0), mAgora = new Date().getHours() * 60 + new Date().getMinutes();
+  const aulas = S.turmas.flatMap(t => horarioDe(t).filter(a => a.dia === ds).map(a => ({ t, a }))).sort((x, y) => x.a.inicio.localeCompare(y.a.inicio));
+  if (!S.turmas.some(t => horarioDe(t).length)) return "";
+  return `<section class="panel"><div class="panel-head"><h2>Suas aulas de hoje</h2><span class="small muted">${DIAS[ds] || "Domingo"}</span></div>
+    ${aulas.length ? `<div class="agenda">${aulas.map(({ t, a }) => { const est = minutos(a.fim) <= mAgora ? "feita" : minutos(a.inicio) <= mAgora ? "agora" : "";
+      return `<a class="ag-item ${est}" href="${linkTurma(t.id, "chamada")}"><span class="num ag-h">${a.inicio}–${a.fim}</span><span class="dot" style="background:${esc(t.cor)}"></span><span class="ag-t"><b>${esc(t.nome)}</b><small>${esc(t.disciplina)}</small></span>${est === "agora" ? '<span class="chip acc">agora</span>' : est === "feita" ? '<span class="chip">encerrada</span>' : ""}</a>`; }).join("")}</div>`
+      : `<p class="muted">Nenhuma aula no seu horário hoje.</p>`}</section>`;
+}
 function vInicio() {
   const d0 = hoje(), em7 = addDias(d0, 7);
   const proxAulas = S.planos.filter(p => p.data >= d0 && p.data <= em7).sort((a, b) => a.data.localeCompare(b.data));
@@ -263,6 +272,7 @@ function vInicio() {
   return `
   <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
   <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Fazer chamada</a>` : ""}<button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Planejar aula com IA</button></div></div>
+  ${agendaHoje()}
   <div class="stats">
     <div class="stat"><span class="eyebrow">Turmas</span><span class="v num">${S.turmas.length}</span><span class="small muted">${totAlunos} alunos</span></div>
     <div class="stat"><span class="eyebrow">Aulas nos próximos 7 dias</span><span class="v num">${proxAulas.length}</span><span class="small muted">planejadas</span></div>
@@ -297,7 +307,10 @@ function vResumoTurma() {
   const semR = Br ? semanasDo(Br) : [], semAgora = semR.findIndex(w => d0 >= w.inicio && d0 <= addDias(w.fim, 2));
   const faixa = Br ? `<a class="faixa-bim" href="${linkTurma(t.id, "bimestres")}"><b>${esc(Br.nome)}</b><span>${fmtData(Br.inicio)} a ${fmtData(Br.fim)}${semAgora >= 0 ? ` · semana ${semAgora + 1} de ${semR.length}` : ""}</span>${Br.plano && semAgora >= 0 && Br.plano.semanas[semAgora] ? `<span>Esta semana: <b>${esc(Br.plano.semanas[semAgora].tema)}</b></span>` : `<span>${Br.plano ? "" : "Planeje este período com a IA"}</span>`}</a>`
     : bimestresDe(t).length ? "" : `<a class="faixa-bim vazio" href="${linkTurma(t.id, "bimestres")}"><b>Organize o ano em bimestres</b><span>Notas, frequência e planejamento por período</span></a>`;
-  return faixa + `<div class="atalhos">
+  const px = proximaAula(t);
+  const linhaHor = px ? `<a class="faixa-hor" href="${linkTurma(t.id, "horario")}">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${px.inicio}–${px.fim}</span>`}</a>`
+    : `<a class="faixa-hor vazio" href="${linkTurma(t.id, "horario")}"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
+  return faixa + linhaHor + `<div class="atalhos">
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}"><b>Lançar notas</b><span>Médias e boletim da turma</span></a>
     <a class="atalho" href="${linkTurma(t.id, "atividades")}"><b>Entregas</b><span>Quem entregou as atividades</span></a>
@@ -1649,14 +1662,14 @@ function vBimestres() {
   }
   return head + bs.map(b => {
     const [st, cls] = statusBim(b), sem = semanasDo(b);
-    const aulas = S.chamadas.filter(c => c.turmaId === t.id && c.data >= b.inicio && c.data <= b.fim).length;
+    const aulas = S.chamadas.filter(c => c.turmaId === t.id && c.data >= b.inicio && c.data <= b.fim).length, prev = aulasPrevistas(t, b);
     const planos = S.planos.filter(p => p.turmaId === t.id && p.data >= b.inicio && p.data <= b.fim).length;
     const avs = S.avaliacoes.filter(a => a.turmaId === t.id && String(a.bimestre) === String(b.num)).length;
     const m = mediaTurma(t, b.num), f = freqTurma(t, b.num), pl = b.plano;
     const criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem && p.origem.bim === b.num).map(p => p.origem.semana));
     return `<section class="panel bim-card" id="bim-${b.num}">
       <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
-      <div class="bim-nums"><div><b class="num">${aulas}</b><span>aulas registradas</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
+      <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
       ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
         ${(pl.semanas || []).map((s, i) => `<tr><td class="num"><b>${i + 1}</b><div class="small muted">${esc(sem[i]?.rotulo || "")}</div></td><td><b>${esc(s.tema)}</b></td><td class="small">${esc(s.habilidades || "")}</td><td class="small">${esc(s.objetivos || "")}</td><td class="small">${esc(s.atividades || "")}</td><td class="small">${esc(s.avaliacao || "")}</td><td>${criados.has(i + 1) ? '<span class="chip ok">plano criado</span>' : ""}</td></tr>`).join("")}
@@ -1672,7 +1685,7 @@ function dlgBimIA(num) {
   dlg._bim = num;
   abrirDlg(`Planejar o ${esc(b.nome)} com IA`, `
     <p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""} · ${semanasDo(b).length} semanas (${fmtData(b.inicio)} a ${fmtData(b.fim)})</p>
-    <div class="field" style="max-width:220px"><label for="biAulas">Aulas por semana</label><input class="input" id="biAulas" type="number" min="1" max="20" value="${esc(t.aulasSemana || 2)}"></div>
+    <div class="field" style="max-width:220px"><label for="biAulas">Aulas por semana</label><input class="input" id="biAulas" type="number" min="1" max="20" value="${esc(t.aulasSemana || horarioDe(t).length || 2)}"></div>
     <div class="field"><label for="biCont">Conteúdos que você precisa trabalhar (opcional)</label><textarea class="input" id="biCont" rows="5" placeholder="Ex.: capítulos 3 a 5 do livro; frações, números decimais e porcentagem. Se deixar vazio, a Manu segue o esperado para a série.">${esc(b.conteudos || "")}</textarea></div>
     <div class="field"><label for="biObs">Observações (opcional)</label><input class="input" id="biObs" placeholder="Ex.: feira de ciências na semana 6, turma com dificuldade em leitura"></div>
     <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-bimestre">${ico("spark")}Gerar planejamento</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto. Você revisa antes de criar os planos.</span></div></div>`,
@@ -1806,6 +1819,78 @@ document.addEventListener("click", e => {
     if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar remoção"; return; }
     const a = t.alunos.find(x => x.id === b.dataset.id); salvarAlunos(t.alunos.filter(x => x.id !== b.dataset.id), `${a ? a.nome : "Aluno"} removido(a)`);
   }
+});
+
+/* ---------- Horário de aula da turma ---------- */
+const DIAS = ["", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const DIAS_CURTO = ["", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const horarioDe = t => (t && Array.isArray(t.horario) ? t.horario : []).slice().sort((a, b) => a.dia - b.dia || a.inicio.localeCompare(b.inicio));
+const minutos = h => { const [a, b] = String(h).split(":").map(Number); return a * 60 + (b || 0); };
+const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const diaSemana = iso => { const d = new Date(iso + "T12:00:00").getDay(); return d === 0 ? 7 : d; }; // 1 = segunda
+S.horF = { dia: 1, inicio: "07:00", tempos: 1 };
+function conflitos(t) {
+  const out = [];
+  horarioDe(t).forEach(a => S.turmas.filter(o => o.id !== t.id).forEach(o => horarioDe(o).forEach(b => {
+    if (a.dia === b.dia && minutos(a.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(a.fim)) out.push(`${DIAS[a.dia]} ${a.inicio}–${a.fim} bate com ${o.nome} (${b.inicio}–${b.fim})`);
+  })));
+  return [...new Set(out)];
+}
+function aulasPrevistas(t, b) { // dias de aula previstos no período, pelo horário da turma
+  const h = horarioDe(t); if (!h.length) return null;
+  let n = 0; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) if (h.some(x => x.dia === diaSemana(d))) n++;
+  return n;
+}
+function proximaAula(t) {
+  const h = horarioDe(t); if (!h.length) return null;
+  const agora = new Date(), hojeIso = hoje(), mAgora = agora.getHours() * 60 + agora.getMinutes();
+  for (let k = 0; k < 8; k++) {
+    const d = addDias(hojeIso, k), ds = diaSemana(d);
+    const a = h.find(x => x.dia === ds && (k > 0 || minutos(x.fim) > mAgora));
+    if (a) return { data: d, ...a, hoje: k === 0, agora: k === 0 && minutos(a.inicio) <= mAgora };
+  }
+  return null;
+}
+function vHorario() {
+  const t = turmaAtual(), h = horarioDe(t), dur = Number(t.duracaoAula) || 50, f = S.horF, conf = conflitos(t);
+  const porDia = [1, 2, 3, 4, 5, 6].map(d => h.filter(a => a.dia === d));
+  const totalMin = h.reduce((s, a) => s + minutos(a.fim) - minutos(a.inicio), 0);
+  return `<div class="page-head"><div><h1>Horário de aula</h1><p class="muted">${h.length ? `${h.length} ${h.length === 1 ? "tempo" : "tempos"} por semana · ${Math.floor(totalMin / 60)}h${totalMin % 60 ? String(totalMin % 60).padStart(2, "0") : ""} de aula` : "Informe os dias e horários das aulas desta turma."}</p></div></div>
+  <section class="panel"><form class="hor-form" id="horForm">
+    <div class="field"><label for="hDia">Dia</label><select class="input" id="hDia">${DIAS.slice(1).map((n, i) => `<option value="${i + 1}" ${f.dia === i + 1 ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+    <div class="field"><label for="hIni">Início</label><input class="input" id="hIni" type="time" value="${esc(f.inicio)}" required></div>
+    <div class="field"><label for="hTempos">Tempos seguidos</label><select class="input" id="hTempos">${[1, 2, 3, 4].map(n => `<option value="${n}" ${f.tempos === n ? "selected" : ""}>${n === 1 ? "1 tempo" : n + " tempos (geminada)"}</option>`).join("")}</select></div>
+    <div class="field"><label for="hDur">Duração do tempo</label><select class="input" id="hDur">${[40, 45, 50, 55, 60, 90, 100].map(n => `<option value="${n}" ${dur === n ? "selected" : ""}>${n} min</option>`).join("")}</select></div>
+    <button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form>
+    <p class="small muted">O fim de cada tempo é calculado pela duração. Ex.: início 07:00 com 2 tempos de 50 min cria 07:00–07:50 e 07:50–08:40.</p></section>
+  ${conf.length ? `<div class="banner"><b>Horário em conflito:</b><span>${conf.map(esc).join("; ")}.</span></div>` : ""}
+  <div class="hor-grade">${porDia.map((aulas, i) => `<div class="hor-dia ${diaSemana(hoje()) === i + 1 ? "hoje" : ""}"><b>${DIAS[i + 1]}</b>${aulas.length ? aulas.map(a => `<div class="hor-aula"><span class="num">${a.inicio}–${a.fim}</span><button class="btn sm ghost" data-act="hor-rem" data-id="${esc(a.id)}" aria-label="Remover aula de ${DIAS[a.dia]} ${a.inicio}">×</button></div>`).join("") : `<span class="small muted">sem aula</span>`}</div>`).join("")}</div>`;
+}
+async function salvarHorario(novo, extra = {}, msg) {
+  const nt = { ...JSON.parse(JSON.stringify(turmaAtual())), ...extra }; nt.horario = novo;
+  await salvar("turmas", nt); if (msg) toast(msg);
+}
+document.addEventListener("submit", e => {
+  if (e.target.id !== "horForm") return; e.preventDefault();
+  const t = turmaAtual(), dia = Number(val2("hDia")), ini = val2("hIni"), n = Number(val2("hTempos")) || 1, dur = Number(val2("hDur")) || 50;
+  if (!/^\d{2}:\d{2}$/.test(ini)) { toast("Informe a hora de início."); return; }
+  const atuais = horarioDe(t), novos = [];
+  for (let k = 0; k < n; k++) { const i = minutos(ini) + k * dur; novos.push({ id: uid(), dia, inicio: hhmm(i), fim: hhmm(i + dur) }); }
+  const repetido = novos.find(a => atuais.some(b => b.dia === a.dia && minutos(a.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(a.fim)));
+  if (repetido) { toast(`${DIAS[dia]} ${repetido.inicio} já está no horário desta turma.`); return; }
+  S.horF = { dia: dia < 6 ? dia + 1 : 1, inicio: ini, tempos: n };
+  salvarHorario([...atuais, ...novos], { duracaoAula: dur }, `${DIAS[dia]}: ${novos.map(a => a.inicio + "–" + a.fim).join(", ")}`);
+});
+const val2 = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+// guarda o que já foi escolhido no formulário, para não perder ao redesenhar a tela
+const lerHorF = () => { S.horF = { dia: Number(val2("hDia")) || 1, inicio: val2("hIni") || "07:00", tempos: Number(val2("hTempos")) || 1 }; };
+document.addEventListener("change", e => {
+  if (["hDia", "hIni", "hTempos"].includes(e.target.id)) lerHorF();
+  if (e.target.id === "hDur" && turmaAtual()) { lerHorF(); salvarHorario(horarioDe(turmaAtual()), { duracaoAula: Number(e.target.value) }); }
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act='hor-rem']"); if (!b) return;
+  salvarHorario(horarioDe(turmaAtual()).filter(a => a.id !== b.dataset.id), {}, "Aula removida do horário");
 });
 
 /* ---------- ações ---------- */
