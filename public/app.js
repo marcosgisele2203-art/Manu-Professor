@@ -84,8 +84,8 @@ async function api(metodo, url, corpo) {
 function exemplo() {
   const nomesA = ["Ana Beatriz Souza", "Bruno Henrique Lima", "Carla Mendes", "Davi Oliveira", "Eduarda Ramos", "Felipe Costa", "Gabriela Nunes", "Heitor Alves"];
   const nomesB = ["Isabela Rocha", "João Pedro Martins", "Larissa Teixeira", "Mateus Ferreira", "Nicole Barbosa", "Otávio Pires", "Paula Cardoso"];
-  const t1 = { id: "ex6a", nome: "6º ano A", disciplina: "Matemática", serie: "6º ano EF", ano: "2026", turno: "Manhã", cor: CORES[0], alunos: nomesA.map((n, i) => ({ id: "a" + i, nome: n })), exemplo: true };
-  const t2 = { id: "ex8b", nome: "8º ano B", disciplina: "Ciências", serie: "8º ano EF", ano: "2026", turno: "Tarde", cor: CORES[1], alunos: nomesB.map((n, i) => ({ id: "b" + i, nome: n })), exemplo: true };
+  const t1 = { id: "ex6a", nome: "6º ano A", disciplina: "Matemática", serie: "6º ano EF", ano: "2026", turno: "Matutino", cor: CORES[0], alunos: nomesA.map((n, i) => ({ id: "a" + i, nome: n })), exemplo: true };
+  const t2 = { id: "ex8b", nome: "8º ano B", disciplina: "Ciências", serie: "8º ano EF", ano: "2026", turno: "Vespertino", cor: CORES[1], alunos: nomesB.map((n, i) => ({ id: "b" + i, nome: n })), exemplo: true };
   const d0 = hoje();
   const chamadas = [];
   [-9, -7, -2].forEach((off, k) => {
@@ -491,12 +491,33 @@ const COMPONENTES = {
 COMPONENTES.eja = [...new Set([...COMPONENTES.ef2, ...COMPONENTES.em])];
 function etapaDaSerie(serie) { const s = String(serie || ""); return /\(EI\)|infantil|ber[çc]|maternal|pr[ée]/i.test(s) ? "ei" : /EJA/i.test(s) ? "eja" : /EM\b|m[ée]dio|s[ée]rie/i.test(s) ? "em" : /^[1-5]º/.test(s) ? "ef1" : /^[6-9]º/.test(s) ? "ef2" : ""; }
 const componentesPara = e => e ? COMPONENTES[e] : [...new Set(Object.values(COMPONENTES).flat())];
+const TURNOS = ["", "Matutino", "Vespertino", "Noturno", "Integral"];
+const LETRAS = ["A", "B", "C", "D", "E", "F", "G", "Única"];
+function nomeComposto() {
+  const c = dlg._tn || {}, ls = c.letras || [];
+  if (!c.nome) return "";
+  return ls.includes("Única") ? `${c.nome} (turma única)` : ls.length ? `${c.nome} ${ls.join(", ")}` : c.nome;
+}
 function compoeNomeTurma() {
   const c = dlg._tn || {}; if (!c.nome) return;
-  const el = dlg.querySelector("#tNome"); el.value = c.letra && c.letra !== "Única" ? `${c.nome} ${c.letra}` : c.letra === "Única" ? `${c.nome} (turma única)` : c.nome;
+  dlg.querySelector("#tNome").value = nomeComposto();
   dlg.querySelectorAll(".tn-op[data-act='tn-serie']").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.nome === c.nome)));
-  dlg.querySelectorAll(".tn-letra").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === c.letra)));
+  dlg.querySelectorAll(".tn-letra").forEach(b => b.setAttribute("aria-pressed", String((c.letras || []).includes(b.dataset.v))));
+  renderTurnos();
 }
+// Várias turmas da mesma série: um turno para cada letra
+function renderTurnos() {
+  const c = dlg._tn || {}, ls = (c.letras || []).filter(l => l !== "Única"), box = dlg.querySelector("#tnTurnos"), campo = dlg.querySelector("#tTurno")?.closest(".field");
+  if (!box) return;
+  const cor = dlg.querySelector('input[name="tCor"]')?.closest(".field");
+  if (ls.length < 2) { box.innerHTML = ""; if (campo) campo.hidden = false; if (cor) cor.hidden = false; return; }
+  if (campo) campo.hidden = true; if (cor) cor.hidden = true;
+  c.turnos = c.turnos || {};
+  const padrao = dlg.querySelector("#tTurno").value || "Matutino";
+  box.innerHTML = `<div class="tn-multi"><b>Vão ser criadas ${ls.length} turmas, cada uma com sua cor. Escolha o turno de cada uma:</b>${ls.map(l => { c.turnos[l] = c.turnos[l] || padrao;
+    return `<label class="tn-turno"><span>${esc(c.nome)} ${l}</span><select class="input tn-tsel" data-letra="${l}" aria-label="Turno da turma ${l}">${TURNOS.filter(Boolean).map(x => `<option ${c.turnos[l] === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>`; }).join("")}</div>`;
+}
+document.addEventListener("change", e => { if (e.target.classList.contains("tn-tsel") && dlg._tn) dlg._tn.turnos[e.target.dataset.letra] = e.target.value; });
 function abrirPopTurma(abrir) { const p = dlg.querySelector("#tnPop"), i = dlg.querySelector("#tNome"); if (!p) return; p.hidden = !abrir; i.setAttribute("aria-expanded", String(abrir)); }
 document.addEventListener("focusin", e => { if (e.target.id === "tNome") abrirPopTurma(true); });
 document.addEventListener("click", e => {
@@ -505,12 +526,18 @@ document.addEventListener("click", e => {
   if (!b) return;
   dlg._tn = dlg._tn || {};
   if (b.dataset.act === "tn-serie") {
-    dlg._tn.nome = b.dataset.nome; dlg._tn.letra = dlg._tn.letra || "A";
+    dlg._tn.nome = b.dataset.nome; if (!(dlg._tn.letras || []).length) dlg._tn.letras = ["A"];
     const se = dlg.querySelector("#tSerie"); se.value = b.dataset.serie;
     dlg.querySelector("#tDiscLista").innerHTML = componentesPara(b.dataset.etapa).map(c => `<option value="${esc(c)}">`).join("");
     const disc = dlg.querySelector("#tDisc"); if (b.dataset.etapa === "ei" && !disc.value) disc.value = "Polivalente (todos os campos)";
     compoeNomeTurma();
-  } else if (b.dataset.act === "tn-letra") { dlg._tn.letra = b.dataset.v; compoeNomeTurma(); }
+  } else if (b.dataset.act === "tn-letra") {
+    const v = b.dataset.v, editando = S.turmas.some(x => x.id === dlg._obj?.id);
+    let ls = (dlg._tn.letras || []).filter(l => l !== "Única");
+    if (editando || v === "Única") ls = [v];
+    else ls = ls.includes(v) ? ls.filter(l => l !== v) : [...ls, v].sort((a, c) => LETRAS.indexOf(a) - LETRAS.indexOf(c));
+    dlg._tn.letras = ls; if (!dlg._tn.nome) { toast("Escolha primeiro a série."); return; } compoeNomeTurma();
+  }
   else { abrirPopTurma(false); dlg.querySelector("#tDisc").focus(); }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && dlg.open && !dlg.querySelector("#tnPop")?.hidden) { e.preventDefault(); abrirPopTurma(false); } });
@@ -525,11 +552,12 @@ function dlgTurma(t) {
 </div>
     <div class="field"><label for="tDisc">Disciplina</label><input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa" list="tDiscLista" autocomplete="off"><datalist id="tDiscLista">${componentesPara(etapaDaSerie(t.serie)).map(c => `<option value="${esc(c)}">`).join("")}</datalist></div></div>
 <div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma">${SERIES.map(g => `<div class="tn-grupo"><b>${g.etapa}</b><div class="tn-ops">${g.itens.map(([nome, serie]) => `<button type="button" class="tn-op" data-act="tn-serie" data-nome="${esc(nome)}" data-serie="${esc(serie)}" data-etapa="${g.id}">${esc(nome)}</button>`).join("")}</div></div>`).join("")}
-        <div class="tn-grupo"><b>Turma</b><div class="tn-ops">${["A", "B", "C", "D", "E", "F", "G", "Única"].map(l => `<button type="button" class="tn-op tn-letra" data-act="tn-letra" data-v="${l}">${l}</button>`).join("")}</div></div>
+        <div class="tn-grupo"><b>Turma <span class="tn-dica">${S.turmas.some(x => x.id === t.id) ? "" : "· marque várias para criar todas de uma vez"}</span></b><div class="tn-ops">${["A", "B", "C", "D", "E", "F", "G", "Única"].map(l => `<button type="button" class="tn-op tn-letra" data-act="tn-letra" data-v="${l}">${l}</button>`).join("")}</div></div>
         <div class="tn-fim"><span class="small muted">Ou digite o nome que quiser.</span><button type="button" class="btn sm primary" data-act="tn-ok">Pronto</button></div></div>
     <div class="grid3"><div class="field"><label for="tSerie">Série / etapa</label><input class="input" id="tSerie" value="${esc(t.serie)}" placeholder="7º ano EF"></div>
     <div class="field"><label for="tAno">Ano letivo</label><input class="input" id="tAno" value="${esc(t.ano)}"></div>
-    <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${["", "Manhã", "Tarde", "Noite", "Integral"].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>
+    <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${[...TURNOS, ...(t.turno && !TURNOS.includes(t.turno) ? [t.turno] : [])].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>
+    <div id="tnTurnos"></div>
     <div class="field"><label>Cor</label><div class="toolbar">${CORES.map(c => `<label style="cursor:pointer"><input type="radio" name="tCor" value="${c}" ${t.cor === c ? "checked" : ""} style="accent-color:${c}"> <span class="dot" style="display:inline-block;background:${c}"></span></label>`).join("")}</div></div>
     <p class="small muted">Os alunos são cadastrados depois, na aba Alunos do painel da turma.</p>`,
     `${S.turmas.some(x => x.id === t.id) ? `<button type="button" class="btn danger" data-act="apagar-turma" style="margin-right:auto">Apagar turma</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-turma">Salvar turma</button>`);
@@ -1769,6 +1797,16 @@ document.addEventListener("click", async e => {
     case "nova-turma": dlgTurma(); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
+      const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");
+      if (!S.turmas.some(x => x.id === dlg._obj.id) && ls.length > 1 && val("tNome") === nomeComposto()) {
+        if (!val("tDisc")) { toast("Preencha a disciplina."); return; }
+        const base = S.turmas.length, criadas = ls.map((l, i) => ({ id: uid(), nome: `${dlg._tn.nome} ${l}`, disciplina: val("tDisc"), serie: val("tSerie"), ano: val("tAno"), turno: dlg._tn.turnos?.[l] || val("tTurno") || "", cor: CORES[(base + i) % CORES.length], alunos: [] }));
+        fechar();
+        for (const o of criadas) await salvar("turmas", o);
+        toast(`${criadas.length} turmas criadas: ${criadas.map(o => o.nome.split(" ").pop()).join(", ")}`);
+        for (const o of criadas) await pastaAutomatica(o.id);
+        location.hash = "turmas"; break;
+      }
       const o = dlg._obj; o.nome = val("tNome"); o.disciplina = val("tDisc");
       if (!o.nome || !o.disciplina) { toast("Preencha o nome da turma e a disciplina."); return; }
       o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno");

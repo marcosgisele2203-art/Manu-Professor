@@ -330,3 +330,8 @@ td .grade{border-radius:8px;min-height:36px}
 .tn-fim{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:10px}
 .al-colar summary{cursor:pointer;font-weight:600;color:var(--accent)}
 .al-ren{gap:8px}.al-ren .input{min-height:40px}
+.tn-dica{text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent)}
+.tn-multi{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:12px;background:var(--accent-soft)}
+.tn-multi>b{color:var(--accent-soft-ink);font-size:.92rem}
+.tn-turno{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tn-turno span{font-weight:600}.tn-turno .input{width:auto;min-width:170px;min-height:40px}
