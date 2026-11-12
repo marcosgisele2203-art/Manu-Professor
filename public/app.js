@@ -146,7 +146,7 @@ async function iniciar() {
   render();
   try {
     const eu = await api("GET", "/api/eu");
-    S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; S.foto = eu.foto || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     S.mode = "live";
@@ -228,7 +228,21 @@ function renderNav() {
   }
   const ativo = S.dentroTurma ? "turmas" : S.view === "enem" ? "questoes" : S.view;
   if (!tt) $("#nav").innerHTML = VIEWS.map(([k, n, ai]) => `<a href="#${k}" ${ativo === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
-  $("#who").textContent = S.nome ? S.nome + (escolas().length > 1 ? ` · ${escolas().length} escolas` : escolaPrincipal() ? " · " + escolaPrincipal() : "") : "";
+  // topo do menu: foto e nome do professor
+  if (S.nome) {
+    const partes = S.nome.trim().split(/\s+/), curto = partes.length > 1 ? `${partes[0]} ${partes[partes.length - 1]}` : partes[0];
+    const iniciais = (partes[0][0] + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
+    const cap = x => x.charAt(0).toLocaleUpperCase("pt-BR") + x.slice(1).toLocaleLowerCase("pt-BR");
+    $("#brandNome").textContent = curto === curto.toUpperCase() ? curto.split(" ").map(cap).join(" ") : curto;
+    $("#brandNome").title = S.nome;
+    $("#brandSub").textContent = escolas().length > 1 ? `${escolas().length} escolas` : escolaPrincipal() || "Professor(a)";
+    const bf = $("#brandFoto"), chave = S.foto || iniciais;
+    if (bf.dataset.chave !== chave) {
+      bf.dataset.chave = chave;
+      bf.innerHTML = S.foto ? `<img src="${esc(S.foto)}" alt="" referrerpolicy="no-referrer">` : `<span class="iniciais">${esc(iniciais)}</span>`;
+      const img = bf.querySelector("img"); if (img) img.onerror = () => { bf.innerHTML = `<span class="iniciais">${esc(iniciais)}</span>`; };
+    }
+  }
   $("#adminLink").hidden = !S.admin;
   const u = S.usoIA, box = $("#usoIA");
   if (u && cap.ia) { box.hidden = false; box.innerHTML = `<span>IA este mês: <b class="num">${u.usados}</b> de <span class="num">${u.limite}</span></span><div class="bar"><i style="width:${Math.min(100, Math.round(u.usados / Math.max(1, u.limite) * 100))}%"></i></div>`; }
@@ -268,7 +282,7 @@ function semTurma(msg) {
 /* ----- Meu perfil ----- */
 async function salvarPerfil(dados, msg) {
   $("#syncState").textContent = "Salvando…";
-  try { const p = await api("PATCH", "/api/eu", dados); S.nome = p.nome; S.escola = p.escola || ""; S.escolas = p.escolas; S.disciplinas = p.disciplinas; S.etapas = p.etapas || []; $("#syncState").textContent = "Tudo salvo"; if (msg) toast(msg); render(); return true; }
+  try { const p = await api("PATCH", "/api/eu", dados); S.nome = p.nome; S.escola = p.escola || ""; S.escolas = p.escolas; S.disciplinas = p.disciplinas; S.etapas = p.etapas || []; S.foto = p.foto || ""; $("#syncState").textContent = "Tudo salvo"; if (msg) toast(msg); render(); return true; }
   catch (e) { toast(e.message || "Não foi possível salvar o perfil."); $("#syncState").textContent = ""; return false; }
 }
 function lembrarNoPerfil(escola, disc) { // escola ou disciplina nova digitada na turma entra no perfil
@@ -283,6 +297,9 @@ function vPerfil() {
   const turmasDa = x => S.turmas.filter(t => escolaDe(t) === x);
   const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li${act === "perfil-tira-esc" ? ' class="esc"' : ""}><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button>${act === "perfil-tira-esc" ? `<div class="esc-turmas">${turmasDa(x).map(t => `<a class="esc-turma" href="${linkTurma(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)}<small>${esc(t.disciplina)}${t.turno ? " · " + esc(t.turno) : ""}</small></a>`).join("")}<button type="button" class="btn sm" data-act="nova-turma" data-escola="${esc(x)}">${ico("plus")}Turma nesta escola</button></div>` : ""}</li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
   return `<div class="page-head"><div><h1>Meu perfil</h1><p class="muted">Suas escolas e disciplinas aparecem prontas para escolher quando você cria uma turma.</p></div></div>
+  <section class="panel"><div class="panel-head"><h2>Sua foto</h2></div><div class="perfil-foto"><div class="brand-mark grande">${S.foto ? `<img src="${esc(S.foto)}" alt="Sua foto" referrerpolicy="no-referrer">` : `<span class="iniciais">${esc((S.nome || "?").trim().split(/\s+/).map(x => x[0]).filter(Boolean).slice(0, 2).join("").toUpperCase())}</span>`}</div>
+    <div class="toolbar"><label class="btn">Escolher foto<input type="file" id="pfFoto" accept="image/*" hidden></label>${S.foto ? `<button type="button" class="btn ghost" data-act="perfil-foto-tirar">Tirar foto</button>` : ""}</div>
+    <p class="small muted" style="flex-basis:100%;margin:0">Aparece no alto do menu. Quem entra com o Google já recebe a foto da conta.</p></div></section>
   <section class="panel"><div class="panel-head"><h2>Seu nome</h2></div><form class="perfil-add" data-form="perfil-nome"><input class="input" id="pfNome" value="${esc(S.nome)}" maxlength="120" aria-label="Seu nome"><button class="btn" type="submit">Salvar nome</button></form></section>
   <section class="panel"><div class="panel-head"><h2>Escolas onde você leciona</h2><span class="small muted">${es.length} de 10</span></div>
     ${lista(es, "perfil-tira-esc", "Nenhuma escola cadastrada ainda.")}
@@ -295,6 +312,18 @@ function vPerfil() {
     <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>
   <section class="panel"><div class="panel-head"><h2>Seus dados</h2></div><p class="small muted">Baixe uma cópia de tudo o que você guardou aqui: turmas, alunos, chamadas, notas, planos, provas e materiais. Os dados também têm backup automático todos os dias.</p><a class="btn" href="/api/eu/exportar" download>Baixar meus dados</a></section>`;
 }
+// foto: reduz no navegador para 256 px antes de enviar
+document.addEventListener("change", async e => {
+  if (e.target.id !== "pfFoto" || !e.target.files[0]) return;
+  const arq = e.target.files[0]; e.target.value = "";
+  if (!arq.type.startsWith("image/")) { toast("Escolha um arquivo de imagem."); return; }
+  try {
+    const bmp = await createImageBitmap(arq), lado = Math.min(bmp.width, bmp.height), c = document.createElement("canvas");
+    c.width = c.height = 256;
+    c.getContext("2d").drawImage(bmp, (bmp.width - lado) / 2, (bmp.height - lado) / 2, lado, lado, 0, 0, 256, 256);
+    await salvarPerfil({ foto: c.toDataURL("image/jpeg", 0.85) }, "Foto salva");
+  } catch (_) { toast("Não foi possível usar essa imagem. Tente outra (JPG ou PNG)."); }
+});
 document.addEventListener("submit", async e => {
   const f = e.target.closest("[data-form^='perfil-']"); if (!f) return; e.preventDefault();
   if (f.dataset.form === "perfil-nome") { const v = val2("pfNome").trim(); if (v) await salvarPerfil({ nome: v }, "Nome salvo"); return; }
@@ -311,6 +340,7 @@ document.addEventListener("submit", async e => {
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act^='perfil-']"); if (!b) return;
   const v = b.dataset.v, es = S.escolas || [], ds = S.disciplinas || [];
+  if (b.dataset.act === "perfil-foto-tirar") return salvarPerfil({ foto: "" }, "Foto retirada");
   if (b.dataset.act === "perfil-etapa") { const et = S.etapas || []; return salvarPerfil({ etapas: et.includes(v) ? et.filter(x => x !== v) : [...et, v] }); }
   if (b.dataset.act === "perfil-add-disc") return salvarPerfil({ disciplinas: [...ds, v] }, "Disciplina adicionada");
   if (b.dataset.act === "perfil-tira-disc") return salvarPerfil({ disciplinas: ds.filter(x => x !== v) }, "Disciplina retirada");

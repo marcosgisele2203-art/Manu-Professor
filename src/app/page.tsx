@@ -7,12 +7,12 @@ export default function Inicio() {
     <>
       <div className="app">
         <aside className="rail" aria-label="Navegação">
-          <div className="brand"><div className="brand-mark"><img src="/manu/manu-boas-vindas.webp" alt="" /></div><div><b>Manu</b><span className="small muted">Professor</span></div></div>
+          <a className="brand" href="#perfil" title="Meu perfil"><div className="brand-mark" id="brandFoto"><img src="/manu/manu-boas-vindas.webp" alt="" /></div><div style={{ minWidth: 0 }}><b id="brandNome">Manu</b><span className="small muted" id="brandSub">Professor</span></div></a>
           <nav className="nav" id="nav"></nav>
           <div className="rail-foot">
             <div className="uso-ia small" id="usoIA" hidden></div>
             <a className="btn sm ghost" id="adminLink" href="/admin" hidden>Administração</a>
-            <a className="small who-link" id="who" href="#perfil" title="Meu perfil: escolas e disciplinas"></a>
+            <a className="small who-link" id="who" href="#perfil" title="Meu perfil: escolas e disciplinas">Meu perfil</a>
             <form action="/api/auth/sair" method="post"><button className="btn sm ghost" type="submit">Sair</button></form>
           </div>
         </aside>

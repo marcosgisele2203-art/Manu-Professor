@@ -9,7 +9,7 @@ const GUARDAR = 30; // quantos backups diários ficam no Drive
 
 export async function gerarBackup() {
   const [professores, registros, usosIA] = await Promise.all([
-    prisma.professor.findMany({ select: { id: true, nome: true, email: true, senhaHash: true, googleSub: true, escola: true, escolas: true, disciplinas: true, etapas: true, criadoEm: true, aceitouTermosEm: true, limiteIA: true, bloqueado: true } }),
+    prisma.professor.findMany({ select: { id: true, nome: true, email: true, senhaHash: true, googleSub: true, escola: true, escolas: true, disciplinas: true, etapas: true, foto: true, criadoEm: true, aceitouTermosEm: true, limiteIA: true, bloqueado: true } }),
     prisma.registro.findMany(),
     prisma.usoIA.findMany(),
   ]);

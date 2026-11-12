@@ -22,7 +22,7 @@ export const temDrive = (scope?: string) => (scope || "").split(" ").includes("h
 
 export async function verificarIdToken(idToken: string) {
   const { payload } = await jwtVerify(idToken, JWKS, { audience: process.env.GOOGLE_CLIENT_ID!, issuer: ["https://accounts.google.com", "accounts.google.com"] });
-  return payload as { sub: string; email?: string; email_verified?: boolean; name?: string };
+  return payload as { sub: string; email?: string; email_verified?: boolean; name?: string; picture?: string };
 }
 
 export async function renovarAcesso(refresh: string) {
