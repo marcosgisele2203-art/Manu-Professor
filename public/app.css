@@ -212,7 +212,7 @@ td .grade{border-radius:8px;min-height:36px}
 .uso-ia .bar{background:rgba(255,255,255,.12)}
 
 /* Materiais para imprimir */
-.mat-tipos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mat-tipos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .mat-tipo{display:flex;flex-direction:column;gap:2px;text-align:left;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;color:var(--ink)}
 .mat-tipo b{font-size:.95rem}.mat-tipo span{font-size:.8rem;color:var(--muted);line-height:1.35}
 .mat-tipo:hover{border-color:var(--accent)}

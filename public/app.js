@@ -597,7 +597,9 @@ const MAT_TIPOS = {
   cruzadinha: ["Cruzadinha", "Palavras do tema com dicas, montada automaticamente."],
   cacapalavras: ["Caça-palavras", "Grade com as palavras do tema escondidas."],
   ludica: ["Atividade lúdica", "Desenhar, pintar, ligar e contar, para os pequenos."],
-  adaptar: ["Adaptar uma atividade", "Cole uma atividade que você já tem e a Manu adapta."]
+  adaptar: ["Adaptar uma atividade", "Cole uma atividade que você já tem e a Manu adapta."],
+  resumo: ["Resumo de estudo", "Tópicos claros e perguntas de revisão, do tema ou de um texto."],
+  mapa: ["Mapa mental", "O tema no centro e as ideias em ramos, desenhado automaticamente."]
 };
 const ADAPT = { "": "Nenhuma adaptação", tdah: "TDAH", dislexia: "Dislexia", tea: "TEA (autismo)", visual: "Baixa visão", intelectual: "Deficiência intelectual" };
 S.matForm = { subtipo: "lista", turmaId: "", serie: "", disciplina: "", tema: "", quantidade: 8, adaptacao: "", observacoes: "", texto: "" };
@@ -688,6 +690,42 @@ function linhasResp(n) { return n > 0 ? `<div class="linhas">${'<div></div>'.rep
 function questoesHTML(qs, gab) {
   return `<ol class="qs">${(qs || []).map(q => `<li><div class="enun">${esc(q.enunciado)}</div>${(q.alternativas || []).length ? `<ol class="alts" type="a">${q.alternativas.map(a => `<li>${esc(a)}</li>`).join("")}</ol>` : linhasResp(q.linhas ?? 3)}${gab && q.resposta ? `<div class="gab">Resposta: ${esc(q.resposta)}</div>` : ""}</li>`).join("")}</ol>`;
 }
+function quebrar(txt, max) {
+  const linhas = []; let atual = "";
+  String(txt).split(/\s+/).forEach(p => { if ((atual + " " + p).trim().length > max && atual) { linhas.push(atual); atual = p; } else atual = (atual + " " + p).trim(); });
+  if (atual) linhas.push(atual); return linhas;
+}
+function mapaSVG(m) {
+  const cores = ["#0b7c8a", "#a8205a", "#8a5208", "#3a4f8c", "#1f6b3b", "#7a4a8c", "#b3261e", "#2f7f8f"];
+  const ramos = (m.ramos || []).slice(0, 8).map((r, i) => {
+    const tit = quebrar(r.titulo || "", 26), itens = (r.itens || []).slice(0, 6).map(x => quebrar(x, 34));
+    const h = 14 + tit.length * 18 + 10 + itens.reduce((a, l) => a + l.length * 17 + 6, 0) + 8;
+    return { tit, itens, h, cor: cores[i % cores.length], lado: i % 2 === 0 ? 1 : -1 };
+  });
+  const W = 1000, gap = 22, BW = 280, cx = W / 2;
+  const total = s => ramos.filter(r => r.lado === s).reduce((a, r) => a + r.h + gap, -gap);
+  const H = Math.max(total(1), total(-1), 180) + 40, cy = H / 2;
+  const centro = quebrar(m.centro || m.titulo || "", 18);
+  let out = "";
+  [1, -1].forEach(s => {
+    let y = cy - total(s) / 2;
+    ramos.filter(r => r.lado === s).forEach(r => {
+      const bx = s > 0 ? cx + 150 : cx - 150 - BW, ex = s > 0 ? bx : bx + BW, ey = y + 16;
+      out += `<path d="M${cx + s * 105},${cy} C${cx + s * 140},${cy} ${ex - s * 40},${ey} ${ex},${ey}" fill="none" stroke="${r.cor}" stroke-width="3"/>`;
+      out += `<rect x="${bx}" y="${y}" width="${BW}" height="${r.h}" rx="12" fill="#fff" stroke="${r.cor}" stroke-width="2"/>`;
+      out += `<rect x="${bx}" y="${y}" width="${BW}" height="${14 + r.tit.length * 18}" rx="12" fill="${r.cor}"/><rect x="${bx}" y="${y + 10}" width="${BW}" height="${4 + r.tit.length * 18}" fill="${r.cor}"/>`;
+      let ty = y + 26;
+      r.tit.forEach(l => { out += `<text x="${bx + 14}" y="${ty}" font-size="15" font-weight="700" fill="#fff">${esc(l)}</text>`; ty += 18; });
+      ty += 12;
+      r.itens.forEach(ls => { ls.forEach((l, k) => { out += `<text x="${bx + 14}" y="${ty}" font-size="13.5" fill="#1f3140">${k === 0 ? "• " : "  "}${esc(l)}</text>`; ty += 17; }); ty += 6; });
+      y += r.h + gap;
+    });
+  });
+  const ch = 30 + centro.length * 22;
+  out += `<rect x="${cx - 105}" y="${cy - ch / 2}" width="210" height="${ch}" rx="${Math.min(40, ch / 2)}" fill="#1f3140"/>`;
+  centro.forEach((l, i) => { out += `<text x="${cx}" y="${cy - ch / 2 + 24 + i * 22}" font-size="18" font-weight="700" fill="#fff" text-anchor="middle">${esc(l)}</text>`; });
+  return `<svg class="mapa" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif" role="img" aria-label="Mapa mental: ${esc(m.centro || m.titulo)}">${out}</svg>`;
+}
 function materialCorpo(m, gab) {
   const t = turma(m.turmaId);
   let corpo = "";
@@ -704,7 +742,11 @@ function materialCorpo(m, gab) {
     const G = m.grade, marc = new Set(); if (gab) Object.values(G.pos).forEach(ps => ps.forEach(([r, c]) => marc.add(r + "," + c)));
     corpo = `<table class="caca">${G.grade.map((l, r) => `<tr>${[...l].map((x, c) => `<td class="${marc.has(r + "," + c) ? "achou" : ""}">${x}</td>`).join("")}</tr>`).join("")}</table>
       <div class="banco"><b>Encontre:</b> ${G.palavras.map(w => `<span>${w}</span>`).join("")}</div>${m.tarefa ? `<p class="enun">${esc(m.tarefa)}</p>${linhasResp(4)}` : ""}`;
-  } else if (m.subtipo === "ludica") corpo = `<ol class="qs ludica">${(m.itens || []).map(it => `<li><div class="enun">${esc(it.comando)}</div>${it.espaco === "desenho" ? '<div class="quadro"></div>' : it.espaco === "linhas" ? linhasResp(3) : ""}</li>`).join("")}</ol>`;
+  } else if (m.subtipo === "resumo") corpo = `${m.introducao ? `<p class="instr">${esc(m.introducao)}</p>` : ""}${(m.topicos || []).map(t => `<div class="sec"><h3>${esc(t.titulo)}</h3><div>${esc(t.texto)}</div></div>`).join("")}
+      ${(m.palavrasChave || []).length ? `<div class="banco"><b>Palavras-chave:</b> ${m.palavrasChave.map(w => `<span>${esc(w)}</span>`).join("")}</div>` : ""}
+      ${(m.perguntas || []).length ? `<h3 class="rev">Para revisar</h3>${questoesHTML(m.perguntas.map(q => ({ enunciado: q.enunciado, alternativas: [], linhas: 2, resposta: q.resposta })), gab)}` : ""}`;
+  else if (m.subtipo === "mapa") corpo = `<div class="mapa-wrap">${mapaSVG(m)}</div><div class="so-docx"><ul>${(m.ramos || []).map(r => `<li><b>${esc(r.titulo)}</b><ul>${(r.itens || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul></li>`).join("")}</ul></div>`;
+  else if (m.subtipo === "ludica") corpo = `<ol class="qs ludica">${(m.itens || []).map(it => `<li><div class="enun">${esc(it.comando)}</div>${it.espaco === "desenho" ? '<div class="quadro"></div>' : it.espaco === "linhas" ? linhasResp(3) : ""}</li>`).join("")}</ol>`;
   return `<div class="cab"><div>Escola: ________________________________</div><div>Data: ____/____/______</div><div>Nome: ____________________________________</div><div>Turma: ${t ? esc(t.nome) : "_______"}</div></div>
     <h1>${esc(m.titulo)}${gab ? " · Gabarito" : ""}</h1>${m.instrucoes ? `<p class="instr">${esc(m.instrucoes)}</p>` : ""}${corpo}`;
 }
@@ -725,6 +767,8 @@ const CSS_FOLHA = `.folha{font-family:Arial,Helvetica,sans-serif;color:#111;back
 .folha .caca td.achou{background:#ffe08a}
 .folha .banco{display:flex;flex-wrap:wrap;gap:6px 12px;margin-bottom:10px}.folha .banco span{border:1px solid #999;border-radius:4px;padding:1px 8px}
 .folha .quadro{border:1.5px dashed #888;border-radius:10px;height:150px;margin-top:6px}
+.folha .mapa-wrap{margin:8px 0}.folha svg.mapa{width:100%;height:auto;display:block}.folha .so-docx{display:none}
+.folha .sec{margin:0 0 10px;break-inside:avoid}.folha .sec h3{font-size:12.5pt;margin:0 0 3px;color:#0b7c8a;text-transform:none;letter-spacing:0}.folha h3.rev{font-size:13pt;margin:14px 0 6px;color:#111}
 .folha.ampliado{font-size:18pt;line-height:1.6}.folha.ampliado h1{font-size:24pt}.folha.ampliado .cab{font-size:14pt;grid-template-columns:1fr}.folha.ampliado .linhas div{height:38px}.folha.ampliado .cruz td,.folha.ampliado .caca td{width:38px;height:38px;font-size:18pt}
 .folha.dislexia{font-family:Verdana,Arial,sans-serif;font-size:14pt;line-height:1.9;letter-spacing:.03em;word-spacing:.12em}.folha.dislexia .qs>li{margin-bottom:20px}`;
 document.head.insertAdjacentHTML("beforeend", `<style>${CSS_FOLHA}</style>`);
@@ -753,7 +797,10 @@ function vMateriais() {
       <div class="field"><label for="mSerie">Série ou etapa</label><input class="input" id="mSerie" value="${esc(f.serie)}" placeholder="Ex.: 3º ano EF, Pré II, 1ª série EM"></div>
       <div class="field"><label for="mDisc">Componente ou campo de experiência</label><input class="input" id="mDisc" value="${esc(f.disciplina)}" placeholder="Ex.: Ciências, Língua Portuguesa"></div>
     </div>
-    ${f.subtipo === "adaptar"
+    ${f.subtipo === "resumo" || f.subtipo === "mapa"
+      ? `<div class="field"><label for="mTema">Tema</label><input class="input" id="mTema" value="${esc(f.tema)}" placeholder="Ex.: Revolução Industrial, Sistema digestório"></div>
+         <div class="field"><label for="mTexto">Texto base (opcional)</label><textarea class="input" id="mTexto" rows="5" placeholder="Cole aqui um trecho do livro ou da sua aula para a Manu resumir. Se deixar vazio, ela usa o tema.">${esc(f.texto)}</textarea></div>`
+      : f.subtipo === "adaptar"
       ? `<div class="field"><label for="mTexto">Atividade original (cole o texto)</label><textarea class="input" id="mTexto" rows="8" placeholder="Cole aqui o enunciado e as questões da atividade que você quer adaptar.">${esc(f.texto)}</textarea></div>`
       : `<div class="grid2" style="grid-template-columns:minmax(0,3fr) minmax(0,1fr)"><div class="field"><label for="mTema">Tema</label><input class="input" id="mTema" value="${esc(f.tema)}" placeholder="Ex.: Ciclo da água, Adição com reserva, Animais da fazenda"></div>
          <div class="field"><label for="mQtd">${f.subtipo === "cruzadinha" || f.subtipo === "cacapalavras" ? "Palavras" : f.subtipo === "ludica" ? "Propostas" : "Questões"}</label><input class="input" id="mQtd" type="number" min="3" max="20" value="${esc(f.quantidade)}"></div></div>`}
@@ -765,7 +812,7 @@ function vMateriais() {
   </section>
   ${cur ? `<section class="panel" id="matResultado">
     <div class="panel-head"><div><span class="eyebrow">${esc(MAT_TIPOS[cur.subtipo][0])}${cur.adaptacao ? " · adaptado para " + esc(ADAPT[cur.adaptacao]) : ""}</span><h2>${esc(cur.titulo)}</h2></div>
-      <div class="toolbar"><button class="btn primary" data-act="mat-imprimir">Imprimir</button>${cur.subtipo !== "ludica" ? `<button class="btn" data-act="mat-imprimir-gab">Imprimir gabarito</button>` : ""}${botoesExport(`data-material="1"`)}${S.materiais.some(x => x.id === cur.id) ? `<span class="chip ok">Salvo nos materiais</span>` : `<button class="btn" data-act="mat-salvar">Salvar</button>`}</div></div>
+      <div class="toolbar"><button class="btn primary" data-act="mat-imprimir">Imprimir</button>${cur.subtipo !== "ludica" && cur.subtipo !== "mapa" ? `<button class="btn" data-act="mat-imprimir-gab">Imprimir gabarito</button>` : ""}${botoesExport(`data-material="1"`)}${S.materiais.some(x => x.id === cur.id) ? `<span class="chip ok">Salvo nos materiais</span>` : `<button class="btn" data-act="mat-salvar">Salvar</button>`}</div></div>
     ${cur.grade && cur.grade.fora && cur.grade.fora.length ? `<div class="banner"><span>Não couberam na grade: ${esc(cur.grade.fora.join(", "))}.</span></div>` : ""}
     ${cur.orientacoes || cur.mudancas ? `<div class="ai-box small">${cur.mudancas ? `<div><b>O que foi adaptado:</b> ${esc(cur.mudancas)}</div>` : ""}${cur.orientacoes ? `<div><b>Dicas para aplicar:</b> ${esc(Array.isArray(cur.orientacoes) ? cur.orientacoes.join(" ") : cur.orientacoes)}</div>` : ""}${cur.bncc ? `<div><b>BNCC:</b> ${esc(cur.bncc)}</div>` : ""}</div>` : (cur.bncc ? `<div class="toolbar">${String(cur.bncc).split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>` : "")}
     <div class="folha-wrap"><div class="folha ${estiloFolha(cur)}">${materialCorpo(cur, false)}</div></div>
@@ -777,11 +824,12 @@ function vMateriais() {
 
 async function gerarMaterial() {
   const f = S.matForm;
-  if (f.subtipo === "adaptar" ? f.texto.trim().length < 20 : f.tema.trim().length < 2) { S.matStatus = f.subtipo === "adaptar" ? "Cole a atividade que você quer adaptar." : "Escreva o tema primeiro."; render(); return; }
+  const comTexto = f.subtipo === "adaptar" || f.subtipo === "resumo" || f.subtipo === "mapa";
+  if (f.subtipo === "adaptar" ? f.texto.trim().length < 20 : f.tema.trim().length < 2 && !(comTexto && f.texto.trim().length >= 20)) { S.matStatus = f.subtipo === "adaptar" ? "Cole a atividade que você quer adaptar." : "Escreva o tema primeiro."; render(); return; }
   S.matBusy = true; S.matStatus = "A Manu está preparando o material… pode levar até um minuto."; render();
   matCtl = new AbortController();
   try {
-    const d = await iaJSON({ tipo: "material", subtipo: f.subtipo, tema: f.tema, serie: f.serie, disciplina: f.disciplina, quantidade: Number(f.quantidade) || 8, adaptacao: f.adaptacao, observacoes: f.observacoes, texto: f.subtipo === "adaptar" ? f.texto : undefined }, matCtl.signal);
+    const d = await iaJSON({ tipo: "material", subtipo: f.subtipo, tema: f.tema, serie: f.serie, disciplina: f.disciplina, quantidade: Number(f.quantidade) || 8, adaptacao: f.adaptacao, observacoes: f.observacoes, texto: comTexto && f.texto.trim() ? f.texto : undefined }, matCtl.signal);
     if (!d || typeof d !== "object" || !d.titulo) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const m = { ...d, id: uid(), subtipo: f.subtipo, tema: f.tema, serie: f.serie, disciplina: f.disciplina, turmaId: f.turmaId, adaptacao: f.adaptacao, criadoEm: new Date().toISOString() };
     if (f.subtipo === "cruzadinha") m.grade = montarCruzadinha(Array.isArray(d.palavras) ? d.palavras : []);
@@ -971,6 +1019,20 @@ async function htmlParaDocx(html, estilo) {
   const D = window.docx;
   const fonte = estilo === "dislexia" ? "Verdana" : "Arial", tam = estilo === "ampliado" ? 36 : estilo === "dislexia" ? 28 : 24;
   const raiz = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html").body.firstChild;
+  // o desenho do mapa mental vira uma imagem PNG dentro do documento
+  const imagens = new Map();
+  for (const w of raiz.querySelectorAll(".mapa-wrap")) {
+    const svg = w.querySelector("svg"); if (!svg) continue;
+    try {
+      const vb = svg.viewBox.baseVal, esc2 = 2, img = new Image();
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg));
+      await img.decode();
+      const cv = document.createElement("canvas"); cv.width = vb.width * esc2; cv.height = vb.height * esc2;
+      const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+      const png = await new Promise(ok => cv.toBlob(ok, "image/png"));
+      imagens.set(w, { data: new Uint8Array(await png.arrayBuffer()), w: vb.width, h: vb.height });
+    } catch (_) {}
+  }
   const BLOCO = new Set(["DIV", "P", "H1", "H2", "H3", "OL", "UL", "LI", "TABLE", "SECTION", "FIGURE"]);
   const temBloco = el => [...el.children].some(c => BLOCO.has(c.tagName));
   const runs = (el, fmt = {}) => {
@@ -995,6 +1057,8 @@ async function htmlParaDocx(html, estilo) {
       flush();
       if (c.nodeType !== 1) continue;
       const tag = c.tagName, cls = c.classList;
+      if (cls.contains("mapa-wrap")) { const im = imagens.get(c); if (im) out.push(new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing: { after: 160 }, children: [new D.ImageRun({ type: "png", data: im.data, transformation: { width: 640, height: Math.round(640 * im.h / im.w) } })] })); continue; }
+      if (tag.toLowerCase() === "svg") continue;
       if (tag === "H1") out.push(par(runs(c, { bold: true, size: Math.round(tam * 1.4) }), { after: 160 }));
       else if (tag === "H2" || tag === "H3") out.push(par(runs(c, { bold: true, size: Math.round(tam * 1.1), cor: tag === "H3" ? "0B7C8A" : undefined }), { after: 80 }));
       else if (cls.contains("linhas")) [...c.children].forEach(() => out.push(par([new D.TextRun({ text: " ", font: fonte, size: tam })], { after: 80, indent: nivel, border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: "888888", space: 1 } } })));

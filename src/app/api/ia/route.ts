@@ -97,7 +97,7 @@ export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ erro: "A IA ainda não foi configurada neste servidor (falta ANTHROPIC_API_KEY)." }, { status: 503 });
   const r = Pedido.safeParse(await req.json().catch(() => ({})));
   if (!r.success) return Response.json({ erro: "Pedido inválido: " + r.error.issues[0].message }, { status: 400 });
-  if (r.data.tipo === "material" && (r.data.subtipo === "adaptar" ? (r.data.texto || "").trim().length < 20 : (r.data.tema || "").trim().length < 2))
+  if (r.data.tipo === "material" && (r.data.subtipo === "adaptar" ? (r.data.texto || "").trim().length < 20 : (r.data.tema || "").trim().length < 2 && (r.data.texto || "").trim().length < 20))
     return Response.json({ erro: r.data.subtipo === "adaptar" ? "Cole a atividade que você quer adaptar." : "Escreva o tema da atividade." }, { status: 400 });
   const sit = await situacaoIA(pid);
   if (sit.bloqueado) return Response.json({ erro: "O uso da IA está suspenso na sua conta. Fale com o administrador." }, { status: 403 });
