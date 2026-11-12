@@ -474,12 +474,59 @@ const fechar = () => { if (sampleCtl) sampleCtl.abort(); dlg.close(); };
 const val = id => { const el = dlg.querySelector("#" + id); return el ? el.value.trim() : ""; };
 const turmaOpts = sel => S.turmas.map(t => `<option value="${esc(t.id)}" ${sel === t.id ? "selected" : ""}>${esc(t.nome)} · ${esc(t.disciplina)}</option>`).join("");
 
+// Séries da Educação Infantil ao Ensino Médio
+const SERIES = [
+  { id: "ei", etapa: "Educação Infantil", itens: [["Berçário", "Berçário (EI)"], ["Maternal I", "Maternal I (EI)"], ["Maternal II", "Maternal II (EI)"], ["Pré I", "Pré I (EI)"], ["Pré II", "Pré II (EI)"]] },
+  { id: "ef1", etapa: "Ensino Fundamental · Anos iniciais", itens: [1, 2, 3, 4, 5].map(n => [`${n}º ano`, `${n}º ano EF`]) },
+  { id: "ef2", etapa: "Ensino Fundamental · Anos finais", itens: [6, 7, 8, 9].map(n => [`${n}º ano`, `${n}º ano EF`]) },
+  { id: "em", etapa: "Ensino Médio", itens: [1, 2, 3].map(n => [`${n}ª série`, `${n}ª série EM`]) },
+  { id: "eja", etapa: "EJA", itens: [["EJA Fundamental", "EJA EF"], ["EJA Médio", "EJA EM"]] },
+];
+const COMPONENTES = {
+  ei: ["O eu, o outro e o nós", "Corpo, gestos e movimentos", "Traços, sons, cores e formas", "Escuta, fala, pensamento e imaginação", "Espaços, tempos, quantidades, relações e transformações", "Polivalente (todos os campos)"],
+  ef1: ["Polivalente", "Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Ensino Religioso", "Língua Inglesa"],
+  ef2: ["Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Língua Inglesa", "Ensino Religioso"],
+  em: ["Língua Portuguesa", "Matemática", "Física", "Química", "Biologia", "História", "Geografia", "Filosofia", "Sociologia", "Arte", "Educação Física", "Língua Inglesa", "Língua Espanhola", "Projeto de Vida", "Itinerário formativo"],
+};
+COMPONENTES.eja = [...new Set([...COMPONENTES.ef2, ...COMPONENTES.em])];
+function etapaDaSerie(serie) { const s = String(serie || ""); return /\(EI\)|infantil|ber[çc]|maternal|pr[ée]/i.test(s) ? "ei" : /EJA/i.test(s) ? "eja" : /EM\b|m[ée]dio|s[ée]rie/i.test(s) ? "em" : /^[1-5]º/.test(s) ? "ef1" : /^[6-9]º/.test(s) ? "ef2" : ""; }
+const componentesPara = e => e ? COMPONENTES[e] : [...new Set(Object.values(COMPONENTES).flat())];
+function compoeNomeTurma() {
+  const c = dlg._tn || {}; if (!c.nome) return;
+  const el = dlg.querySelector("#tNome"); el.value = c.letra && c.letra !== "Única" ? `${c.nome} ${c.letra}` : c.letra === "Única" ? `${c.nome} (turma única)` : c.nome;
+  dlg.querySelectorAll(".tn-op[data-act='tn-serie']").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.nome === c.nome)));
+  dlg.querySelectorAll(".tn-letra").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === c.letra)));
+}
+function abrirPopTurma(abrir) { const p = dlg.querySelector("#tnPop"), i = dlg.querySelector("#tNome"); if (!p) return; p.hidden = !abrir; i.setAttribute("aria-expanded", String(abrir)); }
+document.addEventListener("focusin", e => { if (e.target.id === "tNome") abrirPopTurma(true); });
+document.addEventListener("click", e => {
+  if (e.target.id === "tNome") { abrirPopTurma(true); return; }
+  const b = e.target.closest("[data-act='tn-serie'],[data-act='tn-letra'],[data-act='tn-ok']");
+  if (!b) return;
+  dlg._tn = dlg._tn || {};
+  if (b.dataset.act === "tn-serie") {
+    dlg._tn.nome = b.dataset.nome; dlg._tn.letra = dlg._tn.letra || "A";
+    const se = dlg.querySelector("#tSerie"); se.value = b.dataset.serie;
+    dlg.querySelector("#tDiscLista").innerHTML = componentesPara(b.dataset.etapa).map(c => `<option value="${esc(c)}">`).join("");
+    const disc = dlg.querySelector("#tDisc"); if (b.dataset.etapa === "ei" && !disc.value) disc.value = "Polivalente (todos os campos)";
+    compoeNomeTurma();
+  } else if (b.dataset.act === "tn-letra") { dlg._tn.letra = b.dataset.v; compoeNomeTurma(); }
+  else { abrirPopTurma(false); dlg.querySelector("#tDisc").focus(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && dlg.open && !dlg.querySelector("#tnPop")?.hidden) { e.preventDefault(); abrirPopTurma(false); } });
+// fecha a lista ao tocar fora dela (no início do toque, para não brigar com o foco no campo)
+document.addEventListener("pointerdown", e => { if (dlg.open && dlg.querySelector("#tnPop") && !e.target.closest(".tn-campo, .tn-pop")) abrirPopTurma(false); });
+
 function dlgTurma(t) {
   t = t || { id: uid(), nome: "", disciplina: "", serie: "", ano: String(new Date().getFullYear()), turno: "", cor: CORES[S.turmas.length % CORES.length], alunos: [] };
-  dlg._obj = t;
+  dlg._obj = t; dlg._tn = {};
   abrirDlg(t.nome ? "Editar turma" : "Nova turma", `
-    <div class="grid2"><div class="field"><label for="tNome">Nome da turma</label><input class="input" id="tNome" required value="${esc(t.nome)}" placeholder="7º ano C"></div>
-    <div class="field"><label for="tDisc">Disciplina</label><input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa"></div></div>
+    <div class="grid2"><div class="field tn-campo"><label for="tNome">Nome da turma</label><input class="input" id="tNome" required value="${esc(t.nome)}" placeholder="Escolha a série e a turma" autocomplete="off" aria-haspopup="listbox" aria-expanded="false" aria-controls="tnPop">
+</div>
+    <div class="field"><label for="tDisc">Disciplina</label><input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa" list="tDiscLista" autocomplete="off"><datalist id="tDiscLista">${componentesPara(etapaDaSerie(t.serie)).map(c => `<option value="${esc(c)}">`).join("")}</datalist></div></div>
+<div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma">${SERIES.map(g => `<div class="tn-grupo"><b>${g.etapa}</b><div class="tn-ops">${g.itens.map(([nome, serie]) => `<button type="button" class="tn-op" data-act="tn-serie" data-nome="${esc(nome)}" data-serie="${esc(serie)}" data-etapa="${g.id}">${esc(nome)}</button>`).join("")}</div></div>`).join("")}
+        <div class="tn-grupo"><b>Turma</b><div class="tn-ops">${["A", "B", "C", "D", "E", "F", "G", "Única"].map(l => `<button type="button" class="tn-op tn-letra" data-act="tn-letra" data-v="${l}">${l}</button>`).join("")}</div></div>
+        <div class="tn-fim"><span class="small muted">Ou digite o nome que quiser.</span><button type="button" class="btn sm primary" data-act="tn-ok">Pronto</button></div></div>
     <div class="grid3"><div class="field"><label for="tSerie">Série / etapa</label><input class="input" id="tSerie" value="${esc(t.serie)}" placeholder="7º ano EF"></div>
     <div class="field"><label for="tAno">Ano letivo</label><input class="input" id="tAno" value="${esc(t.ano)}"></div>
     <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${["", "Manhã", "Tarde", "Noite", "Integral"].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>

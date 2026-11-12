@@ -27,6 +27,7 @@
   --ok:#8fdcaa; --ok-soft:#12301d; --warn:#f8c77e; --warn-soft:#3a2709; --bad:#ffaa95; --bad-soft:#3b1810; --info:#b5c3f2; --info-soft:#1b2340;
   --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-pop:0 12px 32px rgba(0,0,0,.5); color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -316,3 +317,14 @@ td .grade{border-radius:8px;min-height:36px}
 .faixa-bim b{font-size:1rem}.faixa-bim span{font-size:.88rem}
 .faixa-bim.vazio{background:color-mix(in srgb,var(--mark) 55%,var(--surface));color:var(--mark-ink)}
 @media (max-width:760px){.bim-nums{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Escolha da série no nome da turma */
+.tn-campo{position:relative}
+.tn-pop{background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow-pop);padding:14px;display:flex;flex-direction:column;gap:12px}
+.tn-grupo b{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.tn-ops{display:flex;flex-wrap:wrap;gap:6px}
+.tn-op{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:.88rem;font-weight:600;cursor:pointer;min-height:34px}
+.tn-op:hover{border-color:var(--accent)}
+.tn-op[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tn-letra{min-width:42px}
+.tn-fim{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:10px}
