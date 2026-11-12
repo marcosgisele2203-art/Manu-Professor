@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { adminAtual } from "@/lib/admin";
 import { custoUSD, inicioDoMes, limitePadrao } from "@/lib/uso";
+import { listarBackupsDrive } from "@/lib/backup";
+import Backup from "./Backup";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administração · Manu Professor" };
@@ -24,6 +26,7 @@ export default async function Admin() {
     prisma.registro.groupBy({ by: ["professorId"], where: { colecao: "turmas" }, _count: true }),
     prisma.professor.count({ where: { criadoEm: { gte: semana } } }),
   ]);
+  const bk = await listarBackupsDrive().catch((e) => ({ erro: "Não foi possível ver o Drive: " + (e instanceof Error ? e.message : ""), arquivos: [], email: undefined }));
   const uso = new Map(usoMes.map((u) => [u.professorId, u]));
   const nTurmas = new Map(turmas.map((t) => [t.professorId, t._count]));
   const usosMes = usoMes.reduce((s, u) => s + u._count, 0);
@@ -45,6 +48,7 @@ export default async function Admin() {
         <div className="stat"><span className="eyebrow">Custo estimado no mês</span><span className="v">{usd(custoMes)}</span><span className="small muted">média {usd(usosMes ? custoMes / usosMes : 0)} por pedido</span></div>
         <div className="stat"><span className="eyebrow">Custo estimado total</span><span className="v">{usd(custoTotal)}</span><span className="small muted">{usoTotal._count} {usoTotal._count === 1 ? "pedido" : "pedidos"} desde o início</span></div>
       </div>
+      <Backup arquivos={bk.arquivos} email={"email" in bk ? bk.email : undefined} erro={"erro" in bk ? bk.erro : undefined} />
       <section className="panel">
         <h2>Uso da IA por função neste mês</h2>
         {porTipo.length ? <div className="list">{porTipo.sort((a, b) => b._count - a._count).map((t) => (

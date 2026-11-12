@@ -279,7 +279,8 @@ function vPerfil() {
   <section class="panel"><div class="panel-head"><h2>Disciplinas que você leciona</h2></div>
     ${lista(ds, "perfil-tira-disc", "Nenhuma disciplina cadastrada ainda.")}
     <form class="perfil-add" data-form="perfil-disc"><input class="input" id="pfDisc" placeholder="Digite ou escolha. Ex.: Matemática" list="pfDiscLista" maxlength="80" aria-label="Disciplina" autocomplete="off"><datalist id="pfDiscLista">${sug.map(c => `<option value="${esc(c)}">`).join("")}</datalist><button class="btn primary" type="submit">${ico("plus")}Adicionar disciplina</button></form>
-    <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>`;
+    <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>
+  <section class="panel"><div class="panel-head"><h2>Seus dados</h2></div><p class="small muted">Baixe uma cópia de tudo o que você guardou aqui: turmas, alunos, chamadas, notas, planos, provas e materiais. Os dados também têm backup automático todos os dias.</p><a class="btn" href="/api/eu/exportar" download>Baixar meus dados</a></section>`;
 }
 document.addEventListener("submit", async e => {
   const f = e.target.closest("[data-form^='perfil-']"); if (!f) return; e.preventDefault();
