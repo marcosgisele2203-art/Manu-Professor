@@ -449,3 +449,9 @@ td .grade{border-radius:8px;min-height:36px}
 .grupo-turno{display:flex;align-items:baseline;gap:8px;margin:14px 0 10px;font-size:.95rem;color:var(--ink);padding-left:10px;border-left:3px solid var(--accent)}
 .grupo-turno small{font-weight:500;font-size:.82rem}
 .grupo-escola .grupo-turno:first-of-type{margin-top:4px}
+/* Dentro da turma: o menu da esquerda vira o menu da turma */
+.nav-turma{display:flex;align-items:center;gap:8px;margin:12px 12px 4px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);color:var(--on-sidebar);font-size:.8rem;font-weight:700;letter-spacing:.02em;opacity:.8;min-width:0}
+.nav-turma span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-turma .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+@media (min-width:761px){body.na-turma .abas{display:none}}
+@media (max-width:760px){.nav .so-pc,.nav .nav-turma{display:none}}

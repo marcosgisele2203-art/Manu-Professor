@@ -30,6 +30,9 @@ const I = {
   drive: '<path d="M8 3h8l6 11-4 7H6l-4-7z"/><path d="M8 3l6 11H2M16 3 10 14l-4 7M22 14H10"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   horario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2M8 17.5h2"/>',
+  resumo: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  alunos: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
+  bimestres: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.5h3"/>',
   lixo: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
   assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -214,8 +217,17 @@ function render() {
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
 
 function renderNav() {
+  const tt = S.dentroTurma && turmaAtual();
+  if (tt) { // dentro da turma: só Início e as seções da turma
+    const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]));
+    $("#nav").innerHTML = `<a href="#inicio">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${S.view === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("");
+    document.body.classList.add("na-turma");
+  } else {
+    document.body.classList.remove("na-turma");
+  }
   const ativo = S.dentroTurma ? "turmas" : S.view === "enem" ? "questoes" : S.view;
-  $("#nav").innerHTML = VIEWS.map(([k, n, ai]) => `<a href="#${k}" ${ativo === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
+  if (!tt) $("#nav").innerHTML = VIEWS.map(([k, n, ai]) => `<a href="#${k}" ${ativo === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
   $("#who").textContent = S.nome ? S.nome + (escolas().length > 1 ? ` · ${escolas().length} escolas` : escolaPrincipal() ? " · " + escolaPrincipal() : "") : "";
   $("#adminLink").hidden = !S.admin;
   const u = S.usoIA, box = $("#usoIA");
