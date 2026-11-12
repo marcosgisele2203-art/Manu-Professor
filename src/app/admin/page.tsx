@@ -13,7 +13,8 @@ const usd = (v: number) => "US$ " + v.toLocaleString("pt-BR", { minimumFractionD
 const data = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 const NOMES: Record<string, string> = { plano: "Planos de aula", atividade: "Atividades", questoes: "Questões", chat: "Conversas com a Manu", material: "Materiais", slides: "Slides", correcao: "Correção por foto", bimestre: "Planejamento do bimestre" };
 
-export default async function Admin() {
+export default async function Admin({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
+  const { msg } = await searchParams;
   const adm = await adminAtual();
   if (!adm) redirect("/");
   const mes = inicioDoMes();
@@ -42,6 +43,7 @@ export default async function Admin() {
           <p className="muted">Uso de {mesNome}. Os custos são estimados pelo preço do modelo e podem variar um pouco da fatura da Anthropic.</p></div>
         <Link className="btn" href="/">Voltar ao sistema</Link>
       </div>
+      {msg && <p role="status" className="chip" style={{ display: "block", whiteSpace: "normal", padding: "10px 14px", marginBottom: 16 }}>{msg}</p>}
       <div className="stats">
         <div className="stat"><span className="eyebrow">Professores</span><span className="v">{profs.length}</span><span className="small muted">{novos} novos nos últimos 7 dias</span></div>
         <div className="stat"><span className="eyebrow">Pedidos de IA no mês</span><span className="v">{usosMes}</span><span className="small muted">limite padrão: {padrao} por professor</span></div>
@@ -59,7 +61,7 @@ export default async function Admin() {
       <section className="panel">
         <div className="panel-head"><h2>Professores</h2><span className="small muted">Deixe o limite vazio para usar o padrão ({padrao}).</span></div>
         <div className="table-wrap"><table>
-          <thead><tr><th>Professor</th><th>Escolas</th><th>Cadastro</th><th className="c">Turmas</th><th className="c">IA no mês</th><th className="c">Custo no mês</th><th>Limite mensal</th><th>Acesso à IA</th></tr></thead>
+          <thead><tr><th>Professor</th><th>Escolas</th><th>Cadastro</th><th className="c">Turmas</th><th className="c">IA no mês</th><th className="c">Custo no mês</th><th>Limite mensal</th><th>Acesso à IA</th><th>Conta</th></tr></thead>
           <tbody>{profs.map((p) => { const u = uso.get(p.id); const lim = p.limiteIA ?? padrao; const usados = u?._count ?? 0;
             return (<tr key={p.id} id={"p-" + p.id}>
               <td><div style={{ fontWeight: 600 }}>{p.nome}</div><div className="small muted">{p.email}</div></td>
@@ -76,6 +78,14 @@ export default async function Admin() {
                 <input type="hidden" name="id" value={p.id} /><input type="hidden" name="acao" value={p.bloqueado ? "liberar" : "bloquear"} />
                 {p.bloqueado ? <button className="btn sm" type="submit">Liberar</button> : <button className="btn sm danger" type="submit">Suspender</button>}
                 {p.bloqueado && <span className="chip bad" style={{ marginLeft: 6 }}>suspenso</span>}</form></td>
+              <td>{profs.length > 1 && <details><summary className="small" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>Juntar com…</summary>
+                <form action="/api/admin/professor" method="post" style={{ display: "grid", gap: 6, marginTop: 6, minWidth: 220 }}>
+                  <input type="hidden" name="id" value={p.id} /><input type="hidden" name="acao" value="juntar" />
+                  <span className="small muted">Levar tudo desta conta para:</span>
+                  <select className="input" name="destino" required defaultValue="" style={{ minHeight: 36, padding: "4px 8px" }}><option value="" disabled>Escolha a conta que fica</option>
+                    {profs.filter((o) => o.id !== p.id).map((o) => <option key={o.id} value={o.id}>{o.nome} · {o.email}</option>)}</select>
+                  <label className="small" style={{ display: "flex", gap: 6, alignItems: "flex-start" }}><input type="checkbox" name="confirmo" value="sim" required /><span>Mover turmas e dados e apagar a conta {p.email}</span></label>
+                  <button className="btn sm danger" type="submit">Juntar contas</button></form></details>}</td>
             </tr>); })}</tbody></table></div>
       </section>
     </main>
