@@ -3,8 +3,11 @@ import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
   title: "Manu Professor",
   description: "Turmas, chamada, notas, planejamento e provas com a ajuda da Manu.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icones/icone-192.png", apple: "/icones/icone-192.png" },
+  appleWebApp: { capable: true, title: "Manu Professor", statusBarStyle: "default" },
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#0f766e" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -129,17 +129,53 @@ function exemplo() {
 }
 
 /* ---------- camada de dados ---------- */
+// Sem internet: o que o professor salva fica numa fila no aparelho e é enviado quando a conexão volta
+const FILA = "manu_fila";
+const lerFila = () => { try { return JSON.parse(localStorage.getItem(FILA) || "[]"); } catch (_) { return []; } };
+const gravarFila = f => { try { localStorage.setItem(FILA, JSON.stringify(f)); } catch (_) { toast("A memória do aparelho está cheia: conecte à internet para enviar o que falta."); } };
+const semRede = e => e instanceof TypeError || (typeof navigator !== "undefined" && navigator.onLine === false && !(e && e.code));
+function enfileirar(op) { gravarFila([...lerFila().filter(x => !(x.col === op.col && x.id === op.id)), { ...op, em: Date.now() }]); mostrarSync(); }
+function mostrarSync(txt) {
+  const n = lerFila().length, el = $("#syncState");
+  document.body.classList.toggle("sem-rede", n > 0);
+  if (el) el.textContent = txt || (n ? `Sem internet · ${n} ${n === 1 ? "alteração guardada" : "alterações guardadas"} no aparelho` : "Tudo salvo");
+}
+let enviandoFila = false;
+async function enviarFila() {
+  if (enviandoFila || !lerFila().length) return;
+  enviandoFila = true; let enviados = 0;
+  try {
+    for (const op of lerFila()) {
+      try {
+        if (op.tipo === "put") await api("PUT", "/api/dados/" + op.col, op.obj);
+        else await api("DELETE", "/api/dados/" + op.col + "/" + encodeURIComponent(op.id));
+        enviados++;
+      } catch (e) {
+        if (semRede(e) || (e && e.code === "auth")) throw e;
+        // o servidor recusou (dado inválido): não adianta tentar de novo
+        toast("Uma alteração feita sem internet não pôde ser salva: " + ((e && e.message) || "dado recusado"));
+      }
+      gravarFila(lerFila().filter(x => !(x.col === op.col && x.id === op.id && x.em === op.em)));
+    }
+  } catch (_) { /* continua sem internet: tenta de novo depois */ }
+  finally { enviandoFila = false; mostrarSync(); if (enviados && !lerFila().length) toast("Internet de volta: tudo o que foi feito sem conexão já foi salvo."); }
+}
+addEventListener("online", enviarFila);
+setInterval(() => { if (lerFila().length) enviarFila(); }, 30000);
 async function salvar(col, obj) {
   const arr = S[col]; const i = arr.findIndex(x => x.id === obj.id);
   if (i >= 0) arr[i] = obj; else arr.push(obj);
   render();
-  $("#syncState").textContent = "Salvando…";
-  try { await api("PUT", "/api/dados/" + col, obj); $("#syncState").textContent = "Tudo salvo"; return true; }
-  catch (e) { erroDb(e); return false; }
+  if (lerFila().length) { enfileirar({ tipo: "put", col, id: obj.id, obj }); enviarFila(); return true; } // mantém a ordem
+  mostrarSync("Salvando…");
+  try { await api("PUT", "/api/dados/" + col, obj); mostrarSync(); return true; }
+  catch (e) { if (semRede(e)) { enfileirar({ tipo: "put", col, id: obj.id, obj }); return true; } erroDb(e); return false; }
 }
 async function apagar(col, id) {
   S[col] = S[col].filter(x => x.id !== id); render();
-  try { await api("DELETE", "/api/dados/" + col + "/" + encodeURIComponent(id)); } catch (e) { erroDb(e); }
+  if (lerFila().length) { enfileirar({ tipo: "del", col, id }); enviarFila(); return; }
+  try { await api("DELETE", "/api/dados/" + col + "/" + encodeURIComponent(id)); }
+  catch (e) { if (semRede(e)) enfileirar({ tipo: "del", col, id }); else erroDb(e); }
 }
 function erroDb(e) {
   if (e && e.code === "auth") return;
@@ -154,15 +190,40 @@ async function iniciar() {
     S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; S.foto = eu.foto || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
+    // aplica por cima o que ainda está na fila (feito sem internet)
+    for (const op of lerFila()) { if (!S[op.col]) continue; S[op.col] = S[op.col].filter(x => x.id !== op.id); if (op.tipo === "put") S[op.col].push(op.obj); }
     S.mode = "live";
     for (const t of S.turmas.filter(x => !bimestresDe(x).length)) { t.bimestres = bimestresPadrao(t.ano); api("PUT", "/api/dados/turmas", t).catch(() => {}); }
-    $("#syncState").textContent = "Tudo salvo";
+    mostrarSync(); enviarFila();
   } catch (e) {
     if (e && e.code === "auth") return;
-    S.mode = "erro";
+    S.mode = "erro"; S.erroRede = semRede(e);
   }
   render();
 }
+// app instalável e funcionando sem internet
+if ("serviceWorker" in navigator) { const reg = () => navigator.serviceWorker.register("/sw.js").catch(() => {}); if (document.readyState === "complete") reg(); else addEventListener("load", reg); }
+let pedidoInstalar = null;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); pedidoInstalar = e; if (S.view === "inicio" || S.view === "perfil") render(); });
+addEventListener("appinstalled", () => { pedidoInstalar = null; toast("Manu Professor instalado no aparelho"); render(); });
+const instalado = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+async function instalarApp() {
+  if (pedidoInstalar) { pedidoInstalar.prompt(); await pedidoInstalar.userChoice.catch(() => {}); pedidoInstalar = null; render(); return; }
+  abrirDlg("Instalar no celular", ehIOS()
+    ? `<ol><li>No Safari, toque no botão <b>Compartilhar</b> (quadrado com seta para cima).</li><li>Escolha <b>Adicionar à Tela de Início</b>.</li><li>Toque em <b>Adicionar</b>. O ícone da Manu aparece junto dos outros apps.</li></ol>`
+    : `<ol><li>No Chrome, toque nos <b>três pontinhos</b> no canto de cima.</li><li>Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li><li>Confirme. O ícone da Manu aparece junto dos outros apps.</li></ol>`,
+    `<button type="button" class="btn primary" data-act="fechar">Entendi</button>`);
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-act='instalar-app']")) instalarApp(); if (e.target.closest("[data-act='instalar-depois']")) { try { localStorage.setItem("manu_instalar_depois", "1"); } catch (_) {} render(); } });
+// ao sair: avisa se ainda há algo para enviar e apaga a cópia dos dados deste aparelho
+document.addEventListener("submit", e => {
+  if (!e.target.matches('form[action="/api/auth/sair"]')) return;
+  const n = lerFila().length;
+  if (n && !confirm(`Há ${n} ${n === 1 ? "alteração feita" : "alterações feitas"} sem internet que ainda não foram enviadas. Se sair agora, elas serão perdidas. Sair mesmo assim?`)) { e.preventDefault(); return; }
+  try { localStorage.removeItem(FILA); } catch (_) {}
+  navigator.serviceWorker?.controller?.postMessage("limpar-dados");
+});
 
 /* ---------- cálculos ---------- */
 const turma = id => S.turmas.find(t => t.id === id);
@@ -214,7 +275,7 @@ function render() {
   renderNav();
   const v = $("#view");
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
-  if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
+  if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>${S.erroRede ? "Sem internet" : "Não foi possível carregar seus dados"}</h3><p>${S.erroRede ? "Este aparelho ainda não tem uma cópia dos seus dados. Abra o sistema uma vez com internet; depois ele funciona mesmo sem conexão." : "Verifique a internet e recarregue a página."}</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
   const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
@@ -307,6 +368,7 @@ function vPerfil() {
     ${lista(ds, "perfil-tira-disc", "Nenhuma disciplina cadastrada ainda.")}
     <form class="perfil-add" data-form="perfil-disc"><input class="input" id="pfDisc" placeholder="Digite ou escolha. Ex.: Matemática" list="pfDiscLista" maxlength="80" aria-label="Disciplina" autocomplete="off"><datalist id="pfDiscLista">${sug.map(c => `<option value="${esc(c)}">`).join("")}</datalist><button class="btn primary" type="submit">${ico("plus")}Adicionar disciplina</button></form>
     <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>
+  <section class="panel"><div class="panel-head"><h2>App no celular</h2></div><p class="small muted">${instalado() ? "Você está usando o Manu Professor instalado neste aparelho." : "Instale para abrir com um toque e usar o diário mesmo sem internet. O que você fizer sem conexão é enviado sozinho quando a internet voltar."}</p>${instalado() ? "" : `<button class="btn" data-act="instalar-app">${ico("dl")}Instalar no celular</button>`}</section>
   <section class="panel"><div class="panel-head"><h2>Seus dados</h2></div><p class="small muted">Baixe uma cópia de tudo o que você guardou aqui: turmas, alunos, chamadas, notas, planos, provas e materiais. Os dados também têm backup automático todos os dias.</p><a class="btn" href="/api/eu/exportar" download>Baixar meus dados</a></section>`;
 }
 // foto: reduz no navegador para 256 px antes de enviar
@@ -374,6 +436,7 @@ function vInicio() {
   <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(primeiroNome()) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
   <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Diário de hoje</a>` : ""}</div></div>
   ${!(S.escolas || []).length || !(S.disciplinas || []).length || !(S.etapas || []).length ? `<a class="aviso-perfil" href="#perfil">${ico("turmas")}<span><b>Complete seu perfil</b><small>Cadastre suas escolas, as etapas (Fundamental, Médio…) e as disciplinas. Assim, ao criar uma turma, é só escolher.</small></span><span class="btn sm">Completar</span></a>` : ""}
+  ${!instalado() && (pedidoInstalar || ehIOS()) && !(() => { try { return localStorage.getItem("manu_instalar_depois"); } catch (_) { return null; } })() ? `<div class="aviso-perfil">${ico("dl")}<span><b>Instale o Manu Professor no celular</b><small>Abre com um toque, em tela cheia, e o diário funciona mesmo sem internet na escola.</small></span><button class="btn sm primary" data-act="instalar-app">Instalar</button><button class="btn sm ghost" data-act="instalar-depois">Agora não</button></div>` : ""}
   ${S.googleClientId && !S.googleConectado ? `<div class="aviso-perfil">${ico("drive")}<span><b>Conecte seu Google Drive</b><small>Para criar as pastas das suas turmas e salvar planos, provas e slides no seu Drive. Na tela do Google, <b>marque a caixinha do Google Drive</b> antes de clicar em Continuar.</small></span><button class="btn sm primary" data-act="conectar-drive">Conectar</button></div>` : ""}
   ${agendaHoje()}
   <div class="stats">

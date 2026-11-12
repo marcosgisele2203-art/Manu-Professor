@@ -498,3 +498,5 @@ td .grade{border-radius:8px;min-height:36px}
 .d-aluno{flex-wrap:wrap}.d-aluno .btn{margin:-6px 8px 8px auto;min-height:28px}
 .d-passo-h>div:not(.d-cont){flex:1;min-width:0}
 @media (max-width:600px){.d-cont{margin-left:42px;width:100%}.d-outro{order:5}}
+/* Sem internet */
+body.sem-rede #syncState{color:#9a6700;font-weight:700}
