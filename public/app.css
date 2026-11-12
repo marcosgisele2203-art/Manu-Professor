@@ -246,3 +246,5 @@ td .grade{border-radius:8px;min-height:36px}
 .btn-google:hover{background:#f8faff;border-color:#747775}
 .auth-ou{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.8rem}
 .auth-ou::before,.auth-ou::after{content:"";flex:1;height:1px;background:var(--line)}
+.auth-pendente{display:flex;flex-direction:column;gap:10px;padding:16px;border:1.5px solid var(--accent);border-radius:12px;background:var(--accent-soft)}
+.auth-pendente>span{font-size:.9rem;color:var(--accent-soft-ink);overflow-wrap:anywhere}

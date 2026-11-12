@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { criarSessao } from "@/lib/auth";
+import { criarSessao, guardarGooglePendente } from "@/lib/auth";
 import { googleConfigurado, trocarCodigo, verificarIdToken, cifrar } from "@/lib/google";
 
 // "Continuar com Google": entra ou cria a conta e guarda a permissão do Drive
@@ -16,7 +16,11 @@ export async function POST(req: Request) {
   const refresh = tokens.refresh_token ? cifrar(tokens.refresh_token) : undefined;
   let p = await prisma.professor.findFirst({ where: { OR: [{ googleSub: perfil.sub }, { email }] } });
   if (!p) {
-    if (aceite !== true) return NextResponse.json({ precisaAceite: true });
+    if (aceite !== true) {
+      // Guarda a conta confirmada pelo Google por 10 minutos, para o professor só marcar o aceite
+      await guardarGooglePendente({ sub: perfil.sub, email, nome: perfil.name || email.split("@")[0], refresh });
+      return NextResponse.json({ precisaAceite: true, email, nome: perfil.name || "" });
+    }
     p = await prisma.professor.create({ data: { nome: perfil.name || email.split("@")[0], email, googleSub: perfil.sub, googleRefresh: refresh, aceitouTermosEm: new Date() } });
   } else {
     p = await prisma.professor.update({ where: { id: p.id }, data: { googleSub: perfil.sub, ...(refresh ? { googleRefresh: refresh } : {}) } });

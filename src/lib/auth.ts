@@ -36,6 +36,21 @@ export async function lerSessao(token?: string): Promise<string | null> {
   }
 }
 
+const PENDENTE = "manu_google_pendente";
+export type GooglePendente = { sub: string; email: string; nome: string; refresh?: string };
+export async function guardarGooglePendente(d: GooglePendente) {
+  const token = await new SignJWT({ ...d }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("10m").sign(segredo());
+  (await cookies()).set(PENDENTE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/api/auth/google", maxAge: 600 });
+}
+export async function lerGooglePendente(): Promise<GooglePendente | null> {
+  const t = (await cookies()).get(PENDENTE)?.value;
+  if (!t) return null;
+  try { const { payload } = await jwtVerify(t, segredo()); return payload as unknown as GooglePendente; } catch { return null; }
+}
+export async function limparGooglePendente() {
+  (await cookies()).set(PENDENTE, "", { path: "/api/auth/google", maxAge: 0 });
+}
+
 export async function encerrarSessao() {
   (await cookies()).delete(COOKIE);
 }
