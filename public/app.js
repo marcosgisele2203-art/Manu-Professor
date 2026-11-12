@@ -29,6 +29,7 @@ const I = {
   slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/>',
   drive: '<path d="M8 3h8l6 11-4 7H6l-4-7z"/><path d="M8 3l6 11H2M16 3 10 14l-4 7M22 14H10"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  horario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2M8 17.5h2"/>',
   assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   spark: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>',
@@ -37,10 +38,10 @@ const I = {
 };
 const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
 
-const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
+const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["horario", "Horário"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
-const ABAS_TOPO = ["resumo", "alunos", "horario", "bimestres", "chamada", "notas", "provas"];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
+const ABAS_TOPO = ["resumo", "alunos", "bimestres", "chamada", "notas", "provas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
   { aba: "planos", nome: "Plano de aula", desc: "Alinhado à BNCC" },
@@ -308,8 +309,8 @@ function vResumoTurma() {
   const faixa = Br ? `<a class="faixa-bim" href="${linkTurma(t.id, "bimestres")}"><b>${esc(Br.nome)}</b><span>${fmtData(Br.inicio)} a ${fmtData(Br.fim)}${semAgora >= 0 ? ` · semana ${semAgora + 1} de ${semR.length}` : ""}</span>${Br.plano && semAgora >= 0 && Br.plano.semanas[semAgora] ? `<span>Esta semana: <b>${esc(Br.plano.semanas[semAgora].tema)}</b></span>` : `<span>${Br.plano ? "" : "Planeje este período com a IA"}</span>`}</a>`
     : bimestresDe(t).length ? "" : `<a class="faixa-bim vazio" href="${linkTurma(t.id, "bimestres")}"><b>Organize o ano em bimestres</b><span>Notas, frequência e planejamento por período</span></a>`;
   const px = proximaAula(t);
-  const linhaHor = px ? `<a class="faixa-hor" href="${linkTurma(t.id, "horario")}">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
-    : `<a class="faixa-hor vazio" href="${linkTurma(t.id, "horario")}"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
+  const linhaHor = px ? `<a class="faixa-hor" href="${"#horario"}">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
+    : `<a class="faixa-hor vazio" href="${"#horario"}"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
   return faixa + linhaHor + `<div class="atalhos">
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}"><b>Lançar notas</b><span>Médias e boletim da turma</span></a>
@@ -1866,23 +1867,55 @@ function tempoDe(t, a) { // horários antigos (sem número do tempo) são encaix
   return null;
 }
 const val2 = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+// Meu horário: a semana do professor, com todas as turmas
+const TURNO_SIN = { Manhã: "Matutino", Tarde: "Vespertino", Noite: "Noturno" }, ORDEM_TURNO = ["Matutino", "Vespertino", "Noturno", "Integral"];
+const turnoGrupo = t => TURNO_SIN[t.turno] || t.turno || "";
+function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(S.turmas.map(turnoGrupo))].sort((a, b) => o(a) - o(b)); }
+function turnoHor() { const gs = gruposTurno(); return gs.includes(S.horTurno) ? S.horTurno : gs[0]; }
+function gradeTurno(tn) { const t = S.turmas.find(x => turnoGrupo(x) === tn); return t ? gradeDe(t) : gradeDe({ turno: tn }); }
+const turmasDoTurno = tn => S.turmas.filter(t => turnoGrupo(t) === tn);
+const naCelula = (tn, d, k) => turmasDoTurno(tn).filter(t => horarioDe(t).some(a => a.dia === d && tempoDe(t, a) === k));
 function vHorario() {
-  const t = turmaAtual(), g = gradeDe(t), h = horarioDe(t), dias = g.sabado ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
-  const outra = (d, k) => { const x = horaDoTempo(g, k); for (const o of S.turmas) { if (o.id === t.id) continue; const b = horarioDe(o).find(b => b.dia === d && minutos(x.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(x.fim)); if (b) return o; } return null; };
-  const porDia = dias.map(d => ({ d, ks: [...new Set(h.filter(a => a.dia === d).map(a => tempoDe(t, a)).filter(Boolean))].sort((x, y) => x - y) })).filter(x => x.ks.length);
-  const lista = porDia.length ? `<div class="hor-lista">${porDia.map(({ d, ks }) => `<section class="panel hor-dia${diaSemana(hoje()) === d ? " hoje" : ""}"><h3>${DIAS[d]}${diaSemana(hoje()) === d ? ' <span class="chip">hoje</span>' : ""}</h3><ul>${ks.map(k => { const x = horaDoTempo(g, k), o = outra(d, k);
-      return `<li><b>${k}º tempo</b><span class="num muted">${x.inicio}–${x.fim}</span>${o ? `<small class="aviso">mesmo horário de ${esc(o.nome)}</small>` : ""}<button type="button" class="btn ghost sm" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-label="Tirar ${DIAS[d]}, ${k}º tempo" title="Tirar">×</button></li>`; }).join("")}</ul></section>`).join("")}</div>` : `<p class="muted">Nenhuma aula adicionada ainda. Escolha o dia e o tempo e toque em Adicionar.</p>`;
-  const n = h.length;
-  return `<div class="page-head"><div><h1>Horário de aula</h1><p class="muted">${n ? `${n} ${n === 1 ? "tempo" : "tempos"} por semana nesta turma.` : "Adicione os dias e tempos em que você dá aula nesta turma."} Os horários seguem a grade da escola${t.turno ? " no turno " + esc(t.turno).toLowerCase() : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
-  <section class="panel"><form class="hor-simples" id="horAdd">
-    <div class="field"><label for="hDia">Dia</label><select class="input" id="hDia">${dias.map(d => `<option value="${d}" ${S.horDia === d ? "selected" : ""}>${DIAS[d]}</option>`).join("")}</select></div>
-    <div class="field"><label for="hTempo">Tempo</label><select class="input" id="hTempo">${Array.from({ length: g.tempos }, (_, i) => i + 1).map(k => { const x = horaDoTempo(g, k); return `<option value="${k}" ${S.horTempo === k ? "selected" : ""}>${k}º tempo (${x.inicio}–${x.fim})</option>`; }).join("")}</select></div>
-    <button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form></section>
-  ${lista}`;
+  if (!S.turmas.length) return `<div class="page-head"><div><h1>Meu horário</h1></div></div>` + semTurma("Crie suas turmas e depois monte aqui o horário da semana.");
+  const gs = gruposTurno(), tn = turnoHor(), g = gradeTurno(tn), dias = g.sabado ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5], hj = diaSemana(hoje());
+  const linhas = [];
+  for (let k = 1; k <= g.tempos; k++) {
+    const x = horaDoTempo(g, k);
+    linhas.push(`<tr><th class="tp"><b>${k}º tempo</b><small class="num">${x.inicio}–${x.fim}</small></th>${dias.map(d => { const ts = naCelula(tn, d, k), aberto = S.horPop && S.horPop.d === d && S.horPop.k === k;
+      return `<td class="${hj === d ? "hoje" : ""}"><button type="button" class="cel${ts.length ? " on" : ""}${ts.length > 1 ? " choque" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-haspopup="true" aria-expanded="${aberto}" aria-label="${DIAS[d]}, ${k}º tempo${ts.length ? ": " + ts.map(t => esc(t.nome)).join(", ") : ", vago"}">${ts.length ? ts.map(t => `<span class="cel-turma" style="--c:${esc(t.cor || "#0f766e")}"><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}</small></span>`).join("") : `<span class="mais">+</span>`}</button></td>`; }).join("")}</tr>`);
+    if (g.recreioApos === k && g.recreio > 0 && k < g.tempos) linhas.push(`<tr class="recreio"><th class="tp"><b>Recreio</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.recreio)}</small></th><td colspan="${dias.length}">Intervalo de ${g.recreio} minutos</td></tr>`);
+  }
+  const tot = turmasDoTurno(tn).map(t => ({ t, n: horarioDe(t).filter(a => tempoDe(t, a)).length }));
+  return `<div class="page-head"><div><h1>Meu horário</h1><p class="muted">Toque num tempo e escolha a turma. Cada tempo tem ${g.duracao} minutos${g.recreioApos ? `, com recreio de ${g.recreio} minutos depois do ${g.recreioApos}º tempo` : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
+  ${gs.length > 1 ? `<div class="seg" role="tablist" aria-label="Turno">${gs.map(x => `<button type="button" role="tab" class="${x === tn ? "on" : ""}" aria-selected="${x === tn}" data-act="hor-turno" data-v="${esc(x)}">${esc(x || "Sem turno")}</button>`).join("")}</div>` : ""}
+  <div class="table-wrap"><table class="grade-tempos"><thead><tr><th></th>${dias.map(d => `<th class="${hj === d ? "hoje" : ""}">${DIAS[d]}</th>`).join("")}</tr></thead><tbody>${linhas.join("")}</tbody></table></div>
+  <div class="hor-tot">${tot.map(({ t, n }) => `<a href="${linkTurma(t.id, "resumo")}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)} · ${esc(t.disciplina)} <b class="num">${n}</b> ${n === 1 ? "tempo" : "tempos"}/semana</a>`).join("")}</div>
+  ${S.horPop ? popHorario(tn) : ""}`;
 }
+function popHorario(tn) {
+  const { d, k } = S.horPop, ts = turmasDoTurno(tn), sel = naCelula(tn, d, k).map(t => t.id), x = horaDoTempo(gradeTurno(tn), k);
+  return `<div class="hor-pop" id="horPop" role="dialog" aria-label="Escolher turma"><div class="hor-pop-tit"><b>${DIAS[d]}, ${k}º tempo</b><small class="num muted">${x.inicio}–${x.fim}</small></div>
+    ${ts.map(t => `<button type="button" class="hor-op${sel.includes(t.id) ? " on" : ""}" data-act="hor-escolher" data-turma="${esc(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span><span><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}${t.serie ? " · " + esc(t.serie) : ""}</small></span>${sel.includes(t.id) ? "✓" : ""}</button>`).join("")}
+    ${sel.length ? `<button type="button" class="hor-op vago" data-act="hor-escolher" data-turma="">Deixar vago</button>` : ""}</div>`;
+}
+function posicionarPop() {
+  const pop = document.getElementById("horPop"); if (!pop || !S.horPop) return;
+  const cel = document.querySelector(`.cel[data-dia="${S.horPop.d}"][data-tempo="${S.horPop.k}"]`); if (!cel) return;
+  const r = cel.getBoundingClientRect(), w = Math.min(280, innerWidth - 24);
+  pop.style.width = w + "px";
+  pop.style.left = Math.max(12, Math.min(r.left + scrollX, scrollX + innerWidth - w - 12)) + "px";
+  const abaixo = r.bottom + 6 + pop.offsetHeight < innerHeight;
+  pop.style.top = (abaixo ? r.bottom + 6 : Math.max(8, r.top - pop.offsetHeight - 6)) + scrollY + "px";
+  pop.querySelector(".hor-op")?.focus({ preventScroll: true });
+}
+function fecharPop() { if (S.horPop) { S.horPop = null; render(); } }
+document.addEventListener("pointerdown", e => { if (S.horPop && !e.target.closest("#horPop,[data-act='hor-cel']")) fecharPop(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && S.horPop) { const c = S.horPop; fecharPop(); document.querySelector(`.cel[data-dia="${c.d}"][data-tempo="${c.k}"]`)?.focus(); } });
+addEventListener("resize", posicionarPop);
+document.addEventListener("scroll", e => { if (S.horPop && e.target.classList && e.target.classList.contains("table-wrap")) fecharPop(); }, true);
 function dlgGrade() {
-  const t = turmaAtual(), g = gradeDe(t);
-  abrirDlg("Configurar tempos", `<p class="small muted">Use a grade de horários da sua escola. Os horários desta turma são recalculados.</p>
+  const tn = turnoHor(), g = gradeTurno(tn);
+  abrirDlg("Configurar tempos", `<p class="small muted">Use a grade de horários da sua escola${tn ? " no turno " + esc(tn).toLowerCase() : ""}. Vale para todas as turmas desse turno.</p>
     <div class="grid3"><div class="field"><label for="gIni">Início do 1º tempo</label><input class="input" id="gIni" type="time" value="${esc(g.inicio)}"></div>
     <div class="field"><label for="gDur">Duração de cada tempo</label><select class="input" id="gDur">${[40, 45, 50, 55, 60].map(n => `<option value="${n}" ${g.duracao === n ? "selected" : ""}>${n} minutos</option>`).join("")}</select></div>
     <div class="field"><label for="gTempos">Tempos por dia</label><select class="input" id="gTempos">${[4, 5, 6, 7, 8, 9, 10].map(n => `<option ${g.tempos === n ? "selected" : ""}>${n}</option>`).join("")}</select></div></div>
@@ -1891,35 +1924,40 @@ function dlgGrade() {
     <label class="check" style="border:0;align-self:end"><input type="checkbox" id="gSab" ${g.sabado ? "checked" : ""}><span>Tem aula no sábado</span></label></div>`,
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="hor-grade-salvar">Salvar</button>`);
 }
-S.horDia = 1; S.horTempo = 1;
-document.addEventListener("submit", async e => {
-  if (e.target.id !== "horAdd") return; e.preventDefault();
-  const t = turmaAtual(), g = gradeDe(t), d = Number(val2("hDia")), k = Number(val2("hTempo"));
-  const atual = horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
-  if (atual.some(a => a.dia === d && a.tempo === k)) { toast(`${DIAS[d]}, ${k}º tempo já está no horário.`); return; }
-  // já deixa pronto o próximo tempo do mesmo dia (aula geminada) ou o próximo dia
-  if (k < g.tempos) { S.horDia = d; S.horTempo = k + 1; } else { S.horDia = d < 5 ? d + 1 : 1; S.horTempo = 1; }
-  const nt = JSON.parse(JSON.stringify(t)); nt.grade = g; nt.horario = [...atual, { id: uid(), dia: d, tempo: k, ...horaDoTempo(g, k) }];
-  await salvarTurmaHorario(nt, `${DIAS[d]}, ${k}º tempo adicionado`);
-});
-document.addEventListener("change", e => { if (e.target.id === "hDia") S.horDia = Number(e.target.value); if (e.target.id === "hTempo") S.horTempo = Number(e.target.value); });
-async function salvarTurmaHorario(nt, msg) { await salvar("turmas", nt); if (msg) toast(msg); }
+const comTempos = t => horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar']"); if (!b) return;
-  const t = turmaAtual(); if (!t) return;
-  if (b.dataset.act === "hor-config") { dlgGrade(); return; }
-  if (b.dataset.act === "hor-grade-salvar") {
+  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar'],[data-act='hor-escolher'],[data-act='hor-turno']"); if (!b) return;
+  const act = b.dataset.act, tn = turnoHor();
+  if (act === "hor-turno") { S.horTurno = b.dataset.v; S.horPop = null; render(); return; }
+  if (act === "hor-config") { S.horPop = null; dlgGrade(); return; }
+  if (act === "hor-grade-salvar") {
     const grade = { inicio: val2("gIni") || "07:00", duracao: Number(val2("gDur")), tempos: Number(val2("gTempos")), recreioApos: Number(val2("gRecApos")), recreio: Number(val2("gRec")), sabado: document.getElementById("gSab").checked };
-    const nt = JSON.parse(JSON.stringify(t)); nt.grade = grade;
-    nt.horario = horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo && a.tempo <= grade.tempos && (grade.sabado || a.dia < 6)).map(a => ({ ...a, ...horaDoTempo(grade, a.tempo) }));
-    fechar(); await salvarTurmaHorario(nt, "Grade de tempos salva"); return;
+    fechar();
+    for (const t of turmasDoTurno(tn)) {
+      const nt = JSON.parse(JSON.stringify(t)); nt.grade = grade;
+      nt.horario = comTempos(t).filter(a => a.tempo <= grade.tempos && (grade.sabado || a.dia < 6)).map(a => ({ ...a, ...horaDoTempo(grade, a.tempo) }));
+      await salvar("turmas", nt);
+    }
+    toast("Grade de tempos salva"); return;
   }
-  const d = Number(b.dataset.dia), k = Number(b.dataset.tempo), g = gradeDe(t);
-  const nt = JSON.parse(JSON.stringify(t)); nt.grade = g;
-  const atual = horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
-  const ja = atual.find(a => a.dia === d && a.tempo === k);
-  nt.horario = ja ? atual.filter(a => a !== ja) : [...atual, { id: uid(), dia: d, tempo: k, ...horaDoTempo(g, k) }];
-  await salvarTurmaHorario(nt);
+  if (act === "hor-cel") {
+    const d = Number(b.dataset.dia), k = Number(b.dataset.tempo);
+    S.horPop = S.horPop && S.horPop.d === d && S.horPop.k === k ? null : { d, k };
+    render(); posicionarPop(); return;
+  }
+  // hor-escolher: a turma escolhida fica com o tempo; quem estava nele sai
+  const { d, k } = S.horPop, alvo = b.dataset.turma; S.horPop = null;
+  const g = gradeTurno(tn);
+  for (const t of turmasDoTurno(tn)) {
+    const atual = comTempos(t), tem = atual.some(a => a.dia === d && a.tempo === k), quer = t.id === alvo;
+    if (tem === quer) continue;
+    const nt = JSON.parse(JSON.stringify(t)); nt.grade = gradeDe(t);
+    nt.horario = quer ? [...atual, { id: uid(), dia: d, tempo: k, ...horaDoTempo(g, k) }] : atual.filter(a => !(a.dia === d && a.tempo === k));
+    await salvar("turmas", nt);
+  }
+  render();
+  const t = turma(alvo); toast(t ? `${t.nome} na ${DIAS[d].toLowerCase()}, ${k}º tempo` : `${DIAS[d]}, ${k}º tempo vago`);
+  document.querySelector(`.cel[data-dia="${d}"][data-tempo="${k}"]`)?.focus();
 });
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {
@@ -2054,10 +2092,11 @@ document.addEventListener("keydown", e => {
 dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); });
 
 function lerRota() {
-  const h = location.hash.slice(1);
+  let h = location.hash.slice(1);
+  if (/^turma-.+-horario$/.test(h)) h = "horario"; // links antigos da aba Horário
   const m = h.match(new RegExp("^turma-(.+)-(" + ABAS.map(a => a[0]).join("|") + ")$"));
   if (m) { S.dentroTurma = true; S.turmaSel = m[1]; S.view = m[2]; try { localStorage.setItem("cp_turma", m[1]); } catch (_) {} return; }
-  S.dentroTurma = false; S.view = VIEWS.some(v => v[0] === h) || h === "enem" ? h : "inicio";
+  S.dentroTurma = false; S.horPop = null; S.view = VIEWS.some(v => v[0] === h) || h === "enem" ? h : "inicio";
 }
 function rota() { lerRota(); render(); window.scrollTo(0, 0); }
 window.addEventListener("hashchange", rota);

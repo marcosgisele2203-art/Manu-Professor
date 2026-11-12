@@ -390,3 +390,25 @@ td .grade{border-radius:8px;min-height:36px}
 .hor-dia li:first-child{border-top:0}
 .hor-dia li button{margin-left:auto}
 .hor-dia .aviso{width:100%;color:#b45309}
+/* Meu horário */
+.cel.on{background:var(--surface);border:1.5px solid var(--line-strong);color:var(--ink);display:grid;gap:4px;padding:4px}
+.cel.choque{border-color:#d97706}
+.cel[aria-expanded="true"]{outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:1px}
+.cel-turma{display:block;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface));border-radius:6px;padding:4px 6px;text-align:left}
+.cel-turma b{display:block;font-size:.85rem}.cel-turma small{display:block;color:var(--muted);font-size:.72rem}
+.grade-tempos td.hoje{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.hor-pop{position:absolute;z-index:60;background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:8px;display:grid;gap:2px;max-height:60vh;overflow:auto}
+.hor-pop-tit{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:4px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.hor-op{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:8px;font:inherit;color:var(--ink);cursor:pointer}
+.hor-op:hover,.hor-op:focus-visible{background:var(--surface-2)}
+.hor-op.on{background:color-mix(in srgb,var(--accent) 12%,var(--surface));font-weight:700}
+.hor-op>span:nth-child(2){flex:1;min-width:0}.hor-op small{display:block;color:var(--muted);font-size:.78rem;font-weight:500}
+.hor-op .swatch{width:12px;height:12px;border-radius:4px;flex:none}
+.hor-op.vago{color:var(--muted);justify-content:center;border-top:1px solid var(--line);border-radius:0 0 10px 10px;margin-top:4px}
+.hor-tot{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.hor-tot a{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-size:.85rem;color:var(--ink);text-decoration:none}
+.hor-tot .swatch{width:10px;height:10px;border-radius:3px}
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--surface-2);border-radius:12px;margin-bottom:12px}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:9px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.seg{flex-wrap:wrap;max-width:100%}.seg button{white-space:nowrap}
