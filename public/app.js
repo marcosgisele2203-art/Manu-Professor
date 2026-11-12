@@ -27,6 +27,7 @@ const I = {
   questoes: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
   materiais: '<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/>',
   slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/>',
+  drive: '<path d="M8 3h8l6 11-4 7H6l-4-7z"/><path d="M8 3l6 11H2M16 3 10 14l-4 7M22 14H10"/>',
   provas: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
   assistente: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -120,7 +121,7 @@ async function iniciar() {
   render();
   try {
     const eu = await api("GET", "/api/eu");
-    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin;
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || "";
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     S.mode = "live";
@@ -272,7 +273,7 @@ function vChamada() {
 /* ----- Notas ----- */
 function vNotas() {
   const t = turmaAtual();
-  const head = `<div class="page-head"><div><h1>Notas</h1><p class="muted">Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exportar-notas">${ico("dl")}Exportar boletim (.csv)</button><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
+  const head = `<div class="page-head"><div><h1>Notas</h1><p class="muted">Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
   if (!t) return head + semTurma();
   const avs = S.avaliacoes.filter(a => a.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const al = t.alunos || [];
@@ -409,7 +410,7 @@ function dlgVerPlano(p) {
   abrirDlg(esc(p.titulo), `<div class="doc" style="border:0;padding:0">
     <div class="toolbar"><span class="chip">${esc(t?.nome || "")}</span><span class="chip">${esc(fmtDataLonga(p.data))}</span><span class="chip">${esc(p.duracao || "")}</span>${(p.bncc || "").split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>
     ${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}</div>`,
-    `<button type="button" class="btn ai" data-act="sl-do-plano" data-id="${esc(p.id)}">${ico("spark")}Gerar slides</button><button type="button" class="btn" data-act="baixar-plano" data-id="${esc(p.id)}">${ico("dl")}Baixar (.html)</button><button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+    `<button type="button" class="btn ai" data-act="sl-do-plano" data-id="${esc(p.id)}">${ico("spark")}Gerar slides</button>${botoesExport(`data-plano="${esc(p.id)}"`)}<button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
 function dlgAvaliacao(a) {
@@ -497,7 +498,7 @@ function provaDoc(p, gabarito) {
 }
 function dlgVerProva(p, gab) {
   abrirDlg(esc(p.titulo), `<div class="toolbar"><button type="button" class="btn sm ${gab ? "" : "primary"}" data-act="ver-prova" data-id="${esc(p.id)}">Versão do aluno</button><button type="button" class="btn sm ${gab ? "primary" : ""}" data-act="ver-prova-gab" data-id="${esc(p.id)}">Com gabarito</button></div>${provaDoc(p, gab)}`,
-    `<button type="button" class="btn" data-act="baixar-prova" data-id="${esc(p.id)}" data-gab="0">${ico("dl")}Baixar prova</button><button type="button" class="btn" data-act="baixar-prova" data-id="${esc(p.id)}" data-gab="1">${ico("dl")}Baixar gabarito</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+    `${botoesExport(`data-prova="${esc(p.id)}" data-gab="${gab ? 1 : 0}"`)}<button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
 /* ---------- IA ---------- */
@@ -764,7 +765,7 @@ function vMateriais() {
   </section>
   ${cur ? `<section class="panel" id="matResultado">
     <div class="panel-head"><div><span class="eyebrow">${esc(MAT_TIPOS[cur.subtipo][0])}${cur.adaptacao ? " · adaptado para " + esc(ADAPT[cur.adaptacao]) : ""}</span><h2>${esc(cur.titulo)}</h2></div>
-      <div class="toolbar"><button class="btn primary" data-act="mat-imprimir">Imprimir</button>${cur.subtipo !== "ludica" ? `<button class="btn" data-act="mat-imprimir-gab">Imprimir gabarito</button>` : ""}<button class="btn" data-act="mat-baixar">${ico("dl")}Baixar</button>${S.materiais.some(x => x.id === cur.id) ? `<span class="chip ok">Salvo nos materiais</span>` : `<button class="btn" data-act="mat-salvar">Salvar</button>`}</div></div>
+      <div class="toolbar"><button class="btn primary" data-act="mat-imprimir">Imprimir</button>${cur.subtipo !== "ludica" ? `<button class="btn" data-act="mat-imprimir-gab">Imprimir gabarito</button>` : ""}${botoesExport(`data-material="1"`)}${S.materiais.some(x => x.id === cur.id) ? `<span class="chip ok">Salvo nos materiais</span>` : `<button class="btn" data-act="mat-salvar">Salvar</button>`}</div></div>
     ${cur.grade && cur.grade.fora && cur.grade.fora.length ? `<div class="banner"><span>Não couberam na grade: ${esc(cur.grade.fora.join(", "))}.</span></div>` : ""}
     ${cur.orientacoes || cur.mudancas ? `<div class="ai-box small">${cur.mudancas ? `<div><b>O que foi adaptado:</b> ${esc(cur.mudancas)}</div>` : ""}${cur.orientacoes ? `<div><b>Dicas para aplicar:</b> ${esc(Array.isArray(cur.orientacoes) ? cur.orientacoes.join(" ") : cur.orientacoes)}</div>` : ""}${cur.bncc ? `<div><b>BNCC:</b> ${esc(cur.bncc)}</div>` : ""}</div>` : (cur.bncc ? `<div class="toolbar">${String(cur.bncc).split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>` : "")}
     <div class="folha-wrap"><div class="folha ${estiloFolha(cur)}">${materialCorpo(cur, false)}</div></div>
@@ -844,7 +845,7 @@ function vSlides() {
   </section>
   ${d ? `<section class="panel" id="slResultado">
     <div class="panel-head"><div><span class="eyebrow">${d.slides.length} slides${d.bncc ? " · " + esc(d.bncc) : ""}</span><h2>${esc(d.titulo)}</h2></div>
-      <div class="toolbar"><button class="btn" data-act="sl-apresentar">Apresentar</button><button class="btn primary" data-act="sl-pptx">${ico("dl")}Baixar PowerPoint</button>${S.slides.some(x => x.id === d.id) ? `<span class="chip ok">Salvo</span>` : `<button class="btn" data-act="sl-salvar">Salvar</button>`}</div></div>
+      <div class="toolbar"><button class="btn" data-act="sl-apresentar">Apresentar</button><button class="btn primary" data-act="sl-pptx">${ico("dl")}Baixar PowerPoint</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-slides="1">${ico("drive")}Google Apresentações</button>` : ""}${S.slides.some(x => x.id === d.id) ? `<span class="chip ok">Salvo</span>` : `<button class="btn" data-act="sl-salvar">Salvar</button>`}</div></div>
     <div class="deck">${d.slides.map((s, i) => `<figure class="deck-item">${slideHTML(s, d, i)}${s.notas ? `<figcaption><b>Fala do professor:</b> ${esc(s.notas)}</figcaption>` : ""}</figure>`).join("")}</div>
   </section>` : ""}
   <section class="panel"><h2>Minhas apresentações</h2>
@@ -880,6 +881,9 @@ async function carregarPptx() {
 }
 async function baixarPptx(d) {
   try { await carregarPptx(); } catch (_) { toast("Não foi possível preparar o PowerPoint. Verifique a internet e tente de novo."); return; }
+  await montarPptx(d).writeFile({ fileName: slug(d.titulo) + ".pptx" });
+}
+function montarPptx(d) {
   const C = { teal: "0B7C8A", tealEsc: "075E69", ink: "1F3140", muted: "556676", soft: "E3F5F6", rosa: "FDE8F0", rosaInk: "A8205A", ouro: "FDF0DC", ouroInk: "8A5208", branco: "FFFFFF" };
   const F = "Arial";
   const pptx = new PptxGenJS();
@@ -910,7 +914,7 @@ async function baixarPptx(d) {
     }
     if (s.notas) sl.addNotes(s.notas);
   });
-  await pptx.writeFile({ fileName: slug(d.titulo) + ".pptx" });
+  return pptx;
 }
 
 document.addEventListener("input", e => {
@@ -945,6 +949,182 @@ document.addEventListener("click", async e => {
   else if (act === "sl-do-plano") { const p = S.planos.find(x => x.id === b.dataset.id); if (p) { const t = turma(p.turmaId); Object.assign(S.slForm, { planoId: p.id, tema: p.titulo, serie: t?.serie || "", disciplina: t?.disciplina || "" }); fechar(); location.hash = "slides"; } }
 });
 document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && S.slShow >= 0) { S.slShow = -1; render(); } });
+
+/* ---------- Exportar para Word, Excel e Google Drive ---------- */
+const MIME = {
+  docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.google-apps.document", "Google Docs"],
+  pptx: ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.google-apps.presentation", "Google Apresentações"],
+  xlsx: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.google-apps.spreadsheet", "Google Planilhas"]
+};
+const scriptsCarregados = {};
+function carregarScript(src) {
+  return scriptsCarregados[src] ||= new Promise((ok, erro) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => { delete scriptsCarregados[src]; erro(new Error("script")); }; document.head.appendChild(s); });
+}
+function baixarBlob(nome, blob) {
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// Converte o HTML das folhas (plano, material, prova) num documento Word
+async function htmlParaDocx(html, estilo) {
+  await carregarScript("/vendor/docx-9.5.1.umd.js");
+  const D = window.docx;
+  const fonte = estilo === "dislexia" ? "Verdana" : "Arial", tam = estilo === "ampliado" ? 36 : estilo === "dislexia" ? 28 : 24;
+  const raiz = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html").body.firstChild;
+  const BLOCO = new Set(["DIV", "P", "H1", "H2", "H3", "OL", "UL", "LI", "TABLE", "SECTION", "FIGURE"]);
+  const temBloco = el => [...el.children].some(c => BLOCO.has(c.tagName));
+  const runs = (el, fmt = {}) => {
+    const out = [];
+    el.childNodes.forEach(n => {
+      if (n.nodeType === 3) { const t = n.textContent.replace(/\s+/g, " "); if (t.trim() || out.length) out.push(new D.TextRun({ text: t, font: fonte, size: fmt.size || tam, bold: fmt.bold, italics: fmt.it, color: fmt.cor, superScript: fmt.sup })); }
+      else if (n.nodeType === 1 && !BLOCO.has(n.tagName)) {
+        if (n.tagName === "BR") out.push(new D.TextRun({ break: 1 }));
+        else out.push(...runs(n, { ...fmt, bold: fmt.bold || /^(B|STRONG)$/.test(n.tagName), it: fmt.it || /^(I|EM)$/.test(n.tagName), sup: n.tagName === "SUP", size: n.tagName === "SUP" ? 14 : fmt.size, cor: n.classList.contains("nl") ? "666666" : fmt.cor }));
+      }
+    });
+    return out;
+  };
+  const par = (rs, o = {}) => new D.Paragraph({ children: rs, spacing: { after: o.after ?? 120, line: estilo === "dislexia" ? 400 : 300 }, indent: o.indent ? { left: o.indent } : undefined, border: o.border, alignment: o.align });
+  const linhasTexto = (txt, fmt = {}) => String(txt).split("\n").map(l => par([new D.TextRun({ text: l, font: fonte, size: fmt.size || tam, bold: fmt.bold, color: fmt.cor })], { after: 60 }));
+  const blocos = (el, nivel = 0) => {
+    const out = [];
+    let buf = null;
+    const flush = () => { if (buf && buf.textContent.trim()) out.push(par(runs(buf), { indent: nivel })); buf = null; };
+    for (const c of el.childNodes) {
+      if (c.nodeType === 3 || (c.nodeType === 1 && !BLOCO.has(c.tagName))) { (buf ||= document.createElement("span")).appendChild(c.cloneNode(true)); continue; }
+      flush();
+      if (c.nodeType !== 1) continue;
+      const tag = c.tagName, cls = c.classList;
+      if (tag === "H1") out.push(par(runs(c, { bold: true, size: Math.round(tam * 1.4) }), { after: 160 }));
+      else if (tag === "H2" || tag === "H3") out.push(par(runs(c, { bold: true, size: Math.round(tam * 1.1), cor: tag === "H3" ? "0B7C8A" : undefined }), { after: 80 }));
+      else if (cls.contains("linhas")) [...c.children].forEach(() => out.push(par([new D.TextRun({ text: " ", font: fonte, size: tam })], { after: 80, indent: nivel, border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: "888888", space: 1 } } })));
+      else if (cls.contains("quadro")) out.push(new D.Table({ width: { size: 100, type: D.WidthType.PERCENTAGE }, rows: [new D.TableRow({ height: { value: 2400, rule: D.HeightRule.ATLEAST }, children: [new D.TableCell({ children: [par([])], borders: Object.fromEntries(["top", "bottom", "left", "right"].map(k => [k, { style: D.BorderStyle.DASHED, size: 8, color: "888888" }])) })] })] }), par([]));
+      else if (cls.contains("gab")) out.push(par(runs(c, { bold: true, cor: "1F6B3B" }), { indent: nivel }));
+      else if (tag === "OL" || tag === "UL") {
+        const tipoL = c.getAttribute("type"), letra = tipoL === "a" || tipoL === "A" || cls.contains("alts"), base = tipoL === "A" ? 65 : 97;
+        [...c.children].filter(li => li.tagName === "LI").forEach((li, i) => {
+          const num = li.getAttribute("value") || (i + 1);
+          const pre = tag === "UL" ? "• " : letra ? String.fromCharCode(base + i) + ") " : num + ". ";
+          const prim = [...li.childNodes].filter(n => n.nodeType === 3 || !BLOCO.has(n.tagName));
+          const tmp = document.createElement("span"); prim.forEach(n => tmp.appendChild(n.cloneNode(true)));
+          const resto = [...li.children].filter(n => BLOCO.has(n.tagName));
+          const primeiroBloco = !tmp.textContent.trim() && resto[0] && !/^(OL|UL|TABLE)$/.test(resto[0].tagName) && !resto[0].classList.contains("linhas") ? resto.shift() : null;
+          const fonteRuns = primeiroBloco ? runs(primeiroBloco) : runs(tmp);
+          out.push(par([new D.TextRun({ text: pre, font: fonte, size: tam, bold: !letra }), ...fonteRuns], { indent: nivel + (letra ? 360 : 0), after: 80 }));
+          const sub = document.createElement("div"); resto.forEach(n => sub.appendChild(n.cloneNode(true)));
+          out.push(...blocos(sub, nivel + 360));
+        });
+        out.push(par([], { after: 60 }));
+      } else if (tag === "TABLE") {
+        const rows = [...c.querySelectorAll("tr")];
+        const cruz = cls.contains("cruz"), caca = cls.contains("caca");
+        const lado = cruz || caca ? 440 : undefined;
+        const ncol = Math.max(...rows.map(tr => tr.children.length));
+        out.push(new D.Table({ alignment: D.AlignmentType.CENTER, ...(lado ? { layout: D.TableLayoutType.FIXED, columnWidths: Array(ncol).fill(lado), width: { size: ncol * lado, type: D.WidthType.DXA } } : {}), rows: rows.map(tr => new D.TableRow({ height: lado ? { value: lado, rule: D.HeightRule.EXACT } : undefined, children: [...tr.children].map(td => {
+          const on = !cruz || td.classList.contains("on");
+          const sup = td.querySelector("sup")?.textContent || "", txt = td.textContent.replace(sup, "").trim();
+          const b = on ? { style: D.BorderStyle.SINGLE, size: cruz ? 12 : 4, color: cruz ? "111111" : "BBBBBB" } : { style: D.BorderStyle.NONE, size: 0, color: "FFFFFF" };
+          const filhos = [];
+          if (sup) filhos.push(new D.TextRun({ text: sup + " ", font: fonte, size: 12 }));
+          if (txt) filhos.push(new D.TextRun({ text: txt, font: fonte, size: cruz || caca ? 22 : tam, bold: cruz || caca || td.tagName === "TH" }));
+          return new D.TableCell({ width: lado ? { size: lado, type: D.WidthType.DXA } : undefined, borders: { top: b, bottom: b, left: b, right: b }, shading: td.classList.contains("achou") ? { fill: "FFE08A", type: D.ShadingType.CLEAR, color: "auto" } : undefined, verticalAlign: D.VerticalAlign.CENTER, children: [new D.Paragraph({ alignment: lado ? D.AlignmentType.CENTER : undefined, children: filhos })] });
+        }) })) }), par([]));
+      } else if (cls.contains("banco")) out.push(par(runs(c)));
+      else if (cls.contains("sec")) { const h = c.querySelector("h3"), d = c.querySelector("div,p"); if (h) out.push(par(runs(h, { bold: true, cor: "0B7C8A" }), { after: 40 })); if (d) out.push(...linhasTexto(d.textContent)); out.push(par([], { after: 60 })); }
+      else if (cls.contains("enun") || cls.contains("texto") && !temBloco(c)) out.push(...linhasTexto(c.textContent));
+      else if (temBloco(c)) out.push(...blocos(c, nivel));
+      else if (c.textContent.trim()) out.push(par(runs(c, { it: cls.contains("instr") || cls.contains("autoria") }), { indent: nivel }));
+    }
+    flush();
+    return out;
+  };
+  const doc = new D.Document({ styles: { default: { document: { run: { font: fonte, size: tam } } } }, sections: [{ properties: { page: { margin: { top: 1000, bottom: 1000, left: 1000, right: 1000 } } }, children: blocos(raiz) }] });
+  return D.Packer.toBlob(doc);
+}
+
+const corpoPlano = p => { const t = turma(p.turmaId); const sec = (h, v) => v ? `<div class="sec"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
+  return `<div class="instr">${esc(t?.disciplina || "")} · ${esc(t?.nome || "")} · ${esc(fmtDataLonga(p.data))} · ${esc(p.duracao || "")}</div><h1>${esc(p.titulo)}</h1>${p.bncc ? `<p>BNCC: ${esc(p.bncc)}</p>` : ""}${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}`; };
+
+async function boletimXlsx(t) {
+  await carregarScript("/vendor/exceljs-4.4.0.min.js");
+  const wb = new ExcelJS.Workbook(); wb.creator = "Manu Professor";
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const ws = wb.addWorksheet("Boletim", { views: [{ state: "frozen", xSplit: 1, ySplit: 2 }] });
+  ws.addRow([`${t.nome} · ${t.disciplina}${t.ano ? " · " + t.ano : ""}`]).font = { bold: true, size: 14 };
+  const cab = ws.addRow(["Aluno", ...avs.map(a => `${a.nome} (peso ${a.peso})`), "Média", "Frequência", "Situação"]);
+  cab.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; c.alignment = { vertical: "middle", horizontal: "center", wrapText: true }; });
+  cab.height = 32;
+  (t.alunos || []).forEach(s => {
+    const m = mediaAluno(t, s.id), f = freqAluno(t, s.id);
+    const sit = m === null ? "sem notas" : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? "em dia" : m < MEDIA_MIN ? "recuperação" : "frequência";
+    const r = ws.addRow([s.nome, ...avs.map(a => { const n = a.notas?.[s.id]; return n == null || n === "" ? null : Number(n); }), m === null ? null : Math.round(m * 10) / 10, f === null ? null : f / 100, sit]);
+    r.eachCell((c, i) => { if (i > 1 && i <= avs.length + 2) c.numFmt = "0.0"; });
+    r.getCell(avs.length + 3).numFmt = "0%";
+    if (m !== null && m < MEDIA_MIN) r.getCell(avs.length + 2).font = { bold: true, color: { argb: "FFA33A25" } };
+    if (f !== null && f < FREQ_MIN) r.getCell(avs.length + 3).font = { bold: true, color: { argb: "FFA33A25" } };
+  });
+  ws.getColumn(1).width = 34; for (let i = 2; i <= avs.length + 4; i++) ws.getColumn(i).width = 16;
+  const ch = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => a.data.localeCompare(b.data));
+  if (ch.length) {
+    const wf = wb.addWorksheet("Frequência", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
+    const h = wf.addRow(["Aluno", ...ch.map(c => fmtData(c.data))]); h.font = { bold: true };
+    (t.alunos || []).forEach(s => wf.addRow([s.nome, ...ch.map(c => c.presencas?.[s.id] || "")]));
+    wf.getColumn(1).width = 34;
+  }
+  return new Blob([await wb.xlsx.writeBuffer()], { type: MIME.xlsx[0] });
+}
+
+// Google Drive: o arquivo vai para o Drive do professor e abre convertido no app do Google
+let gToken = null, gTokenAte = 0;
+async function tokenGoogle() {
+  if (gToken && Date.now() < gTokenAte) return gToken;
+  await carregarScript("https://accounts.google.com/gsi/client");
+  return new Promise((ok, erro) => {
+    const cli = google.accounts.oauth2.initTokenClient({ client_id: S.googleClientId, scope: "https://www.googleapis.com/auth/drive.file",
+      callback: r => { if (r.error) return erro(new Error(r.error)); gToken = r.access_token; gTokenAte = Date.now() + (Number(r.expires_in || 3000) - 120) * 1000; ok(gToken); },
+      error_callback: e => erro(new Error(e.type || "popup")) });
+    cli.requestAccessToken();
+  });
+}
+async function enviarDrive(nome, blob, tipo) {
+  const [origem, destino, app] = MIME[tipo];
+  let token;
+  try { token = await tokenGoogle(); } catch (_) { toast("A conexão com o Google foi cancelada ou bloqueada. Permita a janela do Google e tente de novo."); return; }
+  toast("Enviando para o seu Google Drive…");
+  const b = "manu" + Date.now();
+  const corpo = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: nome, mimeType: destino })}\r\n--${b}\r\nContent-Type: ${origem}\r\n\r\n`, blob, `\r\n--${b}--`]);
+  const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + b }, body: corpo }).catch(() => null);
+  if (!r || !r.ok) { if (r && r.status === 401) gToken = null; toast("O Google não aceitou o arquivo agora. Tente de novo."); return; }
+  const j = await r.json();
+  abrirDlg("Salvo no seu Google Drive", `<p><b>${esc(nome)}</b> foi criado no seu Google Drive e já pode ser editado no ${app}.</p>`,
+    `<button type="button" class="btn" data-act="fechar">Fechar</button><a class="btn primary" href="${esc(j.webViewLink)}" target="_blank" rel="noopener">Abrir no ${app}</a>`);
+}
+
+async function exportar(alvo, formato, el) {
+  if (el) el.disabled = true;
+  try {
+    let nome, blob, tipo;
+    if (alvo.plano) { const p = alvo.plano; nome = p.titulo; tipo = "docx"; blob = await htmlParaDocx(corpoPlano(p)); }
+    else if (alvo.material) { const m = alvo.material; nome = m.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; blob = await htmlParaDocx(materialCorpo(m, !!alvo.gab), estiloFolha(m)); }
+    else if (alvo.prova) { const p = alvo.prova; nome = p.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; blob = await htmlParaDocx(provaDoc(p, !!alvo.gab)); }
+    else if (alvo.slides) { const d = alvo.slides; nome = d.titulo; tipo = "pptx"; await carregarPptx(); blob = await montarPptx(d).write({ outputType: "blob" }); }
+    else if (alvo.turma) { const t = alvo.turma; nome = "Boletim " + t.nome; tipo = "xlsx"; blob = await boletimXlsx(t); }
+    if (formato === "drive") await enviarDrive(nome, blob, tipo);
+    else baixarBlob(slug(nome) + "." + tipo, blob);
+  } catch (e) { console.error(e); toast("Não foi possível gerar o arquivo. Tente de novo."); }
+  if (el) el.disabled = false;
+}
+const botoesExport = (dados, extra = "") => `<button type="button" class="btn" data-act="exp" data-fmt="arquivo" ${dados}${extra}>${ico("dl")}Word</button>${S.googleClientId ? `<button type="button" class="btn" data-act="exp" data-fmt="drive" ${dados}${extra}>${ico("drive")}Google Docs</button>` : ""}`;
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act='exp']"); if (!b) return;
+  const d = b.dataset, gab = d.gab === "1";
+  const alvo = d.plano ? { plano: S.planos.find(x => x.id === d.plano) }
+    : d.material ? { material: S.matAtual, gab }
+    : d.prova ? { prova: S.provas.find(x => x.id === d.prova), gab }
+    : d.slides ? { slides: S.slAtual }
+    : d.turma ? { turma: turma(d.turma) } : null;
+  if (alvo && Object.values(alvo)[0]) exportar(alvo, d.fmt, b);
+});
 
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {

@@ -22,6 +22,9 @@ export default function Privacidade() {
         <p>As funções de IA usam o Claude, da Anthropic. Para gerar um conteúdo, enviamos o tema, a série, a disciplina e o texto que o professor escreveu. <b>Os nomes dos alunos não são enviados à IA.</b> A Anthropic não usa esses dados para treinar seus modelos pelo uso via API.</p>
         <p>O conteúdo gerado pela IA é uma sugestão. O professor deve revisar tudo antes de usar com os alunos.</p>
 
+        <h2>Google Drive</h2>
+        <p>Se você usar o botão de salvar no Google Drive, o Manu Professor pede permissão à sua conta Google apenas para criar arquivos no seu Drive (permissão &quot;drive.file&quot;). O sistema não lê, não altera e não apaga nenhum outro arquivo seu, e não guarda o acesso depois que você fecha a página.</p>
+
         <h2>Responsabilidade do professor</h2>
         <p>Ao cadastrar alunos, o professor confirma que usa esses dados para fins pedagógicos, dentro das atribuições dele na escola, e que não cadastra informações além das necessárias (como dados de saúde ou laudos).</p>
 
