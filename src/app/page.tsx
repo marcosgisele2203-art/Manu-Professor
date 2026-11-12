@@ -18,12 +18,7 @@ export default function Inicio() {
         </aside>
         <div className="main">
           <header className="top">
-            <div className="top-left">
-              <div className="field" style={{ minWidth: 200 }}>
-                <label htmlFor="turmaSel">Turma em foco</label>
-                <select className="input" id="turmaSel"></select>
-              </div>
-            </div>
+            <div className="top-left"><span className="small muted" id="topoTitulo">Manu Professor</span></div>
             <div className="toolbar"><span className="small muted" id="syncState"></span><form className="so-celular" action="/api/auth/sair" method="post"><button className="btn sm ghost" type="submit">Sair</button></form></div>
           </header>
           <main className="content" id="view" aria-live="polite"></main>
