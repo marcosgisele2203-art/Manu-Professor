@@ -258,7 +258,7 @@ function agendaHoje() {
   if (!S.turmas.some(t => horarioDe(t).length)) return "";
   return `<section class="panel"><div class="panel-head"><h2>Suas aulas de hoje</h2><span class="small muted">${DIAS[ds] || "Domingo"}</span></div>
     ${aulas.length ? `<div class="agenda">${aulas.map(({ t, a }) => { const est = minutos(a.fim) <= mAgora ? "feita" : minutos(a.inicio) <= mAgora ? "agora" : "";
-      return `<a class="ag-item ${est}" href="${linkTurma(t.id, "chamada")}"><span class="num ag-h">${a.inicio}–${a.fim}</span><span class="dot" style="background:${esc(t.cor)}"></span><span class="ag-t"><b>${esc(t.nome)}</b><small>${esc(t.disciplina)}</small></span>${est === "agora" ? '<span class="chip acc">agora</span>' : est === "feita" ? '<span class="chip">encerrada</span>' : ""}</a>`; }).join("")}</div>`
+      return `<a class="ag-item ${est}" href="${linkTurma(t.id, "chamada")}"><span class="num ag-h">${tempoDe(t, a) ? `<b>${tempoDe(t, a)}º tempo</b> ` : ""}${a.inicio}–${a.fim}</span><span class="dot" style="background:${esc(t.cor)}"></span><span class="ag-t"><b>${esc(t.nome)}</b><small>${esc(t.disciplina)}</small></span>${est === "agora" ? '<span class="chip acc">agora</span>' : est === "feita" ? '<span class="chip">encerrada</span>' : ""}</a>`; }).join("")}</div>`
       : `<p class="muted">Nenhuma aula no seu horário hoje.</p>`}</section>`;
 }
 function vInicio() {
@@ -308,7 +308,7 @@ function vResumoTurma() {
   const faixa = Br ? `<a class="faixa-bim" href="${linkTurma(t.id, "bimestres")}"><b>${esc(Br.nome)}</b><span>${fmtData(Br.inicio)} a ${fmtData(Br.fim)}${semAgora >= 0 ? ` · semana ${semAgora + 1} de ${semR.length}` : ""}</span>${Br.plano && semAgora >= 0 && Br.plano.semanas[semAgora] ? `<span>Esta semana: <b>${esc(Br.plano.semanas[semAgora].tema)}</b></span>` : `<span>${Br.plano ? "" : "Planeje este período com a IA"}</span>`}</a>`
     : bimestresDe(t).length ? "" : `<a class="faixa-bim vazio" href="${linkTurma(t.id, "bimestres")}"><b>Organize o ano em bimestres</b><span>Notas, frequência e planejamento por período</span></a>`;
   const px = proximaAula(t);
-  const linhaHor = px ? `<a class="faixa-hor" href="${linkTurma(t.id, "horario")}">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${px.inicio}–${px.fim}</span>`}</a>`
+  const linhaHor = px ? `<a class="faixa-hor" href="${linkTurma(t.id, "horario")}">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
     : `<a class="faixa-hor vazio" href="${linkTurma(t.id, "horario")}"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
   return faixa + linhaHor + `<div class="atalhos">
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
@@ -1828,7 +1828,6 @@ const horarioDe = t => (t && Array.isArray(t.horario) ? t.horario : []).slice().
 const minutos = h => { const [a, b] = String(h).split(":").map(Number); return a * 60 + (b || 0); };
 const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 const diaSemana = iso => { const d = new Date(iso + "T12:00:00").getDay(); return d === 0 ? 7 : d; }; // 1 = segunda
-S.horF = { dia: 1, inicio: "07:00", tempos: 1 };
 function conflitos(t) {
   const out = [];
   horarioDe(t).forEach(a => S.turmas.filter(o => o.id !== t.id).forEach(o => horarioDe(o).forEach(b => {
@@ -1851,48 +1850,67 @@ function proximaAula(t) {
   }
   return null;
 }
-function vHorario() {
-  const t = turmaAtual(), h = horarioDe(t), dur = Number(t.duracaoAula) || 50, f = S.horF, conf = conflitos(t);
-  const porDia = [1, 2, 3, 4, 5, 6].map(d => h.filter(a => a.dia === d));
-  const totalMin = h.reduce((s, a) => s + minutos(a.fim) - minutos(a.inicio), 0);
-  return `<div class="page-head"><div><h1>Horário de aula</h1><p class="muted">${h.length ? `${h.length} ${h.length === 1 ? "tempo" : "tempos"} por semana · ${Math.floor(totalMin / 60)}h${totalMin % 60 ? String(totalMin % 60).padStart(2, "0") : ""} de aula` : "Informe os dias e horários das aulas desta turma."}</p></div></div>
-  <section class="panel"><form class="hor-form" id="horForm">
-    <div class="field"><label for="hDia">Dia</label><select class="input" id="hDia">${DIAS.slice(1).map((n, i) => `<option value="${i + 1}" ${f.dia === i + 1 ? "selected" : ""}>${n}</option>`).join("")}</select></div>
-    <div class="field"><label for="hIni">Início</label><input class="input" id="hIni" type="time" value="${esc(f.inicio)}" required></div>
-    <div class="field"><label for="hTempos">Tempos seguidos</label><select class="input" id="hTempos">${[1, 2, 3, 4].map(n => `<option value="${n}" ${f.tempos === n ? "selected" : ""}>${n === 1 ? "1 tempo" : n + " tempos (geminada)"}</option>`).join("")}</select></div>
-    <div class="field"><label for="hDur">Duração do tempo</label><select class="input" id="hDur">${[40, 45, 50, 55, 60, 90, 100].map(n => `<option value="${n}" ${dur === n ? "selected" : ""}>${n} min</option>`).join("")}</select></div>
-    <button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form>
-    <p class="small muted">O fim de cada tempo é calculado pela duração. Ex.: início 07:00 com 2 tempos de 50 min cria 07:00–07:50 e 07:50–08:40.</p></section>
-  ${conf.length ? `<div class="banner"><b>Horário em conflito:</b><span>${conf.map(esc).join("; ")}.</span></div>` : ""}
-  <div class="hor-grade">${porDia.map((aulas, i) => `<div class="hor-dia ${diaSemana(hoje()) === i + 1 ? "hoje" : ""}"><b>${DIAS[i + 1]}</b>${aulas.length ? aulas.map(a => `<div class="hor-aula"><span class="num">${a.inicio}–${a.fim}</span><button class="btn sm ghost" data-act="hor-rem" data-id="${esc(a.id)}" aria-label="Remover aula de ${DIAS[a.dia]} ${a.inicio}">×</button></div>`).join("") : `<span class="small muted">sem aula</span>`}</div>`).join("")}</div>`;
+// Grade de tempos da escola: 1º ao 6º tempo, recreio depois do 3º
+const INICIO_TURNO = { Matutino: "07:00", Manhã: "07:00", Vespertino: "13:00", Tarde: "13:00", Noturno: "19:00", Noite: "19:00", Integral: "07:00" };
+function gradeDe(t) {
+  const g = t.grade || {};
+  return { inicio: g.inicio || INICIO_TURNO[t.turno] || "07:00", duracao: Number(g.duracao) || 50, tempos: Number(g.tempos) || 6, recreioApos: Number(g.recreioApos ?? 3), recreio: Number(g.recreio ?? 10), sabado: !!g.sabado };
 }
-async function salvarHorario(novo, extra = {}, msg) {
-  const nt = { ...JSON.parse(JSON.stringify(turmaAtual())), ...extra }; nt.horario = novo;
-  await salvar("turmas", nt); if (msg) toast(msg);
+function horaDoTempo(g, k) { // k = 1, 2, 3...
+  const ini = minutos(g.inicio) + (k - 1) * g.duracao + (g.recreioApos && k > g.recreioApos ? g.recreio : 0);
+  return { inicio: hhmm(ini), fim: hhmm(ini + g.duracao) };
 }
-document.addEventListener("submit", e => {
-  if (e.target.id !== "horForm") return; e.preventDefault();
-  const t = turmaAtual(), dia = Number(val2("hDia")), ini = val2("hIni"), n = Number(val2("hTempos")) || 1, dur = Number(val2("hDur")) || 50;
-  if (!/^\d{2}:\d{2}$/.test(ini)) { toast("Informe a hora de início."); return; }
-  const atuais = horarioDe(t), novos = [];
-  for (let k = 0; k < n; k++) { const i = minutos(ini) + k * dur; novos.push({ id: uid(), dia, inicio: hhmm(i), fim: hhmm(i + dur) }); }
-  const repetido = novos.find(a => atuais.some(b => b.dia === a.dia && minutos(a.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(a.fim)));
-  if (repetido) { toast(`${DIAS[dia]} ${repetido.inicio} já está no horário desta turma.`); return; }
-  S.horF = { dia: dia < 6 ? dia + 1 : 1, inicio: ini, tempos: n };
-  salvarHorario([...atuais, ...novos], { duracaoAula: dur }, `${DIAS[dia]}: ${novos.map(a => a.inicio + "–" + a.fim).join(", ")}`);
-});
+function tempoDe(t, a) { // horários antigos (sem número do tempo) são encaixados pelo início
+  if (a.tempo) return a.tempo;
+  const g = gradeDe(t); for (let k = 1; k <= g.tempos; k++) if (horaDoTempo(g, k).inicio === a.inicio) return k;
+  return null;
+}
 const val2 = id => { const el = document.getElementById(id); return el ? el.value : ""; };
-// guarda o que já foi escolhido no formulário, para não perder ao redesenhar a tela
-const lerHorF = () => { S.horF = { dia: Number(val2("hDia")) || 1, inicio: val2("hIni") || "07:00", tempos: Number(val2("hTempos")) || 1 }; };
-document.addEventListener("change", e => {
-  if (["hDia", "hIni", "hTempos"].includes(e.target.id)) lerHorF();
-  if (e.target.id === "hDur" && turmaAtual()) { lerHorF(); salvarHorario(horarioDe(turmaAtual()), { duracaoAula: Number(e.target.value) }); }
+function vHorario() {
+  const t = turmaAtual(), g = gradeDe(t), h = horarioDe(t), dias = g.sabado ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+  const marcado = (d, k) => h.find(a => a.dia === d && tempoDe(t, a) === k);
+  const outra = (d, k) => { const x = horaDoTempo(g, k); for (const o of S.turmas) { if (o.id === t.id) continue; const b = horarioDe(o).find(b => b.dia === d && minutos(x.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(x.fim)); if (b) return o; } return null; };
+  const linhas = [];
+  for (let k = 1; k <= g.tempos; k++) {
+    const x = horaDoTempo(g, k);
+    linhas.push(`<tr><th class="tp"><b>${k}º tempo</b><small class="num">${x.inicio}–${x.fim}</small></th>${dias.map(d => { const m = marcado(d, k), o = !m && outra(d, k);
+      return `<td><button type="button" class="cel${m ? " on" : ""}${o ? " ocupada" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-pressed="${!!m}" aria-label="${DIAS[d]}, ${k}º tempo">${m ? `<b>${esc(t.nome)}</b>` : o ? `<span>${esc(o.nome)}</span>` : `<span class="mais">+</span>`}</button></td>`; }).join("")}</tr>`);
+    if (g.recreioApos === k && g.recreio > 0 && k < g.tempos) { const fimR = hhmm(minutos(x.fim) + g.recreio); linhas.push(`<tr class="recreio"><th class="tp"><b>Recreio</b><small class="num">${x.fim}–${fimR}</small></th><td colspan="${dias.length}">Intervalo de ${g.recreio} minutos</td></tr>`); }
+  }
+  const n = h.length;
+  return `<div class="page-head"><div><h1>Horário de aula</h1><p class="muted">${n ? `${n} ${n === 1 ? "tempo" : "tempos"} por semana nesta turma.` : "Toque nos tempos em que você dá aula nesta turma."} Os horários seguem a grade da escola${t.turno ? " no turno " + esc(t.turno).toLowerCase() : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
+  <div class="table-wrap"><table class="grade-tempos"><thead><tr><th></th>${dias.map(d => `<th class="${diaSemana(hoje()) === d ? "hoje" : ""}">${DIAS[d]}</th>`).join("")}</tr></thead><tbody>${linhas.join("")}</tbody></table></div>
+  <p class="small muted">Toque de novo num tempo marcado para tirar. Tempos com o nome de outra turma já estão ocupados por ela no seu horário.</p>`;
+}
+function dlgGrade() {
+  const t = turmaAtual(), g = gradeDe(t);
+  abrirDlg("Configurar tempos", `<p class="small muted">Use a grade de horários da sua escola. Os horários desta turma são recalculados.</p>
+    <div class="grid3"><div class="field"><label for="gIni">Início do 1º tempo</label><input class="input" id="gIni" type="time" value="${esc(g.inicio)}"></div>
+    <div class="field"><label for="gDur">Duração de cada tempo</label><select class="input" id="gDur">${[40, 45, 50, 55, 60].map(n => `<option value="${n}" ${g.duracao === n ? "selected" : ""}>${n} minutos</option>`).join("")}</select></div>
+    <div class="field"><label for="gTempos">Tempos por dia</label><select class="input" id="gTempos">${[4, 5, 6, 7, 8, 9, 10].map(n => `<option ${g.tempos === n ? "selected" : ""}>${n}</option>`).join("")}</select></div></div>
+    <div class="grid3"><div class="field"><label for="gRecApos">Recreio depois do</label><select class="input" id="gRecApos"><option value="0" ${!g.recreioApos ? "selected" : ""}>Sem recreio</option>${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${g.recreioApos === n ? "selected" : ""}>${n}º tempo</option>`).join("")}</select></div>
+    <div class="field"><label for="gRec">Duração do recreio</label><select class="input" id="gRec">${[10, 15, 20, 30].map(n => `<option value="${n}" ${g.recreio === n ? "selected" : ""}>${n} minutos</option>`).join("")}</select></div>
+    <label class="check" style="border:0;align-self:end"><input type="checkbox" id="gSab" ${g.sabado ? "checked" : ""}><span>Tem aula no sábado</span></label></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="hor-grade-salvar">Salvar</button>`);
+}
+async function salvarTurmaHorario(nt, msg) { await salvar("turmas", nt); if (msg) toast(msg); }
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar']"); if (!b) return;
+  const t = turmaAtual(); if (!t) return;
+  if (b.dataset.act === "hor-config") { dlgGrade(); return; }
+  if (b.dataset.act === "hor-grade-salvar") {
+    const grade = { inicio: val2("gIni") || "07:00", duracao: Number(val2("gDur")), tempos: Number(val2("gTempos")), recreioApos: Number(val2("gRecApos")), recreio: Number(val2("gRec")), sabado: document.getElementById("gSab").checked };
+    const nt = JSON.parse(JSON.stringify(t)); nt.grade = grade;
+    nt.horario = horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo && a.tempo <= grade.tempos && (grade.sabado || a.dia < 6)).map(a => ({ ...a, ...horaDoTempo(grade, a.tempo) }));
+    fechar(); await salvarTurmaHorario(nt, "Grade de tempos salva"); return;
+  }
+  const d = Number(b.dataset.dia), k = Number(b.dataset.tempo), g = gradeDe(t);
+  const nt = JSON.parse(JSON.stringify(t)); nt.grade = g;
+  const atual = horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
+  const ja = atual.find(a => a.dia === d && a.tempo === k);
+  nt.horario = ja ? atual.filter(a => a !== ja) : [...atual, { id: uid(), dia: d, tempo: k, ...horaDoTempo(g, k) }];
+  await salvarTurmaHorario(nt);
 });
-document.addEventListener("click", e => {
-  const b = e.target.closest("[data-act='hor-rem']"); if (!b) return;
-  salvarHorario(horarioDe(turmaAtual()).filter(a => a.id !== b.dataset.id), {}, "Aula removida do horário");
-});
-
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;

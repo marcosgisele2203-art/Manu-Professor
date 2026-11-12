@@ -367,3 +367,16 @@ td .grade{border-radius:8px;min-height:36px}
 .ag-h{font-weight:700;min-width:104px}.ag-t{display:flex;flex-direction:column;flex:1;min-width:0}.ag-t small{color:var(--muted)}
 @media (max-width:1000px){.hor-grade{grid-template-columns:repeat(3,minmax(0,1fr))}.hor-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.hor-grade{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Grade de tempos */
+.grade-tempos{table-layout:fixed;min-width:620px}
+.grade-tempos th,.grade-tempos td{white-space:normal;text-align:center;padding:6px}
+.grade-tempos thead th{font-size:.8rem}.grade-tempos thead th.hoje{color:var(--accent)}
+.grade-tempos th.tp{text-align:left;width:120px;background:var(--surface-2);text-transform:none;letter-spacing:0;color:var(--ink)}
+.grade-tempos th.tp b{display:block;font-size:.9rem}.grade-tempos th.tp small{color:var(--muted);font-size:.78rem;font-weight:500}
+.cel{width:100%;min-height:52px;border:1.5px dashed var(--line-strong);border-radius:10px;background:transparent;color:var(--muted);font:inherit;font-size:.8rem;cursor:pointer;padding:4px;overflow-wrap:anywhere}
+.cel:hover{border-color:var(--accent);color:var(--accent)}
+.cel .mais{font-size:1.2rem;opacity:.5}
+.cel.on{border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
+.cel.ocupada{border-style:solid;background:var(--surface-2);color:var(--muted)}
+.grade-tempos tr.recreio th,.grade-tempos tr.recreio td{background:color-mix(in srgb,var(--mark) 45%,var(--surface));color:var(--mark-ink);font-weight:600;font-size:.85rem}
