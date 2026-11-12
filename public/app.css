@@ -328,3 +328,5 @@ td .grade{border-radius:8px;min-height:36px}
 .tn-op[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .tn-letra{min-width:42px}
 .tn-fim{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:10px}
+.al-colar summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.al-ren{gap:8px}.al-ren .input{min-height:40px}

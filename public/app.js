@@ -39,8 +39,8 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
-const ABAS_TOPO = ["resumo", "bimestres", "chamada", "notas", "provas"];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
+const ABAS_TOPO = ["resumo", "alunos", "bimestres", "chamada", "notas", "provas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
   { aba: "planos", nome: "Plano de aula", desc: "Alinhado à BNCC" },
@@ -204,7 +204,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-layout">${colunaIA()}<div class="turma-conteudo">${fn()}</div></div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -224,7 +224,7 @@ function cabecalhoTurma() {
       <h1>${esc(t.nome)}</h1><p class="muted">${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}${t.turno ? " · " + esc(t.turno) : ""} · ${(t.alunos || []).length} alunos</p></div></div>
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(x.nome)} · ${esc(x.disciplina)}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(bimSelecionado(t)) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${bimSelecionado(t) === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
-      <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar e alunos</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
+      <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
   <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>`;
 }
 function colunaIA() {
@@ -303,7 +303,7 @@ function vResumoTurma() {
     <a class="atalho" href="${linkTurma(t.id, "provas")}"><b>Provas</b><span>Montar, imprimir e corrigir por foto</span></a>
   </div>
   <div class="stats">
-    <div class="stat"><span class="eyebrow">Alunos</span><span class="v">${al.length}</span><span class="small muted"><button class="btn sm ghost" data-act="editar-turma" data-id="${esc(t.id)}" style="padding:0;min-height:0">editar lista</button></span></div>
+    <div class="stat"><span class="eyebrow">Alunos</span><span class="v">${al.length}</span><span class="small muted"><a class="btn sm ghost" href="${linkTurma(t.id, "alunos")}" style="padding:0;min-height:0">ver e adicionar alunos</a></span></div>
     <div class="stat"><span class="eyebrow">Média${Br ? " no " + esc(Br.nome) : " da turma"}</span><span class="v">${fmtNota(mm)}</span><span class="small muted">${S.avaliacoes.filter(a => a.turmaId === t.id).length} avaliações</span></div>
     <div class="stat"><span class="eyebrow">Frequência${Br ? " no período" : " média"}</span><span class="v">${fm === null ? "—" : fm + "%"}</span><span class="small muted">${S.chamadas.filter(c => c.turmaId === t.id).length} aulas registradas</span></div>
     <div class="stat"><span class="eyebrow">Alunos em alerta</span><span class="v" style="color:${al2.length ? "var(--bad)" : "var(--ok)"}">${new Set(al2.map(x => x.a.id)).size}</span><span class="small muted">frequência ou média baixa</span></div>
@@ -357,7 +357,7 @@ function vChamada() {
     </div>
     ${al.length ? `<div class="list">${al.map((a, i) => `<div class="row"><span class="num muted small" style="width:22px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Frequência${Bc ? " no " + esc(Bc.nome) : ""}: ${freqAluno(t, a.id, bimC) ?? "—"}${freqAluno(t, a.id, bimC) !== null ? "%" : ""}</div></div>
       <div class="pres" role="group" aria-label="Presença de ${esc(a.nome)}">${["P", "F", "J"].map(v => `<button data-act="marcar" data-aluno="${esc(a.id)}" data-v="${v}" aria-pressed="${pres[a.id] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>`
-      : `<p class="muted">Esta turma ainda não tem alunos. <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Adicionar alunos</button></p>`}
+      : `<p class="muted">Esta turma ainda não tem alunos. <a class="btn sm" href="${linkTurma(t.id, "alunos")}">Adicionar alunos</a></p>`}
   </section>
   <section class="panel"><h2>Aulas registradas</h2>
     ${hist.length ? `<div class="list">${hist.map(c => { const v = Object.values(c.presencas || {}); return `<div class="row"><span class="chip num">${fmtData(c.data)}</span><div class="grow small">${esc(c.conteudo || "Sem conteúdo registrado")}</div><span class="small muted num">${v.filter(x => x !== "F").length}/${v.length} presentes</span><button class="btn sm ghost" data-act="abrir-chamada" data-data="${esc(c.data)}">Abrir</button></div>`; }).join("")}</div>` : `<p class="muted">Nenhuma chamada registrada nesta turma.</p>`}
@@ -531,7 +531,7 @@ function dlgTurma(t) {
     <div class="field"><label for="tAno">Ano letivo</label><input class="input" id="tAno" value="${esc(t.ano)}"></div>
     <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${["", "Manhã", "Tarde", "Noite", "Integral"].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>
     <div class="field"><label>Cor</label><div class="toolbar">${CORES.map(c => `<label style="cursor:pointer"><input type="radio" name="tCor" value="${c}" ${t.cor === c ? "checked" : ""} style="accent-color:${c}"> <span class="dot" style="display:inline-block;background:${c}"></span></label>`).join("")}</div></div>
-    <div class="field"><label for="tAlunos">Alunos, um por linha (cole da lista da secretaria)</label><textarea class="input" id="tAlunos" rows="8" placeholder="Ana Beatriz Souza&#10;Bruno Henrique Lima">${esc((t.alunos || []).map(a => a.nome).join("\n"))}</textarea><span class="small muted">Remover um nome apaga as notas e presenças dele nesta turma.</span></div>`,
+    <p class="small muted">Os alunos são cadastrados depois, na aba Alunos do painel da turma.</p>`,
     `${S.turmas.some(x => x.id === t.id) ? `<button type="button" class="btn danger" data-act="apagar-turma" style="margin-right:auto">Apagar turma</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-turma">Salvar turma</button>`);
 }
 
@@ -1707,6 +1707,56 @@ document.addEventListener("click", async e => {
   }
 });
 
+/* ---------- Alunos da turma ---------- */
+S.alEdit = null;
+const limparNome = s => String(s).replace(/^\s*\d+[\s.\-–)]+/, "").replace(/\s+/g, " ").trim();
+function vAlunos() {
+  const t = turmaAtual(), al = t.alunos || [], bim = bimSelecionado(t);
+  return `<div class="page-head"><div><h1>Alunos</h1><p class="muted">${al.length ? `${al.length} ${al.length === 1 ? "aluno" : "alunos"} nesta turma.` : "Cadastre os alunos para fazer chamada e lançar notas."}</p></div>${al.length > 1 ? `<div class="toolbar"><button class="btn sm" data-act="al-ordenar">Ordenar A a Z</button></div>` : ""}</div>
+  <section class="panel">
+    <form class="toolbar" id="alForm" style="align-items:flex-end"><div class="field" style="flex:1;min-width:220px"><label for="alNome">Nome do aluno</label><input class="input" id="alNome" type="text" autocomplete="off" placeholder="Ex.: Ana Beatriz Souza"></div><button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form>
+    <details class="al-colar"><summary>Colar a lista da secretaria (vários nomes de uma vez)</summary>
+      <div class="field" style="margin-top:8px"><label for="alLista">Um nome por linha. Números no começo são ignorados.</label><textarea class="input" id="alLista" rows="6" placeholder="1. Ana Beatriz Souza&#10;2. Bruno Henrique Lima"></textarea></div>
+      <div><button class="btn" data-act="al-colar">Adicionar todos</button></div></details>
+  </section>
+  ${al.length ? `<section class="panel"><div class="list">${al.map((a, i) => { const m = mediaAluno(t, a.id, bim), f = freqAluno(t, a.id, bim);
+    return S.alEdit === a.id
+      ? `<form class="row al-ren" data-id="${esc(a.id)}"><span class="num muted small" style="width:26px">${String(i + 1).padStart(2, "0")}</span><input class="input grow" id="alRen" type="text" value="${esc(a.nome)}" aria-label="Novo nome"><button class="btn sm primary" type="submit">Salvar</button><button class="btn sm ghost" type="button" data-act="al-cancelar">Cancelar</button></form>`
+      : `<div class="row"><span class="num muted small" style="width:26px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Média ${fmtNota(m)} · Frequência ${f === null ? "—" : f + "%"}</div></div>
+        <button class="btn sm ghost" data-act="al-renomear" data-id="${esc(a.id)}">Renomear</button><button class="btn sm ghost danger" data-act="al-remover" data-id="${esc(a.id)}">Remover</button></div>`; }).join("")}</div>
+    <p class="small muted">Remover um aluno tira o nome dele da chamada, das notas e das entregas desta turma.</p></section>`
+    : `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima ou cole a lista da secretaria.</p></div>`}`;
+}
+async function salvarAlunos(alunos, msg) {
+  const nt = JSON.parse(JSON.stringify(turmaAtual())); nt.alunos = alunos; S.alEdit = null;
+  await salvar("turmas", nt); if (msg) toast(msg);
+}
+function adicionarNomes(nomes) {
+  const t = turmaAtual(), atuais = (t.alunos || []).slice(), vistos = new Set(atuais.map(a => a.nome.toLowerCase()));
+  const novos = nomes.map(limparNome).filter(n => n && !vistos.has(n.toLowerCase()) && vistos.add(n.toLowerCase()));
+  if (!novos.length) { toast(nomes.length ? "Esses nomes já estão na turma." : "Digite um nome."); return false; }
+  salvarAlunos([...atuais, ...novos.map(n => ({ id: uid(), nome: n }))], novos.length === 1 ? `${novos[0]} adicionado(a)` : `${novos.length} alunos adicionados`);
+  return true;
+}
+document.addEventListener("submit", e => {
+  if (e.target.id === "alForm") { e.preventDefault(); const i = $("#alNome"); if (adicionarNomes([i.value])) { i.value = ""; i.blur(); setTimeout(() => $("#alNome")?.focus(), 50); } }
+  if (e.target.classList.contains("al-ren")) { e.preventDefault(); const n = limparNome($("#alRen").value); if (!n) return; const id = e.target.dataset.id;
+    $("#alRen").blur(); salvarAlunos(turmaAtual().alunos.map(a => a.id === id ? { ...a, nome: n } : a), "Nome atualizado"); }
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act^='al-']"); if (!b) return;
+  const t = turmaAtual(); if (!t) return;
+  const act = b.dataset.act;
+  if (act === "al-colar") { const l = $("#alLista"); if (adicionarNomes(l.value.split(/\n+/))) l.value = ""; }
+  else if (act === "al-ordenar") salvarAlunos(t.alunos.slice().sort((a, c) => a.nome.localeCompare(c.nome, "pt-BR")), "Lista em ordem alfabética");
+  else if (act === "al-renomear") { S.alEdit = b.dataset.id; render(); setTimeout(() => { const i = $("#alRen"); if (i) { i.focus(); i.select(); } }, 30); }
+  else if (act === "al-cancelar") { S.alEdit = null; render(); }
+  else if (act === "al-remover") {
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar remoção"; return; }
+    const a = t.alunos.find(x => x.id === b.dataset.id); salvarAlunos(t.alunos.filter(x => x.id !== b.dataset.id), `${a ? a.nome : "Aluno"} removido(a)`);
+  }
+});
+
 /* ---------- ações ---------- */
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
@@ -1723,12 +1773,10 @@ document.addEventListener("click", async e => {
       if (!o.nome || !o.disciplina) { toast("Preencha o nome da turma e a disciplina."); return; }
       o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno");
       o.cor = (dlg.querySelector('input[name="tCor"]:checked') || {}).value || o.cor;
-      const nomes = val("tAlunos").split(/\n+/).map(s => s.replace(/^\s*\d+[\s.\-–)]+/, "").trim()).filter(Boolean);
-      const antigos = o.alunos || [];
-      o.alunos = nomes.map(n => antigos.find(a => a.nome === n) || { id: uid(), nome: n });
+      o.alunos = o.alunos || [];
       delete o.exemplo;
       const nova = !S.turmas.some(x => x.id === o.id);
-      fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); pastaAutomatica(o.id); if (nova) irTurma(o.id); break; }
+      fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); pastaAutomatica(o.id); if (nova) irTurma(o.id, "alunos"); break; }
     case "apagar-turma": {
       if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar turma e tudo dela"; return; }
       const tid = dlg._obj.id; fechar();
