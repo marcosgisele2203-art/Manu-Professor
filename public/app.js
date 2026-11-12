@@ -39,8 +39,8 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
-const ABAS_TOPO = ["resumo", "chamada", "notas", "provas"];
+const ABAS = [["resumo", "Resumo"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
+const ABAS_TOPO = ["resumo", "bimestres", "chamada", "notas", "provas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
   { aba: "planos", nome: "Plano de aula", desc: "Alinhado à BNCC" },
@@ -156,17 +156,32 @@ async function iniciar() {
 /* ---------- cálculos ---------- */
 const turma = id => S.turmas.find(t => t.id === id);
 const turmaAtual = () => turma(S.turmaSel) || S.turmas[0] || null;
-function freqAluno(t, alunoId) {
-  const ch = S.chamadas.filter(c => c.turmaId === t.id && c.presencas && c.presencas[alunoId]);
+const bimestresDe = t => (t && Array.isArray(t.bimestres)) ? t.bimestres : [];
+const bimPorNum = (t, n) => bimestresDe(t).find(b => String(b.num) === String(n)) || null;
+const bimDaData = (t, d) => bimestresDe(t).find(b => d >= b.inicio && d <= b.fim) || null;
+function bimSelecionado(t) {
+  if (!t || !bimestresDe(t).length) return "";
+  S.bimSel = S.bimSel || {};
+  if (S.bimSel[t.id] === undefined) { const a = bimDaData(t, hoje()); S.bimSel[t.id] = a ? String(a.num) : ""; }
+  return S.bimSel[t.id];
+}
+function freqAluno(t, alunoId, bim) {
+  const B = bim ? bimPorNum(t, bim) : null;
+  const ch = S.chamadas.filter(c => c.turmaId === t.id && c.presencas && c.presencas[alunoId] && (!B || (c.data >= B.inicio && c.data <= B.fim)));
   if (!ch.length) return null;
   const pres = ch.filter(c => c.presencas[alunoId] !== "F").length;
   return Math.round(pres / ch.length * 100);
 }
-function mediaAluno(t, alunoId) {
-  const avs = S.avaliacoes.filter(a => a.turmaId === t.id);
+function mediaAluno(t, alunoId, bim) {
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim)));
   let soma = 0, pesos = 0;
   avs.forEach(a => { const n = a.notas && a.notas[alunoId]; if (n !== undefined && n !== null && n !== "" && !isNaN(n)) { soma += Number(n) * (Number(a.peso) || 1); pesos += (Number(a.peso) || 1); } });
   return pesos ? soma / pesos : null;
+}
+function mediaAnual(t, alunoId) {
+  const bs = bimestresDe(t); if (!bs.length) return mediaAluno(t, alunoId);
+  const ms = bs.map(b => mediaAluno(t, alunoId, b.num)).filter(x => x !== null);
+  return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null;
 }
 function alertas() {
   const out = [];
@@ -189,7 +204,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-layout">${colunaIA()}<div class="turma-conteudo">${fn()}</div></div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -208,6 +223,7 @@ function cabecalhoTurma() {
   return `<div class="turma-head"><div class="turma-id"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><span class="eyebrow"><a href="#turmas">Turmas</a></span>
       <h1>${esc(t.nome)}</h1><p class="muted">${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}${t.turno ? " · " + esc(t.turno) : ""} · ${(t.alunos || []).length} alunos</p></div></div>
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(x.nome)} · ${esc(x.disciplina)}</option>`).join("")}</select>` : ""}
+      ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(bimSelecionado(t)) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${bimSelecionado(t) === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar e alunos</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
   <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>`;
 }
@@ -270,13 +286,17 @@ function vInicio() {
 /* ----- Resumo da turma ----- */
 function vResumoTurma() {
   const t = turmaAtual(), d0 = hoje(), al = t.alunos || [];
-  const meds = al.map(a => mediaAluno(t, a.id)).filter(x => x !== null), fr = al.map(a => freqAluno(t, a.id)).filter(x => x !== null);
+  const bimR = bimSelecionado(t), Br = bimR ? bimPorNum(t, bimR) : null;
+  const meds = al.map(a => mediaAluno(t, a.id, bimR)).filter(x => x !== null), fr = al.map(a => freqAluno(t, a.id, bimR)).filter(x => x !== null);
   const mm = meds.length ? meds.reduce((a, b) => a + b, 0) / meds.length : null, fm = fr.length ? Math.round(fr.reduce((a, b) => a + b, 0) / fr.length) : null;
   const aulas = S.planos.filter(p => p.turmaId === t.id && p.data >= d0).sort((a, b) => a.data.localeCompare(b.data)).slice(0, 5);
   const ativ = S.atividades.filter(a => a.turmaId === t.id && a.prazo >= d0).sort((a, b) => a.prazo.localeCompare(b.prazo)).slice(0, 5);
   const al2 = alertas().filter(x => x.t.id === t.id);
   const hojeFeita = S.chamadas.some(c => c.turmaId === t.id && c.data === d0);
-  return `<div class="atalhos">
+  const semR = Br ? semanasDo(Br) : [], semAgora = semR.findIndex(w => d0 >= w.inicio && d0 <= addDias(w.fim, 2));
+  const faixa = Br ? `<a class="faixa-bim" href="${linkTurma(t.id, "bimestres")}"><b>${esc(Br.nome)}</b><span>${fmtData(Br.inicio)} a ${fmtData(Br.fim)}${semAgora >= 0 ? ` · semana ${semAgora + 1} de ${semR.length}` : ""}</span>${Br.plano && semAgora >= 0 && Br.plano.semanas[semAgora] ? `<span>Esta semana: <b>${esc(Br.plano.semanas[semAgora].tema)}</b></span>` : `<span>${Br.plano ? "" : "Planeje este período com a IA"}</span>`}</a>`
+    : bimestresDe(t).length ? "" : `<a class="faixa-bim vazio" href="${linkTurma(t.id, "bimestres")}"><b>Organize o ano em bimestres</b><span>Notas, frequência e planejamento por período</span></a>`;
+  return faixa + `<div class="atalhos">
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}"><b>Lançar notas</b><span>Médias e boletim da turma</span></a>
     <a class="atalho" href="${linkTurma(t.id, "atividades")}"><b>Entregas</b><span>Quem entregou as atividades</span></a>
@@ -284,8 +304,8 @@ function vResumoTurma() {
   </div>
   <div class="stats">
     <div class="stat"><span class="eyebrow">Alunos</span><span class="v">${al.length}</span><span class="small muted"><button class="btn sm ghost" data-act="editar-turma" data-id="${esc(t.id)}" style="padding:0;min-height:0">editar lista</button></span></div>
-    <div class="stat"><span class="eyebrow">Média da turma</span><span class="v">${fmtNota(mm)}</span><span class="small muted">${S.avaliacoes.filter(a => a.turmaId === t.id).length} avaliações</span></div>
-    <div class="stat"><span class="eyebrow">Frequência média</span><span class="v">${fm === null ? "—" : fm + "%"}</span><span class="small muted">${S.chamadas.filter(c => c.turmaId === t.id).length} aulas registradas</span></div>
+    <div class="stat"><span class="eyebrow">Média${Br ? " no " + esc(Br.nome) : " da turma"}</span><span class="v">${fmtNota(mm)}</span><span class="small muted">${S.avaliacoes.filter(a => a.turmaId === t.id).length} avaliações</span></div>
+    <div class="stat"><span class="eyebrow">Frequência${Br ? " no período" : " média"}</span><span class="v">${fm === null ? "—" : fm + "%"}</span><span class="small muted">${S.chamadas.filter(c => c.turmaId === t.id).length} aulas registradas</span></div>
     <div class="stat"><span class="eyebrow">Alunos em alerta</span><span class="v" style="color:${al2.length ? "var(--bad)" : "var(--ok)"}">${new Set(al2.map(x => x.a.id)).size}</span><span class="small muted">frequência ou média baixa</span></div>
   </div>
   <div class="cols">
@@ -326,7 +346,8 @@ function vChamada() {
   const pres = ch?.presencas || {};
   const al = t.alunos || [];
   const nP = al.filter(a => pres[a.id] === "P").length, nF = al.filter(a => pres[a.id] === "F").length, nJ = al.filter(a => pres[a.id] === "J").length;
-  const hist = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 8);
+  const bimC = bimSelecionado(t), Bc = bimC ? bimPorNum(t, bimC) : null;
+  const hist = S.chamadas.filter(c => c.turmaId === t.id && (!Bc || (c.data >= Bc.inicio && c.data <= Bc.fim))).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 12);
   return head + `
   <section class="panel">
     <div class="panel-head">
@@ -334,7 +355,7 @@ function vChamada() {
       <div class="field" style="min-width:220px;flex:1"><label for="chConteudo">Conteúdo da aula (diário)</label><input class="input" type="text" id="chConteudo" value="${esc(ch?.conteudo || "")}" placeholder="Ex.: Frações equivalentes, p. 84"></div></div>
       <div class="toolbar"><span class="chip ok num">${nP} P</span><span class="chip bad num">${nF} F</span><span class="chip warn num">${nJ} J</span><button class="btn sm" data-act="todos-presentes">Todos presentes</button></div>
     </div>
-    ${al.length ? `<div class="list">${al.map((a, i) => `<div class="row"><span class="num muted small" style="width:22px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Frequência: ${freqAluno(t, a.id) ?? "—"}${freqAluno(t, a.id) !== null ? "%" : ""}</div></div>
+    ${al.length ? `<div class="list">${al.map((a, i) => `<div class="row"><span class="num muted small" style="width:22px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Frequência${Bc ? " no " + esc(Bc.nome) : ""}: ${freqAluno(t, a.id, bimC) ?? "—"}${freqAluno(t, a.id, bimC) !== null ? "%" : ""}</div></div>
       <div class="pres" role="group" aria-label="Presença de ${esc(a.nome)}">${["P", "F", "J"].map(v => `<button data-act="marcar" data-aluno="${esc(a.id)}" data-v="${v}" aria-pressed="${pres[a.id] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>`
       : `<p class="muted">Esta turma ainda não tem alunos. <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Adicionar alunos</button></p>`}
   </section>
@@ -348,12 +369,20 @@ function vNotas() {
   const t = turmaAtual();
   const head = `<div class="page-head"><div><h1>Notas</h1><p class="muted">Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
   if (!t) return head + semTurma();
-  const avs = S.avaliacoes.filter(a => a.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const bim = bimSelecionado(t), bs = bimestresDe(t);
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim))).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const al = t.alunos || [];
-  if (!avs.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma avaliação em ${esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.</p><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button></div>`;
-  return head + `<div class="table-wrap"><table>
+  if (bs.length && !bim) {
+    return head + chipsPeriodo(t) + `<div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média final</th><th class="c">Freq. anual</th><th class="c">Situação</th></tr></thead><tbody>
+      ${al.map(s => { const mf = mediaAnual(t, s.id), f = freqAluno(t, s.id);
+        const sit = mf === null ? `<span class="chip">sem notas</span>` : (mf >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">aprovado até aqui</span>` : (mf < MEDIA_MIN ? `<span class="chip warn">abaixo da média</span>` : `<span class="chip bad">frequência</span>`);
+        return `<tr><td class="sticky-col">${esc(s.nome)}</td>${bs.map(b => { const m = mediaAluno(t, s.id, b.num); return `<td class="c num" style="color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td>`; }).join("")}<td class="c num" style="font-weight:700;color:${mf !== null && mf < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(mf)}</td><td class="c num" style="color:${f !== null && f < FREQ_MIN ? "var(--bad)" : "inherit"}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td></tr>`; }).join("")}
+      </tbody></table></div><p class="small muted">Média final = média das médias dos períodos que já têm nota. Para lançar notas, escolha um período acima.</p>`;
+  }
+  if (!avs.length) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma avaliação ${bim ? "no " + esc(bimPorNum(t, bim)?.nome || "") : "em " + esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.</p><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button></div>`;
+  return head + chipsPeriodo(t) + `<div class="table-wrap"><table>
     <thead><tr><th class="sticky-col">Aluno</th>${avs.map(a => `<th class="c"><button class="btn sm ghost" data-act="editar-avaliacao" data-id="${esc(a.id)}" title="Editar avaliação">${esc(a.nome)}</button><div class="num" style="text-transform:none">peso ${esc(a.peso)} · ${fmtData(a.data)}</div></th>`).join("")}<th class="c">Média</th><th class="c">Freq.</th><th class="c">Situação</th></tr></thead>
-    <tbody>${al.map(s => { const m = mediaAluno(t, s.id), f = freqAluno(t, s.id);
+    <tbody>${al.map(s => { const m = mediaAluno(t, s.id, bim), f = freqAluno(t, s.id, bim);
       const sit = m === null ? `<span class="chip">sem notas</span>` : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">em dia</span>` : (m < MEDIA_MIN ? `<span class="chip warn">recuperação</span>` : `<span class="chip bad">frequência</span>`);
       return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avs.map(a => { const n = a.notas?.[s.id]; return `<td class="c"><input class="grade" type="text" inputmode="decimal" aria-label="Nota de ${esc(s.nome)} em ${esc(a.nome)}" data-av="${esc(a.id)}" data-aluno="${esc(s.id)}" value="${n === undefined || n === null ? "" : esc(String(n).replace(".", ","))}"></td>`; }).join("")}
       <td class="c num" style="font-weight:600;color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td><td class="c num" style="color:${f !== null && f < FREQ_MIN ? "var(--bad)" : "inherit"}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td></tr>`; }).join("")}</tbody></table></div>
@@ -491,13 +520,14 @@ function dlgVerPlano(p) {
 
 function dlgAvaliacao(a) {
   const t = turmaAtual();
-  a = a || { id: uid(), turmaId: t.id, nome: "", peso: 1, data: hoje(), bimestre: "1", notas: {} };
+  a = a || { id: uid(), turmaId: t.id, nome: "", peso: 1, data: hoje(), bimestre: String(bimSelecionado(t) || bimDaData(t, hoje())?.num || "1"), notas: {} };
+  const opcoesBim = bimestresDe(t).length ? bimestresDe(t).map(b => [String(b.num), b.nome]) : ["1", "2", "3", "4"].map(b => [b, b + "º bimestre"]);
   dlg._obj = a;
   abrirDlg(S.avaliacoes.some(x => x.id === a.id) ? "Editar avaliação" : "Nova avaliação", `
     <div class="field"><label for="aNome">Nome</label><input class="input" id="aNome" value="${esc(a.nome)}" placeholder="Prova 2 — Equações"></div>
     <div class="grid3"><div class="field"><label for="aPeso">Peso na média</label><input class="input" id="aPeso" type="number" min="0" step="0.5" value="${esc(a.peso)}"></div>
     <div class="field"><label for="aData">Data</label><input class="input" id="aData" type="date" value="${esc(a.data)}"></div>
-    <div class="field"><label for="aBim">Bimestre</label><select class="input" id="aBim">${["1", "2", "3", "4"].map(b => `<option value="${b}" ${a.bimestre === b ? "selected" : ""}>${b}º bimestre</option>`).join("")}</select></div></div>`,
+    <div class="field"><label for="aBim">Período</label><select class="input" id="aBim">${opcoesBim.map(([v, n]) => `<option value="${v}" ${String(a.bimestre) === v ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div></div>`,
     `${S.avaliacoes.some(x => x.id === a.id) ? `<button type="button" class="btn danger" data-act="apagar-avaliacao" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-avaliacao">Salvar</button>`);
 }
 
@@ -1209,6 +1239,20 @@ async function boletimXlsx(t) {
     if (f !== null && f < FREQ_MIN) r.getCell(avs.length + 3).font = { bold: true, color: { argb: "FFA33A25" } };
   });
   ws.getColumn(1).width = 34; for (let i = 2; i <= avs.length + 4; i++) ws.getColumn(i).width = 16;
+  const bs = bimestresDe(t);
+  if (bs.length) {
+    const wb2 = wb.addWorksheet("Médias por período", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
+    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média final", "Frequência anual"]);
+    h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; });
+    (t.alunos || []).forEach(s => {
+      const ms = bs.map(b => { const m = mediaAluno(t, s.id, b.num); return m === null ? null : Math.round(m * 10) / 10; });
+      const mf = mediaAnual(t, s.id), f = freqAluno(t, s.id);
+      const row = wb2.addRow([s.nome, ...ms, mf === null ? null : Math.round(mf * 10) / 10, f === null ? null : f / 100]);
+      row.eachCell((c, i) => { if (i > 1 && i <= bs.length + 2) c.numFmt = "0.0"; });
+      row.getCell(bs.length + 3).numFmt = "0%";
+    });
+    wb2.getColumn(1).width = 34; for (let i = 2; i <= bs.length + 3; i++) wb2.getColumn(i).width = 16;
+  }
   const ch = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => a.data.localeCompare(b.data));
   if (ch.length) {
     const wf = wb.addWorksheet("Frequência", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
@@ -1482,6 +1526,138 @@ document.addEventListener("click", async e => {
     correta: Math.max(0, letras.indexOf(q.certa)), resposta: "", bncc: "",
     fonte: `Enem ${r.ano}, questão ${q.i}${q.lingua ? (q.lingua === "ingles" ? " (inglês)" : " (espanhol)") : ""} · INEP/MEC`, enem: { ano: r.ano, i: q.i, lingua: q.lingua || null } };
   b.disabled = true; await salvar("questoes", nova); toast("Questão guardada no seu banco");
+});
+
+/* ---------- Bimestres da turma ---------- */
+const MODELOS_PERIODO = {
+  bimestre: [["1º bimestre", "02-02", "04-17"], ["2º bimestre", "04-20", "07-10"], ["3º bimestre", "07-27", "10-02"], ["4º bimestre", "10-05", "12-18"]],
+  trimestre: [["1º trimestre", "02-02", "05-15"], ["2º trimestre", "05-18", "08-28"], ["3º trimestre", "08-31", "12-18"]]
+};
+S.bimSel = {}; S.bimNovo = { tipo: "bimestre", ano: String(new Date().getFullYear()) };
+function semanasDo(b) {
+  const out = []; const d = new Date(b.inicio + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const fim = new Date(b.fim + "T12:00:00"); let n = 1;
+  while (d <= fim) {
+    const seg = d.toISOString().slice(0, 10), sex = new Date(d); sex.setDate(sex.getDate() + 4);
+    const ini = seg < b.inicio ? b.inicio : seg, f = sex.toISOString().slice(0, 10) > b.fim ? b.fim : sex.toISOString().slice(0, 10);
+    out.push({ n: n++, inicio: ini, fim: f, rotulo: `${fmtData(ini)} a ${fmtData(f)}` });
+    d.setDate(d.getDate() + 7);
+  }
+  return out;
+}
+function statusBim(b) { const d = hoje(); return d < b.inicio ? ["próximo", ""] : d > b.fim ? ["encerrado", "ok"] : ["em andamento", "acc"]; }
+const mediaTurma = (t, bim) => { const ms = (t.alunos || []).map(a => mediaAluno(t, a.id, bim)).filter(x => x !== null); return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null; };
+const freqTurma = (t, bim) => { const fs = (t.alunos || []).map(a => freqAluno(t, a.id, bim)).filter(x => x !== null); return fs.length ? Math.round(fs.reduce((a, b) => a + b, 0) / fs.length) : null; };
+function chipsPeriodo(t) {
+  const bs = bimestresDe(t); if (!bs.length) return "";
+  const sel = String(bimSelecionado(t));
+  return `<div class="periodos" role="group" aria-label="Período">${bs.map(b => `<button type="button" class="per" data-act="bim-sel" data-v="${b.num}" aria-pressed="${sel === String(b.num)}">${esc(b.nome)}</button>`).join("")}<button type="button" class="per" data-act="bim-sel" data-v="" aria-pressed="${sel === ""}">Ano todo</button></div>`;
+}
+
+function vBimestres() {
+  const t = turmaAtual(), bs = bimestresDe(t);
+  const head = `<div class="page-head"><div><h1>Bimestres</h1><p class="muted">Divida o ano letivo da turma em períodos. As notas, a frequência e o planejamento passam a ser organizados por período.</p></div>${bs.length ? `<div class="toolbar"><button class="btn" data-act="bim-editar">Editar datas</button></div>` : ""}</div>`;
+  if (!bs.length) {
+    const n = S.bimNovo, mod = MODELOS_PERIODO[n.tipo];
+    return head + `<section class="panel"><h2>Como o ano letivo é dividido?</h2>
+      <div class="toolbar">${Object.keys(MODELOS_PERIODO).map(k => `<label class="per-op"><input type="radio" name="perTipo" value="${k}" ${n.tipo === k ? "checked" : ""}> ${k === "bimestre" ? "4 bimestres" : "3 trimestres"}</label>`).join("")}
+        <div class="field" style="width:120px"><label for="perAno">Ano letivo</label><input class="input" id="perAno" inputmode="numeric" value="${esc(n.ano)}"></div></div>
+      <div class="list">${mod.map(([nome, i, f]) => `<div class="row"><div class="grow title">${nome}</div><span class="chip num">${fmtData(n.ano + "-" + i)} a ${fmtData(n.ano + "-" + f)}</span></div>`).join("")}</div>
+      <p class="small muted">Essas são datas sugeridas. Depois de criar, ajuste pelo calendário da sua escola em Editar datas.</p>
+      <div><button class="btn primary" data-act="bim-criar">Criar ${n.tipo === "bimestre" ? "bimestres" : "trimestres"}</button></div></section>`;
+  }
+  return head + bs.map(b => {
+    const [st, cls] = statusBim(b), sem = semanasDo(b);
+    const aulas = S.chamadas.filter(c => c.turmaId === t.id && c.data >= b.inicio && c.data <= b.fim).length;
+    const planos = S.planos.filter(p => p.turmaId === t.id && p.data >= b.inicio && p.data <= b.fim).length;
+    const avs = S.avaliacoes.filter(a => a.turmaId === t.id && String(a.bimestre) === String(b.num)).length;
+    const m = mediaTurma(t, b.num), f = freqTurma(t, b.num), pl = b.plano;
+    const criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem && p.origem.bim === b.num).map(p => p.origem.semana));
+    return `<section class="panel bim-card" id="bim-${b.num}">
+      <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
+      <div class="bim-nums"><div><b class="num">${aulas}</b><span>aulas registradas</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
+      ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
+        <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
+        ${(pl.semanas || []).map((s, i) => `<tr><td class="num"><b>${i + 1}</b><div class="small muted">${esc(sem[i]?.rotulo || "")}</div></td><td><b>${esc(s.tema)}</b></td><td class="small">${esc(s.habilidades || "")}</td><td class="small">${esc(s.objetivos || "")}</td><td class="small">${esc(s.atividades || "")}</td><td class="small">${esc(s.avaliacao || "")}</td><td>${criados.has(i + 1) ? '<span class="chip ok">plano criado</span>' : ""}</td></tr>`).join("")}
+        </tbody></table></div>
+        <div class="toolbar"><button class="btn primary" data-act="bim-planos" data-num="${b.num}" ${criados.size >= (pl.semanas || []).length ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula das semanas"}</button><button class="btn ai sm" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Refazer com IA</button></div></div>`
+      : `<div class="toolbar"><button class="btn ai" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Planejar o ${esc(b.nome)} com IA</button><span class="small muted">A Manu distribui as habilidades da BNCC pelas ${sem.length} semanas.</span></div>`}
+    </section>`;
+  }).join("");
+}
+
+function dlgBimIA(num) {
+  const t = turmaAtual(), b = bimPorNum(t, num);
+  dlg._bim = num;
+  abrirDlg(`Planejar o ${esc(b.nome)} com IA`, `
+    <p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""} · ${semanasDo(b).length} semanas (${fmtData(b.inicio)} a ${fmtData(b.fim)})</p>
+    <div class="field" style="max-width:220px"><label for="biAulas">Aulas por semana</label><input class="input" id="biAulas" type="number" min="1" max="20" value="${esc(t.aulasSemana || 2)}"></div>
+    <div class="field"><label for="biCont">Conteúdos que você precisa trabalhar (opcional)</label><textarea class="input" id="biCont" rows="5" placeholder="Ex.: capítulos 3 a 5 do livro; frações, números decimais e porcentagem. Se deixar vazio, a Manu segue o esperado para a série.">${esc(b.conteudos || "")}</textarea></div>
+    <div class="field"><label for="biObs">Observações (opcional)</label><input class="input" id="biObs" placeholder="Ex.: feira de ciências na semana 6, turma com dificuldade em leitura"></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-bimestre">${ico("spark")}Gerar planejamento</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto. Você revisa antes de criar os planos.</span></div></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button>`);
+}
+async function iaBimestre() {
+  const t = turmaAtual(), b = bimPorNum(t, dlg._bim), sem = semanasDo(b);
+  const aulas = Math.max(1, Math.min(20, parseInt(val("biAulas")) || 2)), cont = val("biCont");
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: cont || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id) }, signal);
+    if (!r || !Array.isArray(r.semanas) || !r.semanas.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
+    const nt = JSON.parse(JSON.stringify(t)); nt.aulasSemana = aulas;
+    const nb = bimPorNum(nt, b.num); nb.conteudos = cont;
+    nb.plano = { visaoGeral: String(r.visaoGeral || ""), habilidades: Array.isArray(r.habilidades) ? r.habilidades.map(String).slice(0, 20) : [], aulasPorSemana: aulas,
+      semanas: r.semanas.slice(0, sem.length).map(s => ({ tema: String(s.tema || ""), habilidades: String(s.habilidades || ""), objetivos: String(s.objetivos || ""), atividades: String(s.atividades || ""), avaliacao: String(s.avaliacao || "") })) };
+    await salvar("turmas", nt);
+    st.textContent = "Pronto.";
+    fechar(); toast(`Planejamento do ${b.nome} pronto`);
+    setTimeout(() => document.getElementById("bim-" + b.num)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  });
+}
+function dlgBimDatas() {
+  const t = turmaAtual();
+  abrirDlg("Datas dos períodos", `<p class="small muted">Use o calendário escolar da sua rede.</p>
+    ${bimestresDe(t).map(b => `<div class="grid3" style="align-items:end"><div class="field"><label for="bn${b.num}">Nome</label><input class="input" id="bn${b.num}" value="${esc(b.nome)}"></div><div class="field"><label for="bi${b.num}">Início</label><input class="input" type="date" id="bi${b.num}" value="${esc(b.inicio)}"></div><div class="field"><label for="bf${b.num}">Fim</label><input class="input" type="date" id="bf${b.num}" value="${esc(b.fim)}"></div></div>`).join("")}`,
+    `<button type="button" class="btn danger" data-act="bim-apagar" style="margin-right:auto">Apagar períodos</button><button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-salvar-datas">Salvar datas</button>`);
+}
+document.addEventListener("change", e => {
+  if (e.target.name === "perTipo") { S.bimNovo.tipo = e.target.value; render(); }
+  if (e.target.id === "perAno") { S.bimNovo.ano = e.target.value.replace(/\D/g, "").slice(0, 4); render(); }
+  if (e.target.id === "bimSel") { S.bimSel[S.turmaSel] = e.target.value; render(); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='bim-'],[data-act='ia-bimestre']"); if (!b) return;
+  const act = b.dataset.act, t = turmaAtual(); if (!t) return;
+  if (act === "bim-sel") { S.bimSel[t.id] = b.dataset.v; render(); return; }
+  if (act === "bim-ia") { dlgBimIA(Number(b.dataset.num)); return; }
+  if (act === "ia-bimestre") { iaBimestre(); return; }
+  if (act === "bim-editar") { dlgBimDatas(); return; }
+  if (act === "bim-criar") {
+    const ano = /^\d{4}$/.test(S.bimNovo.ano) ? S.bimNovo.ano : String(new Date().getFullYear());
+    const nt = JSON.parse(JSON.stringify(t)); nt.tipoPeriodo = S.bimNovo.tipo;
+    nt.bimestres = MODELOS_PERIODO[S.bimNovo.tipo].map(([nome, i, f], k) => ({ num: k + 1, nome, inicio: ano + "-" + i, fim: ano + "-" + f }));
+    delete S.bimSel[t.id]; await salvar("turmas", nt); toast("Períodos criados. Ajuste as datas se precisar."); return;
+  }
+  if (act === "bim-salvar-datas") {
+    const nt = JSON.parse(JSON.stringify(t));
+    for (const x of nt.bimestres) { x.nome = val("bn" + x.num) || x.nome; x.inicio = val("bi" + x.num) || x.inicio; x.fim = val("bf" + x.num) || x.fim; if (x.fim < x.inicio) { toast(`${x.nome}: o fim precisa ser depois do início.`); return; } }
+    fechar(); await salvar("turmas", nt); toast("Datas salvas"); return;
+  }
+  if (act === "bim-apagar") {
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar períodos e planejamentos"; return; }
+    const nt = JSON.parse(JSON.stringify(t)); delete nt.bimestres; delete nt.tipoPeriodo; fechar(); delete S.bimSel[t.id]; await salvar("turmas", nt); toast("Períodos apagados"); return;
+  }
+  if (act === "bim-planos") {
+    const bi = bimPorNum(t, Number(b.dataset.num)), sem = semanasDo(bi), pl = bi.plano; if (!pl) return;
+    const criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem && p.origem.bim === bi.num).map(p => p.origem.semana));
+    b.disabled = true; let n = 0;
+    for (let i = 0; i < pl.semanas.length; i++) {
+      if (criados.has(i + 1)) continue;
+      const s = pl.semanas[i], w = sem[i] || sem[sem.length - 1];
+      await salvar("planos", { id: uid(), turmaId: t.id, data: w.inicio, titulo: s.tema || `Semana ${i + 1}`, duracao: `${pl.aulasPorSemana || 2} aulas na semana`, bncc: s.habilidades, objetivos: s.objetivos, conteudo: s.tema, metodologia: s.atividades, recursos: "", avaliacao: s.avaliacao, status: "planejado", origem: { bim: bi.num, semana: i + 1 } });
+      n++;
+    }
+    toast(`${n} planos de aula criados no Planejamento. Abra cada um para detalhar com a IA.`); return;
+  }
 });
 
 /* ---------- ações ---------- */

@@ -9,7 +9,7 @@ export const metadata = { title: "Administração · Manu Professor" };
 
 const usd = (v: number) => "US$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const data = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
-const NOMES: Record<string, string> = { plano: "Planos de aula", atividade: "Atividades", questoes: "Questões", chat: "Conversas com a Manu", material: "Materiais", slides: "Slides", correcao: "Correção por foto" };
+const NOMES: Record<string, string> = { plano: "Planos de aula", atividade: "Atividades", questoes: "Questões", chat: "Conversas com a Manu", material: "Materiais", slides: "Slides", correcao: "Correção por foto", bimestre: "Planejamento do bimestre" };
 
 export default async function Admin() {
   const adm = await adminAtual();

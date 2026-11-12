@@ -300,3 +300,19 @@ td .grade{border-radius:8px;min-height:36px}
 .mat-escolhido{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--mark) 55%,var(--surface));color:var(--ink)}
 .mat-escolhido svg{width:20px;height:20px;color:var(--mark-ink);flex:none;margin-top:2px}
 .mat-escolhido b{display:block;color:var(--mark-ink);font-size:1.05rem}.mat-escolhido span{font-size:.88rem;color:var(--muted)}
+
+/* Bimestres */
+.periodos{display:flex;gap:6px;flex-wrap:wrap}
+.per{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;font-weight:600;font-size:.88rem;cursor:pointer;min-height:36px}
+.per[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.per-op{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:12px;cursor:pointer;font-weight:600}
+.per-op input{accent-color:var(--accent)}
+.bim-nums{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.bim-nums div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:var(--surface-2)}
+.bim-nums b{font-size:1.35rem;font-family:var(--f-display)}.bim-nums span{font-size:.78rem;color:var(--muted)}
+.bim-plano{display:flex;flex-direction:column;gap:12px}
+.tab-sem td{white-space:normal;vertical-align:top;min-width:120px}.tab-sem td:first-child{min-width:90px}
+.faixa-bim{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;padding:12px 16px;border-radius:14px;background:var(--accent-soft);color:var(--accent-soft-ink);text-decoration:none}
+.faixa-bim b{font-size:1rem}.faixa-bim span{font-size:.88rem}
+.faixa-bim.vazio{background:color-mix(in srgb,var(--mark) 55%,var(--surface));color:var(--mark-ink)}
+@media (max-width:760px){.bim-nums{grid-template-columns:repeat(2,minmax(0,1fr))}}
