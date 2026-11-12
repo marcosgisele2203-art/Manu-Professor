@@ -1985,12 +1985,10 @@ const val2 = id => { const el = document.getElementById(id); return el ? el.valu
 // Meu horário: a semana do professor, com todas as turmas
 const TURNO_SIN = { Manhã: "Matutino", Tarde: "Vespertino", Noite: "Noturno" }, ORDEM_TURNO = ["Matutino", "Vespertino", "Noturno", "Integral"];
 const turnoGrupo = t => TURNO_SIN[t.turno] || t.turno || "";
-function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(["Matutino", "Vespertino", "Noturno", "Integral", ...S.turmas.filter(daEscolaHor).map(turnoGrupo)])].sort((a, b) => o(a) - o(b)); }
-function escolaHor() { const es = escolas(); return es.includes(S.horEscola) ? S.horEscola : es[0] || ""; }
-const daEscolaHor = t => !variasEscolas() || escolaDe(t) === escolaHor();
+function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(["Matutino", "Vespertino", "Noturno", "Integral", ...S.turmas.map(turnoGrupo)])].sort((a, b) => o(a) - o(b)); }
 function turnoHor() { const gs = gruposTurno(); return gs.includes(S.horTurno) ? S.horTurno : gs.find(x => turmasDoTurno(x).length) || gs[0]; }
 function gradeTurno(tn) { const t = turmasDoTurno(tn)[0]; return t ? gradeDe(t) : gradeDe({ turno: tn }); }
-const turmasDoTurno = tn => S.turmas.filter(t => daEscolaHor(t) && turnoGrupo(t) === tn);
+const turmasDoTurno = tn => S.turmas.filter(t => turnoGrupo(t) === tn);
 function ocupadaFora(tn, d, k) { // aula em outra escola (ou outro turno) que bate com este horário
   const x = horaDoTempo(gradeTurno(tn), k), meus = new Set(turmasDoTurno(tn).map(t => t.id));
   return S.turmas.find(o => !meus.has(o.id) && horarioDe(o).some(b => b.dia === d && minutos(x.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(x.fim))) || null;
@@ -2003,24 +2001,23 @@ function vHorario() {
   for (let k = 1; k <= g.tempos; k++) {
     const x = horaDoTempo(g, k);
     linhas.push(`<tr><th class="tp"><b>${k}º tempo</b><small class="num">${x.inicio}–${x.fim}</small></th>${dias.map(d => { const ts = naCelula(tn, d, k), aberto = S.horPop && S.horPop.d === d && S.horPop.k === k;
-      return `<td class="${hj === d ? "hoje" : ""}"><button type="button" class="cel${ts.length ? " on" : ""}${ts.length > 1 ? " choque" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-haspopup="true" aria-expanded="${aberto}" aria-label="${DIAS[d]}, ${k}º tempo${ts.length ? ": " + ts.map(t => esc(t.nome)).join(", ") : ", vago"}">${ts.length ? ts.map(t => `<span class="cel-turma" style="--c:${esc(t.cor || "#0f766e")}"><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}</small></span>`).join("") : (fo => fo ? `<span class="cel-fora">Ocupado: ${esc(fo.nome)}${variasEscolas() && escolaDe(fo) !== escolaHor() ? "<br>" + esc(escolaDe(fo)) : " · " + esc(fo.turno || "")}</span>` : `<span class="mais">+</span>`)(ocupadaFora(tn, d, k))}</button></td>`; }).join("")}</tr>`);
+      return `<td class="${hj === d ? "hoje" : ""}"><button type="button" class="cel${ts.length ? " on" : ""}${ts.length > 1 ? " choque" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-haspopup="true" aria-expanded="${aberto}" aria-label="${DIAS[d]}, ${k}º tempo${ts.length ? ": " + ts.map(t => esc(t.nome)).join(", ") : ", vago"}">${ts.length ? ts.map(t => `<span class="cel-turma" style="--c:${esc(t.cor || "#0f766e")}"><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}</small>${variasEscolas() && escolaDe(t) ? `<small class="cel-esc">${esc(escolaDe(t))}</small>` : ""}</span>`).join("") : (fo => fo ? `<span class="cel-fora">Ocupado: ${esc(fo.nome)} · ${esc(fo.turno || "outro turno")}</span>` : `<span class="mais">+</span>`)(ocupadaFora(tn, d, k))}</button></td>`; }).join("")}</tr>`);
     if (g.recreioApos === k && g.recreio > 0 && k < g.tempos) linhas.push(`<tr class="recreio"><th class="tp"><b>Recreio</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.recreio)}</small></th><td colspan="${dias.length}">Intervalo de ${g.recreio} minutos</td></tr>`);
     if (g.almocoApos === k && g.almoco > 0 && k < g.tempos) linhas.push(`<tr class="recreio almoco"><th class="tp"><b>Almoço</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.almoco)}</small></th><td colspan="${dias.length}">Intervalo de almoço · ${g.almoco} minutos</td></tr>`);
   }
   const tot = turmasDoTurno(tn).map(t => ({ t, n: horarioDe(t).filter(a => tempoDe(t, a)).length }));
   return `<div class="page-head"><div><h1>Meu horário</h1><p class="muted">Toque num tempo e escolha a turma. Cada tempo tem ${g.duracao} minutos${g.recreioApos ? `, com recreio de ${g.recreio} minutos depois do ${g.recreioApos}º tempo` : ""}${g.almocoApos && g.almocoApos < g.tempos ? ` e almoço depois do ${g.almocoApos}º tempo` : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
-  ${variasEscolas() ? `<div class="seg seg-escola" role="tablist" aria-label="Escola">${escolas().map(e => `<button type="button" role="tab" class="${e === escolaHor() ? "on" : ""}" aria-selected="${e === escolaHor()}" data-act="hor-escola" data-v="${esc(e)}">${esc(e)}</button>`).join("")}</div>` : ""}
   ${gs.length ? `<div class="seg" role="tablist" aria-label="Turno">${gs.map(x => `<button type="button" role="tab" class="${x === tn ? "on" : ""}" aria-selected="${x === tn}" data-act="hor-turno" data-v="${esc(x)}">${esc(x || "Sem turno")}${turmasDoTurno(x).length ? "" : ' <small class="muted">(vazio)</small>'}</button>`).join("")}</div>` : ""}
   <div class="table-wrap"><table class="grade-tempos"><thead><tr><th></th>${dias.map(d => `<th class="${hj === d ? "hoje" : ""}">${DIAS[d]}</th>`).join("")}</tr></thead><tbody>${linhas.join("")}</tbody></table></div>
-  <div class="hor-tot">${tot.map(({ t, n }) => `<a href="${linkTurma(t.id, "resumo")}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)} · ${esc(t.disciplina)} <b class="num">${n}</b> ${n === 1 ? "tempo" : "tempos"}/semana</a>`).join("")}</div>
+  <div class="hor-tot">${tot.map(({ t, n }) => `<a href="${linkTurma(t.id, "resumo")}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(rotuloTurma(t))} <b class="num">${n}</b> ${n === 1 ? "tempo" : "tempos"}/semana</a>`).join("")}</div>
   ${S.horPop ? popHorario(tn) : ""}`;
 }
 function popHorario(tn) {
   const { d, k } = S.horPop, ts = turmasDoTurno(tn), sel = naCelula(tn, d, k).map(t => t.id), x = horaDoTempo(gradeTurno(tn), k);
   return `<div class="hor-pop" id="horPop" role="dialog" aria-label="Escolher turma"><div class="hor-pop-tit"><b>${DIAS[d]}, ${k}º tempo</b><small class="num muted">${x.inicio}–${x.fim}</small></div>
     ${(fo => fo ? `<p class="small aviso-pop">Neste horário você já tem ${esc(fo.nome)}${escolaDe(fo) ? " na " + esc(escolaDe(fo)) : ""}.</p>` : "")(naCelula(tn, d, k).length ? null : ocupadaFora(tn, d, k))}
-    ${ts.length ? "" : `<p class="small muted" style="margin:6px 8px">Você ainda não tem turma no turno ${esc(tn || "sem turno").toLowerCase()}${variasEscolas() ? " nesta escola" : ""}.</p><button type="button" class="hor-op" data-act="nova-turma" data-turno="${esc(tn)}" data-escola="${esc(escolaHor())}">${ico("plus")}<span><b>Criar turma</b></span></button>`}
-    ${ts.map(t => `<button type="button" class="hor-op${sel.includes(t.id) ? " on" : ""}" data-act="hor-escolher" data-turma="${esc(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span><span><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}${t.serie ? " · " + esc(t.serie) : ""}</small></span>${sel.includes(t.id) ? "✓" : ""}</button>`).join("")}
+    ${ts.length ? "" : `<p class="small muted" style="margin:6px 8px">Você ainda não tem turma no turno ${esc(tn || "sem turno").toLowerCase()}.</p><button type="button" class="hor-op" data-act="nova-turma" data-turno="${esc(tn)}">${ico("plus")}<span><b>Criar turma</b></span></button>`}
+    ${ts.map(t => `<button type="button" class="hor-op${sel.includes(t.id) ? " on" : ""}" data-act="hor-escolher" data-turma="${esc(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span><span><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}${variasEscolas() && escolaDe(t) ? " · " + esc(escolaDe(t)) : t.serie ? " · " + esc(t.serie) : ""}</small></span>${sel.includes(t.id) ? "✓" : ""}</button>`).join("")}
     ${sel.length ? `<button type="button" class="hor-op vago" data-act="hor-escolher" data-turma="">Deixar vago</button>` : ""}</div>`;
 }
 function posicionarPop() {
@@ -2053,9 +2050,8 @@ function dlgGrade() {
 }
 const comTempos = t => horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar'],[data-act='hor-escolher'],[data-act='hor-turno'],[data-act='hor-escola']"); if (!b) return;
+  const b = e.target.closest("[data-act='hor-cel'],[data-act='hor-config'],[data-act='hor-grade-salvar'],[data-act='hor-escolher'],[data-act='hor-turno']"); if (!b) return;
   const act = b.dataset.act, tn = turnoHor();
-  if (act === "hor-escola") { S.horEscola = b.dataset.v; S.horTurno = null; S.horPop = null; render(); return; }
   if (act === "hor-turno") { S.horTurno = b.dataset.v; S.horPop = null; render(); return; }
   if (act === "hor-config") { S.horPop = null; dlgGrade(); return; }
   if (act === "hor-grade-salvar") {

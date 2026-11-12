@@ -416,3 +416,4 @@ td .grade{border-radius:8px;min-height:36px}
 .esc-turma small{color:var(--muted);font-weight:500}.esc-turma .swatch{width:10px;height:10px;border-radius:3px}
 .link-btn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:6px 0;text-decoration:underline}
 .suggest .btn{white-space:normal;text-align:left;height:auto;min-height:36px;padding-block:6px;max-width:100%}
+.cel-turma small.cel-esc{font-weight:600;color:var(--ink);opacity:.7;margin-top:1px}
