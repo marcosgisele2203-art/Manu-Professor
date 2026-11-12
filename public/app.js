@@ -1794,7 +1794,7 @@ document.addEventListener("click", async e => {
   switch (act) {
     case "fechar": fechar(); break;
     case "ir": if (id) irTurma(id, b.dataset.view); else location.hash = b.dataset.view; break;
-    case "nova-turma": dlgTurma(); break;
+    case "nova-turma": dlgTurma(); setTimeout(() => abrirPopTurma(true), 30); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
       const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");
