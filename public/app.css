@@ -380,3 +380,5 @@ td .grade{border-radius:8px;min-height:36px}
 .cel.on{border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
 .cel.ocupada{border-style:solid;background:var(--surface-2);color:var(--muted)}
 .grade-tempos tr.recreio th,.grade-tempos tr.recreio td{background:color-mix(in srgb,var(--mark) 45%,var(--surface));color:var(--mark-ink);font-weight:600;font-size:.85rem}
+.hor-simples{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:12px;align-items:end}
+@media (max-width:560px){.hor-simples{grid-template-columns:1fr}}
