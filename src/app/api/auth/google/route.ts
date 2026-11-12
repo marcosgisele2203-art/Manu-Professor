@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { criarSessao, guardarGooglePendente } from "@/lib/auth";
-import { googleConfigurado, trocarCodigo, verificarIdToken, cifrar } from "@/lib/google";
+import { googleConfigurado, trocarCodigo, verificarIdToken, cifrar, temDrive } from "@/lib/google";
 
 // "Continuar com Google": entra ou cria a conta e guarda a permissão do Drive
 export async function POST(req: Request) {
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ erro: "Não foi possível confirmar sua conta Google. Tente de novo." }, { status: 401 }); }
   if (!perfil.email || !perfil.email_verified) return NextResponse.json({ erro: "Sua conta Google não tem e-mail confirmado." }, { status: 400 });
   const email = perfil.email.toLowerCase();
-  const refresh = tokens.refresh_token ? cifrar(tokens.refresh_token) : undefined;
+  const refresh = tokens.refresh_token && temDrive(tokens.scope) ? cifrar(tokens.refresh_token) : undefined;
   let p = await prisma.professor.findFirst({ where: { OR: [{ googleSub: perfil.sub }, { email }] } });
   if (!p) {
     if (aceite !== true) {

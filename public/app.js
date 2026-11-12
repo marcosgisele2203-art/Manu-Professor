@@ -334,6 +334,7 @@ function vInicio() {
   <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
   <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Fazer chamada</a>` : ""}<button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Planejar aula com IA</button></div></div>
   ${!(S.escolas || []).length || !(S.disciplinas || []).length || !(S.etapas || []).length ? `<a class="aviso-perfil" href="#perfil">${ico("turmas")}<span><b>Complete seu perfil</b><small>Cadastre suas escolas, as etapas (Fundamental, Médio…) e as disciplinas. Assim, ao criar uma turma, é só escolher.</small></span><span class="btn sm">Completar</span></a>` : ""}
+  ${S.googleClientId && !S.googleConectado ? `<div class="aviso-perfil">${ico("drive")}<span><b>Conecte seu Google Drive</b><small>Para criar as pastas das suas turmas e salvar planos, provas e slides no seu Drive. Na tela do Google, <b>marque a caixinha do Google Drive</b> antes de clicar em Continuar.</small></span><button class="btn sm primary" data-act="conectar-drive">Conectar</button></div>` : ""}
   ${agendaHoje()}
   <div class="stats">
     <div class="stat"><span class="eyebrow">Turmas</span><span class="v num">${S.turmas.length}</span><span class="small muted">${totAlunos} alunos</span></div>
@@ -1467,6 +1468,16 @@ async function boletimXlsx(t) {
 // Google Drive: o arquivo vai para o Drive do professor e abre convertido no app do Google
 let gToken = null, gTokenAte = 0;
 let gServidorSem = false;
+async function conectarDrive() {
+  await carregarScript("https://accounts.google.com/gsi/client");
+  google.accounts.oauth2.initCodeClient({ client_id: S.googleClientId, scope: "https://www.googleapis.com/auth/drive.file", ux_mode: "popup", select_account: false,
+    callback: async resp => {
+      if (!resp.code) { toast("A conexão com o Google foi cancelada."); return; }
+      try { await api("POST", "/api/google/conectar", { code: resp.code }); S.googleConectado = true; gServidorSem = false; render(); toast("Google Drive conectado"); }
+      catch (e) { abrirDlg("Falta um passo", `<p>${esc(e.message || "Não foi possível conectar o Google Drive.")}</p>`, `<button type="button" class="btn" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="conectar-drive">Tentar de novo</button>`); }
+    } }).requestCode();
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-act='conectar-drive']")) { if (dlg.open) fechar(); conectarDrive().catch(() => toast("Não foi possível abrir a janela do Google. Permita pop-ups.")); } });
 async function tokenGoogle() {
   if (gToken && Date.now() < gTokenAte) return gToken;
   if (!gServidorSem) {

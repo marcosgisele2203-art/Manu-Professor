@@ -59,7 +59,7 @@ async function tokenDoAdmin() {
     const r = await renovarAcesso(refresh);
     if (r.ok && r.access_token) return { token: r.access_token, email: a.email };
   }
-  return { erro: "Nenhum administrador está com o Google Drive conectado. Entre no sistema com “Continuar com Google” usando o e-mail de administrador." };
+  return { erro: "Nenhum administrador está com o Google Drive conectado. Na página inicial do sistema, toque em “Conectar” no aviso do Google Drive (com o e-mail de administrador) e marque a caixinha do Drive." };
 }
 
 async function drive(token: string, url: string, init: RequestInit = {}) {

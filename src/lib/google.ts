@@ -17,6 +17,9 @@ export async function trocarCodigo(code: string) {
   return (await r.json()) as { id_token: string; access_token: string; refresh_token?: string; expires_in: number; scope?: string };
 }
 
+// O Google deixa a pessoa desmarcar a caixinha do Drive: só guardamos a permissão se ela veio
+export const temDrive = (scope?: string) => (scope || "").split(" ").includes("https://www.googleapis.com/auth/drive.file");
+
 export async function verificarIdToken(idToken: string) {
   const { payload } = await jwtVerify(idToken, JWKS, { audience: process.env.GOOGLE_CLIENT_ID!, issuer: ["https://accounts.google.com", "accounts.google.com"] });
   return payload as { sub: string; email?: string; email_verified?: boolean; name?: string };
