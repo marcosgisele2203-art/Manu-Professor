@@ -142,7 +142,7 @@ async function iniciar() {
   render();
   try {
     const eu = await api("GET", "/api/eu");
-    S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     S.mode = "live";
@@ -255,7 +255,7 @@ function semTurma(msg) {
 /* ----- Meu perfil ----- */
 async function salvarPerfil(dados, msg) {
   $("#syncState").textContent = "Salvando…";
-  try { const p = await api("PATCH", "/api/eu", dados); S.nome = p.nome; S.escola = p.escola || ""; S.escolas = p.escolas; S.disciplinas = p.disciplinas; $("#syncState").textContent = "Tudo salvo"; if (msg) toast(msg); render(); return true; }
+  try { const p = await api("PATCH", "/api/eu", dados); S.nome = p.nome; S.escola = p.escola || ""; S.escolas = p.escolas; S.disciplinas = p.disciplinas; S.etapas = p.etapas || []; $("#syncState").textContent = "Tudo salvo"; if (msg) toast(msg); render(); return true; }
   catch (e) { toast(e.message || "Não foi possível salvar o perfil."); $("#syncState").textContent = ""; return false; }
 }
 function lembrarNoPerfil(escola, disc) { // escola ou disciplina nova digitada na turma entra no perfil
@@ -265,17 +265,21 @@ function lembrarNoPerfil(escola, disc) { // escola ou disciplina nova digitada n
   if (Object.keys(d).length && S.mode === "live") salvarPerfil(d);
 }
 function vPerfil() {
-  const es = S.escolas || [], ds = S.disciplinas || [], sug = [...new Set(Object.values(COMPONENTES).flat())].filter(c => !ds.includes(c));
-  const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button></li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
+  const es = S.escolas || [], ds = S.disciplinas || [], et = S.etapas || [];
+  const sug = [...new Set((et.length ? et : Object.keys(COMPONENTES)).flatMap(e => COMPONENTES[e] || []))].filter(c => !ds.includes(c));
+  const turmasDa = x => S.turmas.filter(t => escolaDe(t) === x);
+  const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li${act === "perfil-tira-esc" ? ' class="esc"' : ""}><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button>${act === "perfil-tira-esc" ? `<div class="esc-turmas">${turmasDa(x).map(t => `<a class="esc-turma" href="${linkTurma(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)}<small>${esc(t.disciplina)}${t.turno ? " · " + esc(t.turno) : ""}</small></a>`).join("")}<button type="button" class="btn sm" data-act="nova-turma" data-escola="${esc(x)}">${ico("plus")}Turma nesta escola</button></div>` : ""}</li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
   return `<div class="page-head"><div><h1>Meu perfil</h1><p class="muted">Suas escolas e disciplinas aparecem prontas para escolher quando você cria uma turma.</p></div></div>
   <section class="panel"><div class="panel-head"><h2>Seu nome</h2></div><form class="perfil-add" data-form="perfil-nome"><input class="input" id="pfNome" value="${esc(S.nome)}" maxlength="120" aria-label="Seu nome"><button class="btn" type="submit">Salvar nome</button></form></section>
   <section class="panel"><div class="panel-head"><h2>Escolas onde você leciona</h2><span class="small muted">${es.length} de 10</span></div>
     ${lista(es, "perfil-tira-esc", "Nenhuma escola cadastrada ainda.")}
     <form class="perfil-add" data-form="perfil-esc"><input class="input" id="pfEscola" placeholder="Nome da escola. Ex.: EM Rio Azul" maxlength="120" aria-label="Nome da escola"><button class="btn primary" type="submit">${ico("plus")}Adicionar escola</button></form></section>
+  <section class="panel"><div class="panel-head"><h2>Etapas em que você leciona</h2><span class="small muted">Ao criar turma, a lista mostra só as séries dessas etapas</span></div>
+    <div class="chips-esc">${ETAPAS.map(([id, n]) => `<button type="button" class="tn-op" data-act="perfil-etapa" data-v="${id}" aria-pressed="${et.includes(id)}">${et.includes(id) ? "✓ " : ""}${n}</button>`).join("")}</div></section>
   <section class="panel"><div class="panel-head"><h2>Disciplinas que você leciona</h2></div>
     ${lista(ds, "perfil-tira-disc", "Nenhuma disciplina cadastrada ainda.")}
     <form class="perfil-add" data-form="perfil-disc"><input class="input" id="pfDisc" placeholder="Digite ou escolha. Ex.: Matemática" list="pfDiscLista" maxlength="80" aria-label="Disciplina" autocomplete="off"><datalist id="pfDiscLista">${sug.map(c => `<option value="${esc(c)}">`).join("")}</datalist><button class="btn primary" type="submit">${ico("plus")}Adicionar disciplina</button></form>
-    <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${["Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Língua Inglesa", "Polivalente (todos os campos)"].filter(c => !ds.includes(c)).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>`;
+    <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>`;
 }
 document.addEventListener("submit", async e => {
   const f = e.target.closest("[data-form^='perfil-']"); if (!f) return; e.preventDefault();
@@ -293,6 +297,7 @@ document.addEventListener("submit", async e => {
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act^='perfil-']"); if (!b) return;
   const v = b.dataset.v, es = S.escolas || [], ds = S.disciplinas || [];
+  if (b.dataset.act === "perfil-etapa") { const et = S.etapas || []; return salvarPerfil({ etapas: et.includes(v) ? et.filter(x => x !== v) : [...et, v] }); }
   if (b.dataset.act === "perfil-add-disc") return salvarPerfil({ disciplinas: [...ds, v] }, "Disciplina adicionada");
   if (b.dataset.act === "perfil-tira-disc") return salvarPerfil({ disciplinas: ds.filter(x => x !== v) }, "Disciplina retirada");
   if (b.dataset.act === "perfil-principal") { for (const t of S.turmas.filter(t => !t.escola && es[0])) { t.escola = es[0]; api("PUT", "/api/dados/turmas", t).catch(() => {}); } }
@@ -327,7 +332,7 @@ function vInicio() {
   return `
   <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
   <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Fazer chamada</a>` : ""}<button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Planejar aula com IA</button></div></div>
-  ${!(S.escolas || []).length || !(S.disciplinas || []).length ? `<a class="aviso-perfil" href="#perfil">${ico("turmas")}<span><b>Complete seu perfil</b><small>Cadastre as escolas onde você dá aula e suas disciplinas. Assim, ao criar uma turma, é só escolher.</small></span><span class="btn sm">Completar</span></a>` : ""}
+  ${!(S.escolas || []).length || !(S.disciplinas || []).length || !(S.etapas || []).length ? `<a class="aviso-perfil" href="#perfil">${ico("turmas")}<span><b>Complete seu perfil</b><small>Cadastre suas escolas, as etapas (Fundamental, Médio…) e as disciplinas. Assim, ao criar uma turma, é só escolher.</small></span><span class="btn sm">Completar</span></a>` : ""}
   ${agendaHoje()}
   <div class="stats">
     <div class="stat"><span class="eyebrow">Turmas</span><span class="v num">${S.turmas.length}</span><span class="small muted">${totAlunos} alunos</span></div>
@@ -562,7 +567,11 @@ const SERIES = [
   { id: "ef2", etapa: "Ensino Fundamental · Anos finais", itens: [6, 7, 8, 9].map(n => [`${n}º ano`, `${n}º ano EF`]) },
   { id: "em", etapa: "Ensino Médio", itens: [1, 2, 3].map(n => [`${n}ª série`, `${n}ª série EM`]) },
   { id: "eja", etapa: "EJA", itens: [["EJA Fundamental", "EJA EF"], ["EJA Médio", "EJA EM"]] },
+  { id: "outro", etapa: "Outros", itens: [["Reforço escolar", "Reforço escolar"], ["Curso técnico", "Curso técnico"], ["Curso livre", "Curso livre"], ["Educação Especial (AEE)", "AEE"]] },
 ];
+const ETAPAS = [["ei", "Educação Infantil"], ["ef1", "Fundamental · Anos iniciais"], ["ef2", "Fundamental · Anos finais"], ["em", "Ensino Médio"], ["eja", "EJA"], ["outro", "Outro (reforço, técnico, AEE…)"]];
+// séries que aparecem na lista da turma: só as etapas do perfil (ou todas, se não marcou nenhuma)
+const seriesVisiveis = todas => todas || !(S.etapas || []).length ? SERIES.filter(g => g.id !== "outro" || (S.etapas || []).includes("outro") || todas) : SERIES.filter(g => S.etapas.includes(g.id));
 const COMPONENTES = {
   ei: ["O eu, o outro e o nós", "Corpo, gestos e movimentos", "Traços, sons, cores e formas", "Escuta, fala, pensamento e imaginação", "Espaços, tempos, quantidades, relações e transformações", "Polivalente (todos os campos)"],
   ef1: ["Polivalente", "Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Ensino Religioso", "Língua Inglesa"],
@@ -570,6 +579,7 @@ const COMPONENTES = {
   em: ["Língua Portuguesa", "Matemática", "Física", "Química", "Biologia", "História", "Geografia", "Filosofia", "Sociologia", "Arte", "Educação Física", "Língua Inglesa", "Língua Espanhola", "Projeto de Vida", "Itinerário formativo"],
 };
 COMPONENTES.eja = [...new Set([...COMPONENTES.ef2, ...COMPONENTES.em])];
+COMPONENTES.outro = ["Reforço de Língua Portuguesa", "Reforço de Matemática", "Atendimento Educacional Especializado"];
 function etapaDaSerie(serie) { const s = String(serie || ""); return /\(EI\)|infantil|ber[çc]|maternal|pr[ée]/i.test(s) ? "ei" : /EJA/i.test(s) ? "eja" : /EM\b|m[ée]dio|s[ée]rie/i.test(s) ? "em" : /^[1-5]º/.test(s) ? "ef1" : /^[6-9]º/.test(s) ? "ef2" : ""; }
 const componentesPara = e => e ? COMPONENTES[e] : [...new Set(Object.values(COMPONENTES).flat())];
 const TURNOS = ["", "Matutino", "Vespertino", "Noturno", "Integral"];
@@ -646,6 +656,17 @@ document.addEventListener("click", e => {
   document.getElementById("tDisc").value = b.dataset.v;
   b.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
 });
+function gruposSeries(todas) {
+  const gs = seriesVisiveis(todas), filtrado = gs.length < SERIES.length;
+  return gs.map(g => `<div class="tn-grupo"><b>${g.etapa}</b><div class="tn-ops">${g.itens.map(([nome, serie]) => `<button type="button" class="tn-op" data-act="tn-serie" data-nome="${esc(nome)}" data-serie="${esc(serie)}" data-etapa="${g.id}" aria-pressed="${dlg._tn?.nome === nome}">${esc(nome)}</button>`).join("")}</div></div>`).join("")
+    + (filtrado ? `<button type="button" class="link-btn small" data-act="tn-todas">Mostrar todas as etapas</button>` : "");
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-act='tn-todas']"); if (!b) return; document.getElementById("tnSeries").innerHTML = gruposSeries(true); });
+function escolherEscolaDlg(nome) {
+  const sel = document.getElementById("tEscolaSel"), i = document.getElementById("tEscola"); if (!i) return;
+  i.value = nome; if (!sel) return;
+  const tem = [...sel.options].some(o => o.value === nome); sel.value = tem ? nome : "__nova"; i.hidden = tem;
+}
 function dlgTurma(t) {
   t = t || { id: uid(), nome: "", disciplina: (S.disciplinas || []).length === 1 ? S.disciplinas[0] : "", serie: "", ano: String(new Date().getFullYear()), turno: "", cor: CORES[S.turmas.length % CORES.length], alunos: [] };
   dlg._obj = t; dlg._tn = {};
@@ -653,7 +674,7 @@ function dlgTurma(t) {
     <div class="grid2"><div class="field tn-campo"><label for="tNome">Nome da turma</label><input class="input" id="tNome" required value="${esc(t.nome)}" placeholder="Escolha a série e a turma" autocomplete="off" aria-haspopup="listbox" aria-expanded="false" aria-controls="tnPop">
 </div>
     <div class="field"><label for="tDisc">Disciplina</label><input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa" list="tDiscLista" autocomplete="off"><datalist id="tDiscLista">${[...new Set([...(S.disciplinas || []), ...componentesPara(etapaDaSerie(t.serie))])].map(c => `<option value="${esc(c)}">`).join("")}</datalist></div></div>
-<div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma">${SERIES.map(g => `<div class="tn-grupo"><b>${g.etapa}</b><div class="tn-ops">${g.itens.map(([nome, serie]) => `<button type="button" class="tn-op" data-act="tn-serie" data-nome="${esc(nome)}" data-serie="${esc(serie)}" data-etapa="${g.id}">${esc(nome)}</button>`).join("")}</div></div>`).join("")}
+<div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma"><div id="tnSeries">${gruposSeries(false)}</div>
         <div class="tn-grupo"><b>Turma <span class="tn-dica">${S.turmas.some(x => x.id === t.id) ? "" : "· marque várias para criar todas de uma vez"}</span></b><div class="tn-ops">${["A", "B", "C", "D", "E", "F", "G", "Única"].map(l => `<button type="button" class="tn-op tn-letra" data-act="tn-letra" data-v="${l}">${l}</button>`).join("")}</div></div>
         <div class="tn-fim"><span class="small muted">Ou digite o nome que quiser.</span><button type="button" class="btn sm primary" data-act="tn-ok">Pronto</button></div></div>
     ${campoEscola(escolaDe(t))}
@@ -2071,7 +2092,7 @@ document.addEventListener("click", async e => {
   switch (act) {
     case "fechar": fechar(); break;
     case "ir": if (id) irTurma(id, b.dataset.view); else location.hash = b.dataset.view; break;
-    case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } if (b.dataset.escola) { const e = document.getElementById("tEscola"); if (e) e.value = b.dataset.escola; } setTimeout(() => abrirPopTurma(true), 30); break;
+    case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } if (b.dataset.escola) escolherEscolaDlg(b.dataset.escola); setTimeout(() => abrirPopTurma(true), 30); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
       const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");

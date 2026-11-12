@@ -18,6 +18,7 @@ model Professor {
   escola    String?
   escolas   String[] @default([]) // escolas onde leciona (a primeira é a principal)
   disciplinas String[] @default([])
+  etapas    String[] @default([]) // ei, ef1, ef2, em, eja, outro
   criadoEm  DateTime @default(now())
   aceitouTermosEm DateTime?
   limiteIA  Int?     // usos de IA por mês; vazio = usa o padrão (LIMITE_IA_MENSAL)
