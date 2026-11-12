@@ -12,14 +12,14 @@ export default function Inicio() {
           <div className="rail-foot">
             <div className="uso-ia small" id="usoIA" hidden></div>
             <a className="btn sm ghost" id="adminLink" href="/admin" hidden>Administração</a>
-            <span className="small muted" id="who"></span>
+            <a className="small who-link" id="who" href="#perfil" title="Meu perfil: escolas e disciplinas"></a>
             <form action="/api/auth/sair" method="post"><button className="btn sm ghost" type="submit">Sair</button></form>
           </div>
         </aside>
         <div className="main">
           <header className="top">
             <div className="top-left"><span className="small muted" id="topoTitulo">Manu Professor</span></div>
-            <div className="toolbar"><span className="small muted" id="syncState"></span><form className="so-celular" action="/api/auth/sair" method="post"><button className="btn sm ghost" type="submit">Sair</button></form></div>
+            <div className="toolbar"><span className="small muted" id="syncState"></span><a className="btn sm ghost so-celular" href="#perfil">Perfil</a><form className="so-celular" action="/api/auth/sair" method="post"><button className="btn sm ghost" type="submit">Sair</button></form></div>
           </header>
           <main className="content" id="view" aria-live="polite"></main>
         </div>

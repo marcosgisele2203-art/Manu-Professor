@@ -16,6 +16,8 @@ model Professor {
   googleSub String?
   googleRefresh String? // permissão do Google Drive guardada (criptografada)
   escola    String?
+  escolas   String[] @default([]) // escolas onde leciona (a primeira é a principal)
+  disciplinas String[] @default([])
   criadoEm  DateTime @default(now())
   aceitouTermosEm DateTime?
   limiteIA  Int?     // usos de IA por mês; vazio = usa o padrão (LIMITE_IA_MENSAL)

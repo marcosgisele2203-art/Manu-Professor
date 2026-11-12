@@ -420,3 +420,13 @@ td .grade{border-radius:8px;min-height:36px}
 .seg-escola button{font-weight:700}
 .cel-fora{font-size:.72rem;color:var(--muted);line-height:1.25}
 .aviso-pop{margin:4px 8px 6px;padding:6px 8px;border-radius:8px;background:#fef3c7;color:#92400e}
+/* Meu perfil */
+.who-link{color:inherit;text-decoration:none;opacity:.85}.who-link:hover{opacity:1;text-decoration:underline}
+.perfil-lista{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
+.perfil-lista li{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
+.perfil-lista li>span{flex:1;min-width:0;font-weight:600}
+.perfil-add{display:flex;gap:8px;flex-wrap:wrap}.perfil-add .input{flex:1;min-width:200px}
+.chips-esc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.aviso-perfil{display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:16px;border-radius:14px;background:color-mix(in srgb,var(--accent) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);color:var(--ink);text-decoration:none}
+.aviso-perfil svg{width:28px;height:28px;color:var(--accent);flex:none}
+.aviso-perfil>span:nth-child(2){flex:1}.aviso-perfil small{display:block;color:var(--muted)}
