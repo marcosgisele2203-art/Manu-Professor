@@ -279,24 +279,9 @@ td .grade{border-radius:8px;min-height:36px}
 @media (max-width:1100px){.atalhos{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:760px){.atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}.turma-head .toolbar{width:100%}}
 
-/* Coluna de IA no painel da turma */
-.turma-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;align-items:start}
+/* Painel da turma */
 .turma-conteudo{display:flex;flex-direction:column;gap:20px;min-width:0}
-.ia-lateral{position:sticky;top:calc(env(safe-area-inset-top,0px) + 70px);display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:var(--shadow);max-height:calc(100dvh - 100px);overflow-y:auto}
-.ia-tit{display:flex;align-items:center;gap:8px;padding:4px 8px 10px;color:var(--mark-ink)}.ia-tit svg{width:18px;height:18px}
-.ia-grupo{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:12px 8px 4px}
-.ia-item{display:flex;flex-direction:column;gap:1px;text-align:left;padding:8px 10px;border-radius:10px;color:var(--ink);text-decoration:none;border:0;background:transparent;font:inherit;cursor:pointer}
-.ia-item span{font-weight:600;font-size:.92rem}.ia-item small{font-size:.76rem;color:var(--muted)}
-.ia-item.sub{padding:6px 10px 6px 18px}.ia-item.sub span{font-weight:500;font-size:.88rem}
-.ia-item:hover{background:var(--surface-2)}
-.ia-item[aria-current="page"]{background:var(--mark);color:var(--mark-ink)}.ia-item[aria-current="page"] small{color:var(--mark-ink)}
 .atalhos{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media (max-width:1000px){
-  .turma-layout{grid-template-columns:minmax(0,1fr)}
-  .ia-lateral{position:static;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;max-height:none;padding:8px;gap:6px;align-items:center}
-  .ia-tit{padding:0 6px;flex:none}.ia-grupo{display:none}
-  .ia-item,.ia-item.sub{flex:none;padding:6px 12px;border:1px solid var(--line);border-radius:999px}.ia-item small{display:none}
-}
 @media (max-width:760px){.atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mat-escolhido{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--mark) 55%,var(--surface));color:var(--ink)}
 .mat-escolhido svg{width:20px;height:20px;color:var(--mark-ink);flex:none;margin-top:2px}
@@ -464,3 +449,15 @@ td .grade{border-radius:8px;min-height:36px}
 .brand-mark .iniciais{display:grid;place-items:center;width:100%;height:100%;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:.95rem;letter-spacing:.02em}
 .perfil-foto{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .brand-mark.grande{width:84px;height:84px}.brand-mark.grande .iniciais{font-size:1.6rem}
+/* Criar com IA dentro do bimestre */
+.turma-conteudo{min-width:0}
+.bim-ia{border:1px solid color-mix(in srgb,var(--mark) 60%,var(--line));background:color-mix(in srgb,var(--mark) 18%,var(--surface));border-radius:14px;padding:14px;display:grid;gap:12px}
+.bim-ia-tit{display:flex;align-items:center;gap:8px;color:var(--mark-ink)}.bim-ia-tit svg{width:18px;height:18px}
+.bim-ia-grupo{display:grid;gap:6px}
+.bim-ia-grupo>span{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
+.bim-ia-itens{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.ia-card{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;font:inherit;cursor:pointer}
+.ia-card b{font-size:.9rem;font-weight:700}.ia-card small{font-size:.76rem;color:var(--muted)}
+.ia-card:hover,.ia-card:focus-visible{border-color:var(--mark-ink);background:color-mix(in srgb,var(--mark) 25%,var(--surface))}
+.voltar-bim{display:inline-block;margin:-4px 0 12px;font-weight:600;color:var(--accent);text-decoration:none}
+@media (min-width:761px){body.na-turma .voltar-bim{margin-top:0}}

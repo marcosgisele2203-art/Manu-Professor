@@ -44,7 +44,12 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"]];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Chamada"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+// ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
+const DO_BIMESTRE = ["planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
+// link que respeita a turma aberta (banco, Enem, Manu)
+const lk = v => S.dentroTurma && turmaAtual() ? linkTurma(turmaAtual().id, v) : "#" + v;
+const NAV_PRINCIPAL = ["inicio", "turmas", "horario"];
 const ABAS_TOPO = ["resumo", "alunos", "bimestres", "chamada", "notas", "provas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
@@ -165,6 +170,7 @@ const turmaAtual = () => turma(S.turmaSel) || S.turmas[0] || null;
 const bimestresDe = t => (t && Array.isArray(t.bimestres)) ? t.bimestres : [];
 const bimPorNum = (t, n) => bimestresDe(t).find(b => String(b.num) === String(n)) || null;
 const bimDaData = (t, d) => bimestresDe(t).find(b => d >= b.inicio && d <= b.fim) || null;
+function primeiroNome() { const n = (S.nome || "").trim().split(/\s+/)[0] || ""; return n === n.toUpperCase() ? n.charAt(0) + n.slice(1).toLocaleLowerCase("pt-BR") : n; }
 function bimSelecionado(t) {
   if (!t || !bimestresDe(t).length) return "";
   S.bimSel = S.bimSel || {};
@@ -211,7 +217,7 @@ function render() {
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>Não foi possível carregar seus dados</h3><p>Verifique a internet e recarregue a página.</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
   const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
-  v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-layout">${colunaIA()}<div class="turma-conteudo">${fn()}</div></div>` : fn();
+  v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
@@ -221,13 +227,13 @@ function renderNav() {
   if (tt) { // dentro da turma: só Início e as seções da turma
     const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]));
     $("#nav").innerHTML = `<a href="#inicio">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${S.view === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("");
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("");
     document.body.classList.add("na-turma");
   } else {
     document.body.classList.remove("na-turma");
   }
   const ativo = S.dentroTurma ? "turmas" : S.view === "enem" ? "questoes" : S.view;
-  if (!tt) $("#nav").innerHTML = VIEWS.map(([k, n, ai]) => `<a href="#${k}" ${ativo === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
+  if (!tt) $("#nav").innerHTML = VIEWS.filter(v => NAV_PRINCIPAL.includes(v[0])).map(([k, n, ai]) => `<a href="#${k}" ${ativo === k ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span>${ai ? '<span class="ai">IA</span>' : ""}</a>`).join("");
   // topo do menu: foto e nome do professor
   if (S.nome) {
     const partes = S.nome.trim().split(/\s+/), curto = partes.length > 1 ? `${partes[0]} ${partes[partes.length - 1]}` : partes[0];
@@ -254,17 +260,8 @@ function cabecalhoTurma() {
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(rotuloTurma(x))}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(bimSelecionado(t)) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${bimSelecionado(t) === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
-  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>`;
-}
-function colunaIA() {
-  const t = turmaAtual();
-  return `<aside class="ia-lateral" aria-label="Criar com IA"><div class="ia-tit">${ico("spark")}<b>Criar com IA</b></div>${FERRAMENTAS_IA.map(f => {
-    if (f.grupo) return `<div class="ia-grupo">${f.grupo}</div>`;
-    const ativo = f.aba && S.view === f.aba && (!f.sub || S.matForm.subtipo === f.sub) && !(f.aba === "materiais" && !f.sub);
-    const attrs = f.acao ? `data-act="${f.acao}"` : f.href ? `href="${f.href}"` : `href="${linkTurma(t.id, f.aba)}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
-    const tag = f.acao ? "button" : "a";
-    return `<${tag} class="ia-item${f.sub ? " sub" : ""}" ${attrs} ${ativo ? 'aria-current="page"' : ""}><span>${f.nome}</span>${f.desc ? `<small>${f.desc}</small>` : ""}</${tag}>`;
-  }).join("")}</aside>`;
+  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+  ${DO_BIMESTRE.includes(S.view) && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestres")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act='ia-mat']"); if (!b) return;
@@ -372,10 +369,10 @@ function vInicio() {
   const al = alertas();
   const totAlunos = S.turmas.reduce((s, t) => s + (t.alunos || []).length, 0);
   const saud = new Date().getHours() < 12 ? "Bom dia" : new Date().getHours() < 18 ? "Boa tarde" : "Boa noite";
-  if (!S.turmas.length) return `<div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1></div></div></div>` + semTurma("Comece cadastrando uma turma. Depois você faz a chamada, lança notas e planeja aulas com ajuda da IA.");
+  if (!S.turmas.length) return `<div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(primeiroNome()) : ""}</h1></div></div></div>` + semTurma("Comece cadastrando uma turma. Depois você faz a chamada, lança notas e planeja aulas com ajuda da IA.");
   return `
-  <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(S.nome.split(" ")[0]) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
-  <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Fazer chamada</a>` : ""}<button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Planejar aula com IA</button></div></div>
+  <div class="page-head"><div class="hello"><img src="/manu/manu-boas-vindas.webp" alt=""><div><span class="eyebrow">${esc(fmtDataLonga(d0))}</span><h1>${saud}${S.nome ? ", " + esc(primeiroNome()) : ""}</h1><p class="muted">Resumo das suas turmas e do que vem pela frente.</p></div></div>
+  <div class="toolbar">${S.turmas.length ? `<a class="btn" href="${linkTurma((turmaAtual() || S.turmas[0]).id, "chamada")}">Fazer chamada</a>` : ""}</div></div>
   ${!(S.escolas || []).length || !(S.disciplinas || []).length || !(S.etapas || []).length ? `<a class="aviso-perfil" href="#perfil">${ico("turmas")}<span><b>Complete seu perfil</b><small>Cadastre suas escolas, as etapas (Fundamental, Médio…) e as disciplinas. Assim, ao criar uma turma, é só escolher.</small></span><span class="btn sm">Completar</span></a>` : ""}
   ${S.googleClientId && !S.googleConectado ? `<div class="aviso-perfil">${ico("drive")}<span><b>Conecte seu Google Drive</b><small>Para criar as pastas das suas turmas e salvar planos, provas e slides no seu Drive. Na tela do Google, <b>marque a caixinha do Google Drive</b> antes de clicar em Continuar.</small></span><button class="btn sm primary" data-act="conectar-drive">Conectar</button></div>` : ""}
   ${agendaHoje()}
@@ -388,7 +385,7 @@ function vInicio() {
   <div class="cols">
     <section class="panel"><div class="panel-head"><h2>Próximas aulas</h2><a class="btn sm ghost" href="#turmas">Ver turmas</a></div>
       ${proxAulas.length ? `<div class="list">${proxAulas.map(p => { const t = turma(p.turmaId); return `<div class="row"><span class="dot" style="background:${esc(t?.cor || "var(--muted)")}"></span><div class="grow"><div class="title">${esc(p.titulo)}</div><div class="small muted">${esc(t?.nome || "Sem turma")} · ${esc(p.duracao || "")}</div></div>${p.bncc ? `<span class="bncc">${esc(p.bncc)}</span>` : ""}<span class="chip num">${fmtData(p.data)}</span><button class="btn sm" data-act="ver-plano" data-id="${esc(p.id)}">Abrir</button></div>`; }).join("")}</div>`
-        : `<p class="muted">Nenhuma aula planejada para esta semana. <button class="btn sm ai" data-act="novo-plano-ia">${ico("spark")}Planejar com IA</button></p>`}
+        : `<p class="muted">Nenhuma aula planejada para esta semana. Para planejar com a IA, abra a turma e vá em Bimestres.</p>`}
     </section>
     <section class="panel"><div class="panel-head"><h2>Precisam de atenção</h2></div>
       ${al.length ? `<div class="list">${al.slice(0, 8).map(x => `<div class="row"><div class="grow"><div class="title">${esc(x.a.nome)}</div><div class="small muted">${esc(x.t.nome)}</div></div><span class="chip ${x.cls}">${esc(x.txt)}</span></div>`).join("")}</div>`
@@ -430,7 +427,7 @@ function vResumoTurma() {
   </div>
   <div class="cols">
     <section class="panel"><div class="panel-head"><h2>Próximas aulas</h2><a class="btn sm ghost" href="${linkTurma(t.id, "planos")}">Ver planejamento</a></div>
-      ${aulas.length ? `<div class="list">${aulas.map(p => `<div class="row"><div class="grow"><div class="title">${esc(p.titulo)}</div><div class="small muted">${esc(p.duracao || "")}</div></div>${p.bncc ? `<span class="bncc">${esc(p.bncc.split(/[,;\s]+/)[0])}</span>` : ""}<span class="chip num">${fmtData(p.data)}</span><button class="btn sm" data-act="ver-plano" data-id="${esc(p.id)}">Abrir</button></div>`).join("")}</div>` : `<p class="muted">Nenhuma aula planejada. <button class="btn sm ai" data-act="novo-plano-ia">${ico("spark")}Planejar com IA</button></p>`}
+      ${aulas.length ? `<div class="list">${aulas.map(p => `<div class="row"><div class="grow"><div class="title">${esc(p.titulo)}</div><div class="small muted">${esc(p.duracao || "")}</div></div>${p.bncc ? `<span class="bncc">${esc(p.bncc.split(/[,;\s]+/)[0])}</span>` : ""}<span class="chip num">${fmtData(p.data)}</span><button class="btn sm" data-act="ver-plano" data-id="${esc(p.id)}">Abrir</button></div>`).join("")}</div>` : `<p class="muted">Nenhuma aula planejada. <a class="btn sm ai" href="${linkTurma(t.id, "bimestres")}">${ico("spark")}Planejar no bimestre</a></p>`}
     </section>
     <section class="panel"><div class="panel-head"><h2>Precisam de atenção</h2></div>
       ${al2.length ? `<div class="list">${al2.map(x => `<div class="row"><div class="grow title">${esc(x.a.nome)}</div><span class="chip ${x.cls}">${esc(x.txt)}</span></div>`).join("")}</div>` : `<p class="muted">Ninguém abaixo de ${FREQ_MIN}% de frequência ou média ${MEDIA_MIN}.</p>`}
@@ -570,8 +567,8 @@ function vQuestoes() {
   const f = S.filtroQ;
   const discs = [...new Set(S.questoes.map(q => q.disciplina).filter(Boolean))].sort();
   const lista = S.questoes.filter(q => (!f.disc || q.disciplina === f.disc) && (!f.dif || q.dificuldade === f.dif) && (!f.txt || (q.enunciado + " " + q.tema).toLowerCase().includes(f.txt.toLowerCase())));
-  const head = `<div class="page-head"><div><h1>Banco de questões</h1><p class="muted">${S.questoes.length} questões guardadas para montar provas.</p></div><div class="toolbar"><button class="btn" data-act="nova-questao">${ico("plus")}Nova questão</button><a class="btn" href="#enem">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
-  if (!S.questoes.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Seu banco está vazio</h3><p>Peça à Manu questões sobre um tema ou pegue questões oficiais do Enem.</p><div class="toolbar" style="justify-content:center"><a class="btn" href="#enem">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
+  const head = `<div class="page-head"><div><h1>Banco de questões</h1><p class="muted">${S.questoes.length} questões guardadas para montar provas.</p></div><div class="toolbar"><button class="btn" data-act="nova-questao">${ico("plus")}Nova questão</button><a class="btn" href="${lk("enem")}">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
+  if (!S.questoes.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Seu banco está vazio</h3><p>Peça à Manu questões sobre um tema ou pegue questões oficiais do Enem.</p><div class="toolbar" style="justify-content:center"><a class="btn" href="${lk("enem")}">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
   return head + `<section class="panel"><div class="toolbar">
       <div class="field" style="flex:1;min-width:180px"><label for="fTxt">Buscar</label><input class="input" type="search" id="fTxt" value="${esc(f.txt)}" placeholder="Tema ou trecho do enunciado"></div>
       <div class="field"><label for="fDisc">Disciplina</label><select class="input" id="fDisc"><option value="">Todas</option>${discs.map(d => `<option ${f.disc === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
@@ -1760,7 +1757,7 @@ function jaGuardada(ano, q) { return S.questoes.some(x => x.enem && x.enem.ano =
 function vEnem() {
   const f = S.enemF, r = S.enemRes;
   const anos = Array.from({ length: 15 }, (_, i) => 2023 - i);
-  return `<div class="page-head"><div><span class="eyebrow"><a href="#questoes">Banco de questões</a> / Enem</span><h1>Questões do Enem</h1><p class="muted">Provas oficiais de 2009 a 2023, publicadas pelo INEP. Guarde as que quiser no seu banco para usar nas provas.</p></div></div>
+  return `<div class="page-head"><div><span class="eyebrow"><a href="${lk("questoes")}">Banco de questões</a> / Enem</span><h1>Questões do Enem</h1><p class="muted">Provas oficiais de 2009 a 2023, publicadas pelo INEP. Guarde as que quiser no seu banco para usar nas provas.</p></div></div>
   <section class="panel"><form class="toolbar" id="enemForm" style="align-items:flex-end">
     <div class="field"><label for="eAno">Ano</label><select class="input" id="eAno">${anos.map(a => `<option ${f.ano === a ? "selected" : ""}>${a}</option>`).join("")}</select></div>
     <div class="field"><label for="eArea">Área</label><select class="input" id="eArea"><option value="">Todas</option>${Object.entries(AREA_CURTA).map(([k, v]) => `<option value="${k}" ${f.area === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
@@ -1842,6 +1839,26 @@ const habsDe = b => Array.isArray(b.habs) ? b.habs : [];
 const textoHab = h => (h.codigo ? h.codigo + " – " : "") + h.descricao;
 function lerHab(txt) { const m = String(txt).trim().match(/^((?:EI|EF|EM)\d{2}[A-Z]{2,4}\d{2,3})\s*[-–:.)]?\s*(.*)$/i); return m ? { codigo: m[1].toUpperCase(), descricao: m[2].trim() } : { codigo: "", descricao: String(txt).trim() }; }
 async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)), nb = bimPorNum(nt, num); fn(nb, nt); await salvar("turmas", nt); if (msg) toast(msg); }
+// "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
+function bimIA(b) {
+  const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
+  if (!ativo) return `<div class="toolbar"><button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
+  const item = f => {
+    const href = f.acao ? "" : f.href ? linkTurma(t.id, f.href.replace("#", "")) : linkTurma(t.id, f.aba);
+    const attrs = f.acao ? `data-act="${f.acao}" data-num="${b.num}" data-bim-ir="${b.num}"` : `href="${href}" data-bim-ir="${b.num}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
+    return `<${f.acao ? "button type=\"button\"" : "a"} class="ia-card${f.sub ? " sub" : ""}" ${attrs}><b>${f.nome}</b>${f.desc ? `<small>${f.desc}</small>` : ""}</${f.acao ? "button" : "a"}>`;
+  };
+  const grupos = [], ferr = [{ grupo: "Planejamento do bimestre" }, { acao: "bim-ia", nome: "Planejar o bimestre", desc: "Semana a semana, BNCC" }, { acao: "bim-hab-ia", nome: "Habilidades da BNCC", desc: "Sugestões para o período" }, { acao: "bim-tec-ia", nome: "Ideias de tecnologia", desc: "Com e sem internet" },
+    { grupo: "Aulas" }, ...FERRAMENTAS_IA.slice(0, 2), ...FERRAMENTAS_IA.slice(2)];
+  let atual = null;
+  for (const f of ferr) { if (f.grupo) { atual = { nome: f.grupo, itens: [] }; grupos.push(atual); } else atual.itens.push(f); }
+  grupos.push({ nome: "Banco e Enem", itens: [{ href: "#questoes", nome: "Banco de questões", desc: "Suas questões guardadas" }, { href: "#enem", nome: "Questões do Enem", desc: "Provas oficiais do INEP" }] });
+  return `<div class="bim-ia"><div class="bim-ia-tit">${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-bim-ir]"); if (a) { const t = turmaAtual(); if (t) S.bimSel[t.id] = String(a.dataset.bimIr); }
+  const at = e.target.closest("[data-act='bim-ativar']"); if (at) { const t = turmaAtual(); S.bimSel[t.id] = String(at.dataset.num); render(); setTimeout(() => document.getElementById("bim-" + at.dataset.num)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+}, true);
 function bimExtras(b) {
   const hs = habsDe(b), rec = b.recursos || [], ids = b.ideiasTec || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
   const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
@@ -1955,6 +1972,7 @@ function vBimestres() {
     return `<section class="panel bim-card" id="bim-${b.num}">
       <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
       <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
+      ${bimIA(b)}
       ${bimExtras(b)}
       ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
@@ -2255,7 +2273,7 @@ document.addEventListener("click", async e => {
   const t = turmaAtual();
   switch (act) {
     case "fechar": fechar(); break;
-    case "ir": if (id) irTurma(id, b.dataset.view); else location.hash = b.dataset.view; break;
+    case "ir": if (id) irTurma(id, b.dataset.view); else location.hash = lk(b.dataset.view); break;
     case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } if (b.dataset.escola) escolherEscolaDlg(b.dataset.escola); setTimeout(() => abrirPopTurma(true), 30); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
@@ -2344,7 +2362,7 @@ document.addEventListener("click", async e => {
     case "ia-questoes": iaQuestoes(); break;
     case "salvar-geradas": { const sel = [...dlg.querySelectorAll('input[name="gSel"]:checked')].map(x => dlg._gerada[Number(x.value)]); fechar(); for (const q of sel) await salvar("questoes", q); toast(`${sel.length} questões guardadas no banco`); break; }
 
-    case "nova-prova": if (!S.questoes.length) { location.hash = "questoes"; return; } dlgProva(); break;
+    case "nova-prova": if (!S.questoes.length) { location.hash = lk("questoes"); return; } dlgProva(); break;
     case "editar-prova": dlgProva(JSON.parse(JSON.stringify(S.provas.find(p => p.id === id)))); break;
     case "salvar-prova": { const o = dlg._obj; o.titulo = val("prTitulo"); if (!o.titulo) { toast("Dê um título à prova."); return; }
       Object.assign(o, { turmaId: val("prTurma"), data: val("prData"), instrucoes: val("prInst"), questaoIds: [...dlg.querySelectorAll('input[name="prQ"]:checked')].map(x => x.value) }); delete o.exemplo;
@@ -2392,7 +2410,11 @@ function lerRota() {
   if (m) { S.dentroTurma = true; S.turmaSel = m[1]; S.view = m[2]; try { localStorage.setItem("cp_turma", m[1]); } catch (_) {} return; }
   S.dentroTurma = false; S.horPop = null; S.view = VIEWS.some(v => v[0] === h) || h === "enem" || h === "perfil" ? h : "inicio";
 }
-function rota() { lerRota(); render(); window.scrollTo(0, 0); }
+function rota() {
+  lerRota(); render(); window.scrollTo(0, 0);
+  // na aba Bimestres, já mostra o bimestre escolhido (onde fica o Criar com IA)
+  if (S.view === "bimestres") { const t = turmaAtual(), n = t && bimSelecionado(t); if (n && n !== "1") setTimeout(() => document.getElementById("bim-" + n)?.scrollIntoView({ block: "start" }), 30); }
+}
 window.addEventListener("hashchange", rota);
 lerRota();
 iniciar();
