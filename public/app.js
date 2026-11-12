@@ -1855,10 +1855,12 @@ function proximaAula(t) {
 const INICIO_TURNO = { Matutino: "07:00", Manhã: "07:00", Vespertino: "13:00", Tarde: "13:00", Noturno: "19:00", Noite: "19:00", Integral: "07:00" };
 function gradeDe(t) {
   const g = t.grade || {};
-  return { inicio: g.inicio || INICIO_TURNO[t.turno] || "07:00", duracao: Number(g.duracao) || 50, tempos: Number(g.tempos) || 6, recreioApos: Number(g.recreioApos ?? 3), recreio: Number(g.recreio ?? 10), sabado: !!g.sabado };
+  const integral = t.turno === "Integral"; // integral: manhã e tarde, com almoço depois do 6º tempo
+  return { inicio: g.inicio || INICIO_TURNO[t.turno] || "07:00", duracao: Number(g.duracao) || 50, tempos: Number(g.tempos) || (integral ? 9 : 6), recreioApos: Number(g.recreioApos ?? 3), recreio: Number(g.recreio ?? 10),
+    almocoApos: Number(g.almocoApos ?? (integral ? 6 : 0)), almoco: Number(g.almoco ?? 60), sabado: !!g.sabado };
 }
 function horaDoTempo(g, k) { // k = 1, 2, 3...
-  const ini = minutos(g.inicio) + (k - 1) * g.duracao + (g.recreioApos && k > g.recreioApos ? g.recreio : 0);
+  const ini = minutos(g.inicio) + (k - 1) * g.duracao + (g.recreioApos && k > g.recreioApos ? g.recreio : 0) + (g.almocoApos && k > g.almocoApos ? g.almoco : 0);
   return { inicio: hhmm(ini), fim: hhmm(ini + g.duracao) };
 }
 function tempoDe(t, a) { // horários antigos (sem número do tempo) são encaixados pelo início
@@ -1870,8 +1872,8 @@ const val2 = id => { const el = document.getElementById(id); return el ? el.valu
 // Meu horário: a semana do professor, com todas as turmas
 const TURNO_SIN = { Manhã: "Matutino", Tarde: "Vespertino", Noite: "Noturno" }, ORDEM_TURNO = ["Matutino", "Vespertino", "Noturno", "Integral"];
 const turnoGrupo = t => TURNO_SIN[t.turno] || t.turno || "";
-function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(S.turmas.map(turnoGrupo))].sort((a, b) => o(a) - o(b)); }
-function turnoHor() { const gs = gruposTurno(); return gs.includes(S.horTurno) ? S.horTurno : gs[0]; }
+function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(["Matutino", "Vespertino", "Noturno", "Integral", ...S.turmas.map(turnoGrupo)])].sort((a, b) => o(a) - o(b)); }
+function turnoHor() { const gs = gruposTurno(); return gs.includes(S.horTurno) ? S.horTurno : gs.find(x => turmasDoTurno(x).length) || gs[0]; }
 function gradeTurno(tn) { const t = S.turmas.find(x => turnoGrupo(x) === tn); return t ? gradeDe(t) : gradeDe({ turno: tn }); }
 const turmasDoTurno = tn => S.turmas.filter(t => turnoGrupo(t) === tn);
 const naCelula = (tn, d, k) => turmasDoTurno(tn).filter(t => horarioDe(t).some(a => a.dia === d && tempoDe(t, a) === k));
@@ -1884,10 +1886,11 @@ function vHorario() {
     linhas.push(`<tr><th class="tp"><b>${k}º tempo</b><small class="num">${x.inicio}–${x.fim}</small></th>${dias.map(d => { const ts = naCelula(tn, d, k), aberto = S.horPop && S.horPop.d === d && S.horPop.k === k;
       return `<td class="${hj === d ? "hoje" : ""}"><button type="button" class="cel${ts.length ? " on" : ""}${ts.length > 1 ? " choque" : ""}" data-act="hor-cel" data-dia="${d}" data-tempo="${k}" aria-haspopup="true" aria-expanded="${aberto}" aria-label="${DIAS[d]}, ${k}º tempo${ts.length ? ": " + ts.map(t => esc(t.nome)).join(", ") : ", vago"}">${ts.length ? ts.map(t => `<span class="cel-turma" style="--c:${esc(t.cor || "#0f766e")}"><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}</small></span>`).join("") : `<span class="mais">+</span>`}</button></td>`; }).join("")}</tr>`);
     if (g.recreioApos === k && g.recreio > 0 && k < g.tempos) linhas.push(`<tr class="recreio"><th class="tp"><b>Recreio</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.recreio)}</small></th><td colspan="${dias.length}">Intervalo de ${g.recreio} minutos</td></tr>`);
+    if (g.almocoApos === k && g.almoco > 0 && k < g.tempos) linhas.push(`<tr class="recreio almoco"><th class="tp"><b>Almoço</b><small class="num">${x.fim}–${hhmm(minutos(x.fim) + g.almoco)}</small></th><td colspan="${dias.length}">Intervalo de almoço · ${g.almoco} minutos</td></tr>`);
   }
   const tot = turmasDoTurno(tn).map(t => ({ t, n: horarioDe(t).filter(a => tempoDe(t, a)).length }));
-  return `<div class="page-head"><div><h1>Meu horário</h1><p class="muted">Toque num tempo e escolha a turma. Cada tempo tem ${g.duracao} minutos${g.recreioApos ? `, com recreio de ${g.recreio} minutos depois do ${g.recreioApos}º tempo` : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
-  ${gs.length > 1 ? `<div class="seg" role="tablist" aria-label="Turno">${gs.map(x => `<button type="button" role="tab" class="${x === tn ? "on" : ""}" aria-selected="${x === tn}" data-act="hor-turno" data-v="${esc(x)}">${esc(x || "Sem turno")}</button>`).join("")}</div>` : ""}
+  return `<div class="page-head"><div><h1>Meu horário</h1><p class="muted">Toque num tempo e escolha a turma. Cada tempo tem ${g.duracao} minutos${g.recreioApos ? `, com recreio de ${g.recreio} minutos depois do ${g.recreioApos}º tempo` : ""}${g.almocoApos && g.almocoApos < g.tempos ? ` e almoço depois do ${g.almocoApos}º tempo` : ""}.</p></div><div class="toolbar"><button class="btn sm" data-act="hor-config">Configurar tempos</button></div></div>
+  ${gs.length ? `<div class="seg" role="tablist" aria-label="Turno">${gs.map(x => `<button type="button" role="tab" class="${x === tn ? "on" : ""}" aria-selected="${x === tn}" data-act="hor-turno" data-v="${esc(x)}">${esc(x || "Sem turno")}${turmasDoTurno(x).length ? "" : ' <small class="muted">(vazio)</small>'}</button>`).join("")}</div>` : ""}
   <div class="table-wrap"><table class="grade-tempos"><thead><tr><th></th>${dias.map(d => `<th class="${hj === d ? "hoje" : ""}">${DIAS[d]}</th>`).join("")}</tr></thead><tbody>${linhas.join("")}</tbody></table></div>
   <div class="hor-tot">${tot.map(({ t, n }) => `<a href="${linkTurma(t.id, "resumo")}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)} · ${esc(t.disciplina)} <b class="num">${n}</b> ${n === 1 ? "tempo" : "tempos"}/semana</a>`).join("")}</div>
   ${S.horPop ? popHorario(tn) : ""}`;
@@ -1895,6 +1898,7 @@ function vHorario() {
 function popHorario(tn) {
   const { d, k } = S.horPop, ts = turmasDoTurno(tn), sel = naCelula(tn, d, k).map(t => t.id), x = horaDoTempo(gradeTurno(tn), k);
   return `<div class="hor-pop" id="horPop" role="dialog" aria-label="Escolher turma"><div class="hor-pop-tit"><b>${DIAS[d]}, ${k}º tempo</b><small class="num muted">${x.inicio}–${x.fim}</small></div>
+    ${ts.length ? "" : `<p class="small muted" style="margin:6px 8px">Você ainda não tem turma no turno ${esc(tn || "sem turno").toLowerCase()}.</p><button type="button" class="hor-op" data-act="nova-turma" data-turno="${esc(tn)}">${ico("plus")}<span><b>Criar turma</b></span></button>`}
     ${ts.map(t => `<button type="button" class="hor-op${sel.includes(t.id) ? " on" : ""}" data-act="hor-escolher" data-turma="${esc(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span><span><b>${esc(t.nome)}</b><small>${esc(t.disciplina || "")}${t.serie ? " · " + esc(t.serie) : ""}</small></span>${sel.includes(t.id) ? "✓" : ""}</button>`).join("")}
     ${sel.length ? `<button type="button" class="hor-op vago" data-act="hor-escolher" data-turma="">Deixar vago</button>` : ""}</div>`;
 }
@@ -1919,9 +1923,11 @@ function dlgGrade() {
     <div class="grid3"><div class="field"><label for="gIni">Início do 1º tempo</label><input class="input" id="gIni" type="time" value="${esc(g.inicio)}"></div>
     <div class="field"><label for="gDur">Duração de cada tempo</label><select class="input" id="gDur">${[40, 45, 50, 55, 60].map(n => `<option value="${n}" ${g.duracao === n ? "selected" : ""}>${n} minutos</option>`).join("")}</select></div>
     <div class="field"><label for="gTempos">Tempos por dia</label><select class="input" id="gTempos">${[4, 5, 6, 7, 8, 9, 10].map(n => `<option ${g.tempos === n ? "selected" : ""}>${n}</option>`).join("")}</select></div></div>
-    <div class="grid3"><div class="field"><label for="gRecApos">Recreio depois do</label><select class="input" id="gRecApos"><option value="0" ${!g.recreioApos ? "selected" : ""}>Sem recreio</option>${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${g.recreioApos === n ? "selected" : ""}>${n}º tempo</option>`).join("")}</select></div>
+    <div class="grid3"><div class="field"><label for="gRecApos">Recreio depois do</label><select class="input" id="gRecApos"><option value="0" ${!g.recreioApos ? "selected" : ""}>Sem recreio</option>${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<option value="${n}" ${g.recreioApos === n ? "selected" : ""}>${n}º tempo</option>`).join("")}</select></div>
     <div class="field"><label for="gRec">Duração do recreio</label><select class="input" id="gRec">${[10, 15, 20, 30].map(n => `<option value="${n}" ${g.recreio === n ? "selected" : ""}>${n} minutos</option>`).join("")}</select></div>
-    <label class="check" style="border:0;align-self:end"><input type="checkbox" id="gSab" ${g.sabado ? "checked" : ""}><span>Tem aula no sábado</span></label></div>`,
+    <label class="check" style="border:0;align-self:end"><input type="checkbox" id="gSab" ${g.sabado ? "checked" : ""}><span>Tem aula no sábado</span></label></div>
+    <div class="grid3"><div class="field"><label for="gAlmApos">Almoço depois do</label><select class="input" id="gAlmApos"><option value="0" ${!g.almocoApos ? "selected" : ""}>Sem almoço</option>${[3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${g.almocoApos === n ? "selected" : ""}>${n}º tempo</option>`).join("")}</select></div>
+    <div class="field"><label for="gAlm">Duração do almoço</label><select class="input" id="gAlm">${[30, 45, 60, 75, 90, 120].map(n => `<option value="${n}" ${g.almoco === n ? "selected" : ""}>${n} minutos</option>`).join("")}</select></div></div>`,
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="hor-grade-salvar">Salvar</button>`);
 }
 const comTempos = t => horarioDe(t).map(a => ({ ...a, tempo: tempoDe(t, a) })).filter(a => a.tempo);
@@ -1931,7 +1937,7 @@ document.addEventListener("click", async e => {
   if (act === "hor-turno") { S.horTurno = b.dataset.v; S.horPop = null; render(); return; }
   if (act === "hor-config") { S.horPop = null; dlgGrade(); return; }
   if (act === "hor-grade-salvar") {
-    const grade = { inicio: val2("gIni") || "07:00", duracao: Number(val2("gDur")), tempos: Number(val2("gTempos")), recreioApos: Number(val2("gRecApos")), recreio: Number(val2("gRec")), sabado: document.getElementById("gSab").checked };
+    const grade = { inicio: val2("gIni") || "07:00", duracao: Number(val2("gDur")), tempos: Number(val2("gTempos")), recreioApos: Number(val2("gRecApos")), recreio: Number(val2("gRec")), almocoApos: Number(val2("gAlmApos")), almoco: Number(val2("gAlm")), sabado: document.getElementById("gSab").checked };
     fechar();
     for (const t of turmasDoTurno(tn)) {
       const nt = JSON.parse(JSON.stringify(t)); nt.grade = grade;
@@ -1968,7 +1974,7 @@ document.addEventListener("click", async e => {
   switch (act) {
     case "fechar": fechar(); break;
     case "ir": if (id) irTurma(id, b.dataset.view); else location.hash = b.dataset.view; break;
-    case "nova-turma": dlgTurma(); setTimeout(() => abrirPopTurma(true), 30); break;
+    case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } setTimeout(() => abrirPopTurma(true), 30); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
       const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");

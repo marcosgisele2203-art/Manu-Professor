@@ -412,3 +412,4 @@ td .grade{border-radius:8px;min-height:36px}
 .seg button{border:0;background:none;padding:6px 14px;border-radius:9px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .seg{flex-wrap:wrap;max-width:100%}.seg button{white-space:nowrap}
+.grade-tempos tr.almoco th,.grade-tempos tr.almoco td{background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--ink)}
