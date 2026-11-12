@@ -349,14 +349,7 @@ td .grade{border-radius:8px;min-height:36px}
 .card-bim{padding:4px 9px;font-size:.8rem;flex:1;justify-content:center}
 #bimRows{display:flex;flex-direction:column;gap:12px}
 
-/* Horário */
-.hor-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;align-items:end}
-.hor-grade{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
-.hor-dia{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);min-height:110px}
-.hor-dia>b{font-size:.9rem}
-.hor-dia.hoje{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-.hor-aula{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 4px 4px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent-soft-ink);font-weight:600;font-size:.88rem}
-.hor-aula .btn{min-height:28px;padding:0 8px;color:var(--accent-soft-ink)}
+/* Horário: próxima aula e aulas de hoje */
 .faixa-hor{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none}
 .faixa-hor b{font-size:.95rem}.faixa-hor span{font-size:.88rem;color:var(--muted)}
 .faixa-hor.vazio{border-style:dashed}
@@ -365,8 +358,6 @@ td .grade{border-radius:8px;min-height:36px}
 .ag-item:hover{border-color:var(--accent)}
 .ag-item.feita{opacity:.6}.ag-item.agora{border-color:var(--accent);background:var(--accent-soft)}
 .ag-h{font-weight:700;min-width:104px}.ag-t{display:flex;flex-direction:column;flex:1;min-width:0}.ag-t small{color:var(--muted)}
-@media (max-width:1000px){.hor-grade{grid-template-columns:repeat(3,minmax(0,1fr))}.hor-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:560px){.hor-grade{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* Grade de tempos */
 .grade-tempos{table-layout:fixed;min-width:620px}
@@ -378,18 +369,7 @@ td .grade{border-radius:8px;min-height:36px}
 .cel:hover{border-color:var(--accent);color:var(--accent)}
 .cel .mais{font-size:1.2rem;opacity:.5}
 .cel.on{border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-ink)}
-.cel.ocupada{border-style:solid;background:var(--surface-2);color:var(--muted)}
 .grade-tempos tr.recreio th,.grade-tempos tr.recreio td{background:color-mix(in srgb,var(--mark) 45%,var(--surface));color:var(--mark-ink);font-weight:600;font-size:.85rem}
-.hor-simples{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:12px;align-items:end}
-@media (max-width:560px){.hor-simples{grid-template-columns:1fr}}
-.hor-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
-.hor-dia h3{margin:0 0 8px;font-size:16px;display:flex;gap:8px;align-items:center}
-.hor-dia.hoje{border-color:var(--primary,#5b4bdb)}
-.hor-dia ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.hor-dia li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line,#eee)}
-.hor-dia li:first-child{border-top:0}
-.hor-dia li button{margin-left:auto}
-.hor-dia .aviso{width:100%;color:#b45309}
 /* Meu horário */
 .cel.on{background:var(--surface);border:1.5px solid var(--line-strong);color:var(--ink);display:grid;gap:4px;padding:4px}
 .cel.choque{border-color:#d97706}
@@ -435,3 +415,4 @@ td .grade{border-radius:8px;min-height:36px}
 .esc-turma{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;font-size:.85rem;color:var(--ink);text-decoration:none;font-weight:600}
 .esc-turma small{color:var(--muted);font-weight:500}.esc-turma .swatch{width:10px;height:10px;border-radius:3px}
 .link-btn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:6px 0;text-decoration:underline}
+.suggest .btn{white-space:normal;text-align:left;height:auto;min-height:36px;padding-block:6px;max-width:100%}

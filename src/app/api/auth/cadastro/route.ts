@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const { nome, email, senha, escola } = r.data;
   if (await prisma.professor.findUnique({ where: { email } }))
     return NextResponse.json({ erro: "Já existe uma conta com este e-mail. Entre com sua senha." }, { status: 409 });
-  const p = await prisma.professor.create({ data: { nome, email, escola: escola || null, aceitouTermosEm: new Date(), senhaHash: await bcrypt.hash(senha, 10) } });
+  const p = await prisma.professor.create({ data: { nome, email, escola: escola || null, escolas: escola ? [escola] : [], aceitouTermosEm: new Date(), senhaHash: await bcrypt.hash(senha, 10) } });
   await criarSessao(p.id);
   return NextResponse.json({ ok: true });
 }

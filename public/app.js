@@ -371,8 +371,8 @@ function vResumoTurma() {
   const faixa = Br ? `<a class="faixa-bim" href="${linkTurma(t.id, "bimestres")}"><b>${esc(Br.nome)}</b><span>${fmtData(Br.inicio)} a ${fmtData(Br.fim)}${semAgora >= 0 ? ` · semana ${semAgora + 1} de ${semR.length}` : ""}</span>${Br.plano && semAgora >= 0 && Br.plano.semanas[semAgora] ? `<span>Esta semana: <b>${esc(Br.plano.semanas[semAgora].tema)}</b></span>` : `<span>${Br.plano ? "" : "Planeje este período com a IA"}</span>`}</a>`
     : bimestresDe(t).length ? "" : `<a class="faixa-bim vazio" href="${linkTurma(t.id, "bimestres")}"><b>Organize o ano em bimestres</b><span>Notas, frequência e planejamento por período</span></a>`;
   const px = proximaAula(t);
-  const linhaHor = px ? `<a class="faixa-hor" href="${"#horario"}">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
-    : `<a class="faixa-hor vazio" href="${"#horario"}"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
+  const linhaHor = px ? `<a class="faixa-hor" href="#horario">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
+    : `<a class="faixa-hor vazio" href="#horario"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
   return faixa + linhaHor + `<div class="atalhos">
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Chamada de hoje feita" : "Fazer chamada de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}"><b>Lançar notas</b><span>Médias e boletim da turma</span></a>
@@ -1945,18 +1945,10 @@ document.addEventListener("click", e => {
 
 /* ---------- Horário de aula da turma ---------- */
 const DIAS = ["", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-const DIAS_CURTO = ["", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const horarioDe = t => (t && Array.isArray(t.horario) ? t.horario : []).slice().sort((a, b) => a.dia - b.dia || a.inicio.localeCompare(b.inicio));
 const minutos = h => { const [a, b] = String(h).split(":").map(Number); return a * 60 + (b || 0); };
 const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 const diaSemana = iso => { const d = new Date(iso + "T12:00:00").getDay(); return d === 0 ? 7 : d; }; // 1 = segunda
-function conflitos(t) {
-  const out = [];
-  horarioDe(t).forEach(a => S.turmas.filter(o => o.id !== t.id).forEach(o => horarioDe(o).forEach(b => {
-    if (a.dia === b.dia && minutos(a.inicio) < minutos(b.fim) && minutos(b.inicio) < minutos(a.fim)) out.push(`${DIAS[a.dia]} ${a.inicio}–${a.fim} bate com ${o.nome} (${b.inicio}–${b.fim})`);
-  })));
-  return [...new Set(out)];
-}
 function aulasPrevistas(t, b) { // dias de aula previstos no período, pelo horário da turma
   const h = horarioDe(t); if (!h.length) return null;
   let n = 0; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) if (h.some(x => x.dia === diaSemana(d))) n++;

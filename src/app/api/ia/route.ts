@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { lerSessao } from "@/lib/auth";
+import { iaEmAndamento, iaComecou, iaTerminou } from "@/lib/limite";
 import { situacaoIA, registrarUso } from "@/lib/uso";
 import { promptMaterial, SUBTIPOS, ADAPTACOES } from "@/lib/materiais";
 
@@ -123,7 +124,12 @@ export async function POST(req: Request) {
     return Response.json({ erro: r.data.subtipo === "adaptar" ? "Cole a atividade que você quer adaptar." : "Escreva o tema da atividade." }, { status: 400 });
   const sit = await situacaoIA(pid);
   if (sit.bloqueado) return Response.json({ erro: "O uso da IA está suspenso na sua conta. Fale com o administrador." }, { status: 403 });
-  if (sit.restantes <= 0) return Response.json({ erro: `Você já usou os ${sit.limite} pedidos de IA deste mês. O limite renova no dia 1º.` }, { status: 429 });
+  // pedidos ainda em andamento também contam, senão vários ao mesmo tempo furariam o limite
+  if (sit.restantes - iaEmAndamento(pid) <= 0) return Response.json({ erro: `Você já usou os ${sit.limite} pedidos de IA deste mês. O limite renova no dia 1º.` }, { status: 429 });
+  if (iaEmAndamento(pid) >= 3) return Response.json({ erro: "Espere terminar os pedidos que já estão em andamento." }, { status: 429 });
+  iaComecou(pid);
+  let terminou = false;
+  const fim = () => { if (!terminou) { terminou = true; iaTerminou(pid); } };
   const { mensagens, json } = montar(r.data);
   const tipo = r.data.tipo;
   const registrar = (m: { usage?: { input_tokens?: number | null; output_tokens?: number | null } }) =>
@@ -142,31 +148,34 @@ export async function POST(req: Request) {
   // Pedidos que devolvem dados (plano, questões): espera a resposta inteira e devolve JSON.
   if (json) {
     try {
-      const msg = await stream.finalMessage();
+      const msg = await stream.finalMessage().finally(fim);
       await registrar(msg);
       if (msg.stop_reason === "refusal") return Response.json({ erro: "A IA não atendeu esse pedido. Tente reformular o tema." }, { status: 422 });
       const texto = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
       try { return Response.json({ dados: extrairJSON(texto) }); }
       catch { return Response.json({ erro: "A resposta veio num formato inesperado. Tente de novo." }, { status: 502 }); }
-    } catch (e) { const x = erroAPI(e); return Response.json({ erro: x.erro }, { status: x.status }); }
+    } catch (e) { fim(); if (req.signal.aborted) await registrarUso(pid, tipo, 0, 0); const x = erroAPI(e); return Response.json({ erro: x.erro }, { status: x.status }); }
   }
 
   // Texto corrido (atividade, chat): repassa o texto conforme é escrito.
   const enc = new TextEncoder();
   const corpo = new ReadableStream<Uint8Array>({
     async start(ctl) {
+      // depois que o professor para, o fluxo já está fechado: enviar ou fechar de novo não pode derrubar o servidor
+      const env = (t: string) => { try { ctl.enqueue(enc.encode(t)); } catch {} };
       try {
         for await (const ev of stream) {
-          if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") ctl.enqueue(enc.encode(ev.delta.text));
+          if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") env(ev.delta.text);
         }
-        const fim = await stream.finalMessage();
-        await registrar(fim);
-        if (fim.stop_reason === "refusal") ctl.enqueue(enc.encode("\n\n[A IA não atendeu esse pedido. Tente reformular.]"));
+        const ultima = await stream.finalMessage();
+        await registrar(ultima);
+        if (ultima.stop_reason === "refusal") env("\n\n[A IA não atendeu esse pedido. Tente reformular.]");
       } catch (e) {
-        ctl.enqueue(enc.encode("\n\n[" + erroAPI(e).erro + "]"));
-      } finally { ctl.close(); }
+        if (!req.signal.aborted) env("\n\n[" + erroAPI(e).erro + "]");
+      } finally { fim(); try { ctl.close(); } catch {} }
     },
-    cancel() { stream.abort(); },
+    // professor fechou ou parou: o pedido conta mesmo assim (a IA já começou a trabalhar)
+    cancel() { stream.abort(); registrarUso(pid, tipo, 0, 0); fim(); },
   });
   return new Response(corpo, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }
