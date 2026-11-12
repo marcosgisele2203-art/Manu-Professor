@@ -239,7 +239,7 @@ function vTurmas() {
     const fm = fr.length ? Math.round(fr.reduce((a, b) => a + b, 0) / fr.length) : null;
     return `<article class="card"><div class="card-top"><div style="display:flex;gap:10px;min-width:0"><span class="swatch" style="background:${esc(t.cor)}"></span><div style="min-width:0"><h3>${esc(t.nome)}</h3><p class="small muted">${esc(t.disciplina)} · ${esc(t.serie || "")}${t.turno ? " · " + esc(t.turno) : ""}</p></div></div>${t.exemplo ? '<span class="chip">exemplo</span>' : ""}</div>
       <div class="grid3" style="gap:8px"><div><span class="eyebrow">Alunos</span><div class="num" style="font-size:1.2rem">${al.length}</div></div><div><span class="eyebrow">Média</span><div class="num" style="font-size:1.2rem">${fmtNota(mm)}</div></div><div><span class="eyebrow">Freq.</span><div class="num" style="font-size:1.2rem">${fm === null ? "—" : fm + "%"}</div></div></div>
-      <div class="toolbar"><button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar e alunos</button><button class="btn sm ghost" data-act="ir" data-view="chamada" data-id="${esc(t.id)}">Chamada</button><button class="btn sm ghost" data-act="ir" data-view="notas" data-id="${esc(t.id)}">Notas</button></div></article>`;
+      <div class="toolbar"><button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar e alunos</button><button class="btn sm ghost" data-act="ir" data-view="chamada" data-id="${esc(t.id)}">Chamada</button><button class="btn sm ghost" data-act="ir" data-view="notas" data-id="${esc(t.id)}">Notas</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
 }
 
@@ -1086,35 +1086,72 @@ async function tokenGoogle() {
     cli.requestAccessToken();
   });
 }
-async function enviarDrive(nome, blob, tipo) {
+// Pastas no Drive do professor: Manu Professor / <turma> / <tipo>. Com a permissão drive.file,
+// o sistema só enxerga as pastas e arquivos que ele mesmo criou.
+const PASTA = "application/vnd.google-apps.folder", gPastas = {};
+async function gFetch(url, token, opt = {}) {
+  const r = await fetch(url, { ...opt, headers: { Authorization: "Bearer " + token, ...(opt.headers || {}) } });
+  if (r.status === 401) { gToken = null; throw new Error("auth"); }
+  if (!r.ok) throw new Error("drive " + r.status);
+  return r.json();
+}
+async function pastaDrive(nome, pai, token) {
+  const chave = (pai || "raiz") + "/" + nome;
+  if (gPastas[chave]) return gPastas[chave];
+  const q = `mimeType='${PASTA}' and name='${nome.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' and '${pai || "root"}' in parents and trashed=false`;
+  const lista = await gFetch("https://www.googleapis.com/drive/v3/files?fields=files(id)&pageSize=1&q=" + encodeURIComponent(q), token);
+  const id = lista.files?.[0]?.id || (await gFetch("https://www.googleapis.com/drive/v3/files?fields=id", token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: nome, mimeType: PASTA, ...(pai ? { parents: [pai] } : {}) }) })).id;
+  return gPastas[chave] = id;
+}
+const nomePastaTurma = t => t ? `${t.nome} · ${t.disciplina}`.replace(/[\\/]/g, "-") : "Sem turma";
+async function pastaDaTurma(turmaId, sub, token) {
+  const raiz = await pastaDrive("Manu Professor", null, token);
+  const pt = await pastaDrive(nomePastaTurma(turma(turmaId)), raiz, token);
+  return { turma: pt, sub: sub ? await pastaDrive(sub, pt, token) : pt };
+}
+async function enviarDrive(nome, blob, tipo, turmaId, sub) {
   const [origem, destino, app] = MIME[tipo];
   let token;
   try { token = await tokenGoogle(); } catch (_) { toast("A conexão com o Google foi cancelada ou bloqueada. Permita a janela do Google e tente de novo."); return; }
   toast("Enviando para o seu Google Drive…");
+  let pastas;
+  try { pastas = await pastaDaTurma(turmaId, sub, token); } catch (_) { toast("Não foi possível criar a pasta no seu Google Drive. Tente de novo."); return; }
   const b = "manu" + Date.now();
-  const corpo = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: nome, mimeType: destino })}\r\n--${b}\r\nContent-Type: ${origem}\r\n\r\n`, blob, `\r\n--${b}--`]);
+  const corpo = new Blob([`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: nome, mimeType: destino, parents: [pastas.sub] })}\r\n--${b}\r\nContent-Type: ${origem}\r\n\r\n`, blob, `\r\n--${b}--`]);
   const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + b }, body: corpo }).catch(() => null);
   if (!r || !r.ok) { if (r && r.status === 401) gToken = null; toast("O Google não aceitou o arquivo agora. Tente de novo."); return; }
   const j = await r.json();
-  abrirDlg("Salvo no seu Google Drive", `<p><b>${esc(nome)}</b> foi criado no seu Google Drive e já pode ser editado no ${app}.</p>`,
-    `<button type="button" class="btn" data-act="fechar">Fechar</button><a class="btn primary" href="${esc(j.webViewLink)}" target="_blank" rel="noopener">Abrir no ${app}</a>`);
+  abrirDlg("Salvo no seu Google Drive", `<p><b>${esc(nome)}</b> foi salvo na pasta <b>Manu Professor / ${esc(nomePastaTurma(turma(turmaId)))}${sub ? " / " + esc(sub) : ""}</b> do seu Google Drive e já pode ser editado no ${app}.</p>`,
+    `<button type="button" class="btn" data-act="fechar">Fechar</button><a class="btn" href="https://drive.google.com/drive/folders/${esc(pastas.sub)}" target="_blank" rel="noopener">Abrir a pasta</a><a class="btn primary" href="${esc(j.webViewLink)}" target="_blank" rel="noopener">Abrir no ${app}</a>`);
 }
 
 async function exportar(alvo, formato, el) {
   if (el) el.disabled = true;
   try {
-    let nome, blob, tipo;
-    if (alvo.plano) { const p = alvo.plano; nome = p.titulo; tipo = "docx"; blob = await htmlParaDocx(corpoPlano(p)); }
-    else if (alvo.material) { const m = alvo.material; nome = m.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; blob = await htmlParaDocx(materialCorpo(m, !!alvo.gab), estiloFolha(m)); }
-    else if (alvo.prova) { const p = alvo.prova; nome = p.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; blob = await htmlParaDocx(provaDoc(p, !!alvo.gab)); }
-    else if (alvo.slides) { const d = alvo.slides; nome = d.titulo; tipo = "pptx"; await carregarPptx(); blob = await montarPptx(d).write({ outputType: "blob" }); }
-    else if (alvo.turma) { const t = alvo.turma; nome = "Boletim " + t.nome; tipo = "xlsx"; blob = await boletimXlsx(t); }
-    if (formato === "drive") await enviarDrive(nome, blob, tipo);
+    let nome, blob, tipo, turmaId = "", sub = "";
+    if (alvo.plano) { const p = alvo.plano; nome = p.titulo; tipo = "docx"; turmaId = p.turmaId; sub = "Planos de aula"; blob = await htmlParaDocx(corpoPlano(p)); }
+    else if (alvo.material) { const m = alvo.material; nome = m.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; turmaId = m.turmaId; sub = "Materiais"; blob = await htmlParaDocx(materialCorpo(m, !!alvo.gab), estiloFolha(m)); }
+    else if (alvo.prova) { const p = alvo.prova; nome = p.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; turmaId = p.turmaId; sub = "Provas"; blob = await htmlParaDocx(provaDoc(p, !!alvo.gab)); }
+    else if (alvo.slides) { const d = alvo.slides; nome = d.titulo; tipo = "pptx"; turmaId = S.planos.find(x => x.id === d.planoId)?.turmaId || ""; sub = "Slides"; await carregarPptx(); blob = await montarPptx(d).write({ outputType: "blob" }); }
+    else if (alvo.turma) { const t = alvo.turma; nome = "Boletim " + t.nome + " - " + new Date().toLocaleDateString("pt-BR"); tipo = "xlsx"; turmaId = t.id; sub = "Boletins"; blob = await boletimXlsx(t); }
+    if (formato === "drive") await enviarDrive(nome, blob, tipo, turmaId, sub);
     else baixarBlob(slug(nome) + "." + tipo, blob);
   } catch (e) { console.error(e); toast("Não foi possível gerar o arquivo. Tente de novo."); }
   if (el) el.disabled = false;
 }
 const botoesExport = (dados, extra = "") => `<button type="button" class="btn" data-act="exp" data-fmt="arquivo" ${dados}${extra}>${ico("dl")}Word</button>${S.googleClientId ? `<button type="button" class="btn" data-act="exp" data-fmt="drive" ${dados}${extra}>${ico("drive")}Google Docs</button>` : ""}`;
+document.addEventListener("click", async e => {
+  const bp = e.target.closest("[data-act='drive-pasta']"); if (!bp) return;
+  bp.disabled = true;
+  try {
+    const token = await tokenGoogle();
+    const pastas = await pastaDaTurma(bp.dataset.id, "", token);
+    for (const sub of ["Planos de aula", "Materiais", "Provas", "Slides", "Boletins"]) await pastaDrive(sub, pastas.turma, token);
+    abrirDlg("Pasta da turma no Google Drive", `<p>A pasta <b>Manu Professor / ${esc(nomePastaTurma(turma(bp.dataset.id)))}</b> está pronta no seu Google Drive, com as subpastas Planos de aula, Materiais, Provas, Slides e Boletins. Tudo o que você salvar no Drive desta turma vai para lá.</p>`,
+      `<button type="button" class="btn" data-act="fechar">Fechar</button><a class="btn primary" href="https://drive.google.com/drive/folders/${esc(pastas.turma)}" target="_blank" rel="noopener">Abrir a pasta</a>`);
+  } catch (_) { toast("Não foi possível acessar o seu Google Drive. Permita a janela do Google e tente de novo."); }
+  bp.disabled = false;
+});
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act='exp']"); if (!b) return;
   const d = b.dataset, gab = d.gab === "1";
