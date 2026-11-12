@@ -1076,7 +1076,7 @@ document.addEventListener("click", e => {
     dlg._tn.nome = b.dataset.nome; if (!(dlg._tn.letras || []).length) dlg._tn.letras = ["A"];
     const se = dlg.querySelector("#tSerie"); se.value = b.dataset.serie;
     dlg.querySelector("#tDiscLista").innerHTML = [...new Set([...(S.disciplinas || []), ...componentesPara(b.dataset.etapa)])].map(c => `<option value="${esc(c)}">`).join("");
-    const disc = dlg.querySelector("#tDisc"); if (b.dataset.etapa === "ei" && !disc.value) disc.value = "Polivalente (todos os campos)";
+    const disc = dlg.querySelector("#tDisc"); if (b.dataset.etapa === "ei" && disc.tagName === "INPUT" && !disc.value) disc.value = "Polivalente (todos os campos)";
     compoeNomeTurma();
   } else if (b.dataset.act === "tn-letra") {
     const v = b.dataset.v, editando = S.turmas.some(x => x.id === dlg._obj?.id);
@@ -1140,12 +1140,13 @@ function dlgTurma(t) {
   abrirDlg(t.nome ? "Editar turma" : "Nova turma", `
     <div class="grid2"><div class="field tn-campo"><label for="tNome">Nome da turma</label><input class="input" id="tNome" required value="${esc(t.nome)}" placeholder="Escolha a série e a turma" autocomplete="off" aria-haspopup="listbox" aria-expanded="false" aria-controls="tnPop">
 </div>
-    <div class="field"><label for="tDisc">Disciplina</label><input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa" list="tDiscLista" autocomplete="off"><datalist id="tDiscLista">${[...new Set([...(S.disciplinas || []), ...componentesPara(etapaDaSerie(t.serie))])].map(c => `<option value="${esc(c)}">`).join("")}</datalist></div></div>
+    <div class="field"><label for="tDisc">Disciplina</label>${(S.disciplinas || []).length
+      ? `<select class="input" id="tDisc" required>${(t.disciplina && !S.disciplinas.includes(t.disciplina) ? [t.disciplina, ...S.disciplinas] : S.disciplinas).map(d => `<option ${t.disciplina === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select><small class="muted">Só as disciplinas do <a href="#perfil" data-act="fechar">Meu perfil</a>. Para outra, acrescente lá.</small><datalist id="tDiscLista" hidden>`
+      : `<input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa" list="tDiscLista" autocomplete="off"><datalist id="tDiscLista">`}${[...new Set([...(S.disciplinas || []), ...componentesPara(etapaDaSerie(t.serie))])].map(c => `<option value="${esc(c)}">`).join("")}</datalist></div></div>
 <div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma"><div id="tnSeries">${gruposSeries(false)}</div>
         <div class="tn-grupo"><b>Turma <span class="tn-dica">${S.turmas.some(x => x.id === t.id) ? "" : "· marque várias para criar todas de uma vez"}</span></b><div class="tn-ops">${["A", "B", "C", "D", "E", "F", "G", "Única"].map(l => `<button type="button" class="tn-op tn-letra" data-act="tn-letra" data-v="${l}">${l}</button>`).join("")}</div></div>
         <div class="tn-fim"><span class="small muted">Ou digite o nome que quiser.</span><button type="button" class="btn sm primary" data-act="tn-ok">Pronto</button></div></div>
     ${campoEscola(escolaDe(t))}
-    ${(S.disciplinas || []).length ? `<div class="field"><span class="small muted">Suas disciplinas</span><div class="chips-esc">${S.disciplinas.map(d => `<button type="button" class="tn-op" data-act="t-disc" data-v="${esc(d)}" aria-pressed="${t.disciplina === d}">${esc(d)}</button>`).join("")}</div></div>` : ""}
     <div class="grid3"><div class="field"><label for="tSerie">Série / etapa</label><input class="input" id="tSerie" value="${esc(t.serie)}" placeholder="7º ano EF"></div>
     <div class="field"><label for="tAno">Ano letivo</label><input class="input" id="tAno" value="${esc(t.ano)}"></div>
     <div class="field"><label for="tTurno">Turno</label><select class="input" id="tTurno">${[...TURNOS, ...(t.turno && !TURNOS.includes(t.turno) ? [t.turno] : [])].map(x => `<option ${t.turno === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div>
