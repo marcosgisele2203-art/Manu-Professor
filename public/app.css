@@ -600,3 +600,8 @@ a.per{text-decoration:none;color:inherit}
 .pe-sugtec span{display:grid;gap:2px}
 .pe-tecs{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:10px 0;background:var(--surface)}
 .pe-tecs ul{margin:6px 0 0;padding-left:18px;display:grid;gap:6px}
+/* plano de aulas no formato do Tagnos */
+.pe-escolher{background:var(--accent-soft);color:var(--accent-soft-ink);border-radius:10px;padding:8px 12px;margin:6px 0 8px}
+.pe-escolher p{margin:4px 0}
+.pe-colar{border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
+.pe-colar p{margin:4px 0 0}

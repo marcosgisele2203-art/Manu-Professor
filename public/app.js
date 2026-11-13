@@ -2560,7 +2560,7 @@ document.addEventListener("click", async e => {
   if (depois) depois(); else { fechar(); render(); }
 });
 
-// modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano diário
+// modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano por aula no Tagnos
 const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
 // a habilidade é do componente da turma? (Matemática x Matemática - RA)
 const habDaTurma = (h, t) => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
@@ -2572,7 +2572,7 @@ function dlgPlanoEscola(num) {
   const marca = h => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
   const tot = unidadesDoBim(t, b, "semanal").reduce((a, u) => a + u.aulas, 0);
   abrirDlg(`Planejamento para a escola · ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)} · ${fmtData(b.inicio)} a ${fmtData(b.fim)} · <b>${tot} aulas</b> pelo seu horário e pelo calendário${horarioDe(t).length ? "" : ` <span class="chip warn">cadastre o horário desta turma em Meu horário para contar as aulas certo</span>`}</p>
-    <div class="field"><span class="small muted">Rede da escola</span><div class="chips-esc">${[["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (plano diário)"]].map(([v, n]) => `<label class="check"><input type="radio" name="peMod" value="${v}" ${m0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
+    <div class="field"><span class="small muted">Rede da escola</span><div class="chips-esc">${[["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (Tagnos, por aula)"]].map(([v, n]) => `<label class="check"><input type="radio" name="peMod" value="${v}" ${m0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
     <div class="field" id="peFmtBox" ${m0 === "municipal" ? "hidden" : ""}><span class="small muted">Como a escola pede o planejamento?</span><div class="chips-esc">${[["diario", "Por aula (diário)"], ["semanal", "Semanal"], ["quinzenal", "Quinzenal"]].map(([v, n]) => `<label class="check"><input type="radio" name="peFmt" value="${v}" ${f0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
     <div class="field"><span class="small muted">Habilidades deste planejamento ${hs.length ? "" : "(nenhuma no bimestre: a Manu escolhe as da série)"}</span>${hs.length ? `<div class="pe-habs">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="peHab" value="${i}" ${marca(h) ? "checked" : ""}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}</span></label>`).join("")}</div>` : ""}</div>
     <div class="field"><span class="small muted">Instrumentos avaliativos</span><div class="chips-esc">${INSTRUMENTOS.map(x => `<label class="check"><input type="checkbox" name="peIns" value="${esc(x)}" ${ins0.includes(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div></div>
@@ -2608,7 +2608,7 @@ async function iaPlanoEscola() {
     const txt = (x, n) => String(x || "").slice(0, n);
     const tecnologias = (sugerirTec && Array.isArray(r.tecnologias) ? r.tecnologias : []).slice(0, 6).map(x => ({ nome: txt(x?.nome, 80), onde: txt(x?.onde, 200), porque: txt(x?.porque, 300) })).filter(x => x.nome);
     await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs, sugerirTec, tecnologias,
-      acoesIntro: txt(r.acoesIntro, 3000), unidades: r.unidades.slice(0, 70).map((u, i) => ({ rotulo: txt(u.rotulo || unidades[i]?.rotulo, 120), data: unidades[i]?.data || "", aulas: unidades[i]?.aulas || 1, habilidades: (Array.isArray(u.habilidades) ? u.habilidades : []).map(String).slice(0, 12), objetos: txt(u.objetos, 600),
+      acoesIntro: txt(r.acoesIntro, 3000), unidades: r.unidades.slice(0, 70).map((u, i) => ({ rotulo: txt(u.rotulo || unidades[i]?.rotulo, 120), data: unidades[i]?.data || "", aulas: unidades[i]?.aulas || 1, habilidades: (Array.isArray(u.habilidades) ? u.habilidades : []).map(String).slice(0, 12), objetos: txt(u.objetos, 600), unidadeTematica: txt(u.unidadeTematica, 120),
         objetivos: txt(u.objetivos, 1200), desenvolvimento: txt(u.desenvolvimento, 4000), recursos: txt(u.recursos, 600), avaliacao: txt(u.avaliacao, 800) })),
       recuperar: txt(r.recuperar, 4000), criterios: txt(r.criterios, 3000), observacoes: txt(r.observacoes, 1500) }; });
     st.textContent = "Pronto."; fechar(); toast(`Planejamento ${formato === "diario" ? "por aula" : formato} do ${b.nome} pronto`);
@@ -2623,9 +2623,12 @@ function textosPlanoEscola(pe) {
     recuperar: pe.recuperar || "", criterios: [(pe.instrumentos || []).join("\n"), pe.criterios].filter(Boolean).join("\n"), observacoes: pe.observacoes || "", nomeU,
   };
 }
+// campos do plano de aulas do Tagnos, na ordem das colunas de lá
+const CAMPOS_TAGNOS = [["unidadeTematica", "Unidade Temática"], ["objetos", "Conteúdo (Objeto de Conhecimento)"], ["habilidades", "Habilidades"], ["desenvolvimento", "Ação didática (Metodologia)"], ["avaliacao", "Avaliação"], ["recursos", "Recursos"]];
+const valorCampo = (u, k) => k === "habilidades" ? (u.habilidades || []).join(", ") : String(u[k] || "");
 function textoAula(u) {
-  return [u.rotulo, (u.habilidades || []).length ? "Habilidades: " + u.habilidades.join(", ") : "", u.objetos ? "Objeto de conhecimento: " + u.objetos : "", u.objetivos ? "Objetivos: " + u.objetivos : "",
-    u.desenvolvimento ? "Desenvolvimento: " + u.desenvolvimento : "", u.recursos ? "Recursos: " + u.recursos : "", u.avaliacao ? "Avaliação: " + u.avaliacao : ""].filter(Boolean).join("\n");
+  // "objetivos" só existe em planejamentos gerados antes do formato do Tagnos
+  return [u.rotulo, u.objetivos ? "Objetivos: " + u.objetivos : "", ...CAMPOS_TAGNOS.map(([k, n]) => valorCampo(u, k) ? `${n}: ${valorCampo(u, k)}` : "")].filter(Boolean).join("\n");
 }
 // tecnologias que a Manu escolheu quando o professor pediu sugestão
 const blocoTecPE = pe => (pe.tecnologias || []).length ? `<div class="pe-tecs"><b>${ico("spark")}Tecnologias que a Manu escolheu</b><ul>${pe.tecnologias.map(x => `<li><b>${esc(x.nome)}</b>${x.onde ? ` · <span class="muted">${esc(x.onde)}</span>` : ""}${x.porque ? `<br><span class="small">${esc(x.porque)}</span>` : ""}</li>`).join("")}</ul></div>` : "";
@@ -2633,11 +2636,13 @@ function painelPlanoEscola(b) {
   const pe = b.planoEscola; if (!pe) return "";
   if (pe.modelo === "municipal") {
     const t = turmaAtual(), criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === b.num).map(p => p.data));
-    return `<details class="bim-det pe-painel" open><summary><b>Planejamento diário (rede municipal)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+    return `<details class="bim-det pe-painel" open><summary><b>Plano de aulas (Tagnos)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
       <div class="pe-corpo"><div class="toolbar"><button class="btn sm" data-act="pe-copiar-tudo" data-num="${b.num}">Copiar tudo</button><button class="btn sm primary" data-act="pe-planos" data-num="${b.num}" ${(pe.unidades || []).every(u => !u.data || criados.has(u.data)) ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula no Planejamento"}</button><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div>${blocoTecPE(pe)}
-      <div class="pe-aulas">${(pe.unidades || []).map((u, i) => `<article class="pe-aula"><div class="pe-campo-h"><b>${esc(u.rotulo)}${u.aulas > 1 ? ` · ${u.aulas} aulas` : ""}</b><button type="button" class="btn sm" data-act="pe-copiar-aula" data-num="${b.num}" data-i="${i}">Copiar</button></div>
-        ${(u.habilidades || []).length ? `<div class="tec-tags">${u.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
-        ${[["Objeto de conhecimento", u.objetos], ["Objetivos", u.objetivos], ["Desenvolvimento", u.desenvolvimento], ["Recursos", u.recursos], ["Avaliação", u.avaliacao]].filter(x => x[1]).map(([k, v]) => `<p class="small"><b>${k}:</b> ${esc(v)}</p>`).join("")}</article>`).join("")}</div></div></details>`;
+      <p class="small muted">No Tagnos, <b>Unidade Temática</b>, <b>Conteúdo</b> e <b>Habilidades</b> são escolhidos na lista; os outros campos você copia e cola. Quando o dia tem mais de uma aula, use o mesmo texto em cada uma.</p>
+      <div class="pe-aulas">${(pe.unidades || []).map((u, i) => `<article class="pe-aula"><div class="pe-campo-h"><b>${esc(u.rotulo)}${u.aulas > 1 ? ` · ${u.aulas} aulas` : ""}</b><button type="button" class="btn sm ghost" data-act="pe-copiar-aula" data-num="${b.num}" data-i="${i}">Copiar tudo da aula</button></div>
+        <div class="pe-escolher"><span class="small muted">Escolha no Tagnos</span>${CAMPOS_TAGNOS.slice(0, 3).filter(([k]) => valorCampo(u, k)).map(([k, n]) => `<p class="small"><b>${n}:</b> ${k === "habilidades" ? u.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join(" ") : esc(valorCampo(u, k))}</p>`).join("")}</div>
+        ${u.objetivos ? `<p class="small"><b>Objetivos:</b> ${esc(u.objetivos)}</p>` : ""}
+        ${CAMPOS_TAGNOS.slice(3).filter(([k]) => valorCampo(u, k)).map(([k, n]) => `<div class="pe-colar"><div class="pe-campo-h"><b class="small">${n}</b><button type="button" class="btn sm" data-act="pe-copiar-campo" data-num="${b.num}" data-i="${i}" data-k="${k}">Copiar</button></div><p class="small">${esc(valorCampo(u, k))}</p></div>`).join("")}</article>`).join("")}</div></div></details>`;
   }
   const tx = textosPlanoEscola(pe), F = { diario: "por aula", semanal: "semanal", quinzenal: "quinzenal" }[pe.formato];
   const campo = (k, tit) => `<div class="pe-campo"><div class="pe-campo-h"><b>${tit}</b><button type="button" class="btn sm" data-act="pe-copiar" data-campo="${k}" data-num="${b.num}">Copiar</button></div><textarea class="input pe-txt" data-campo="${k}" data-num="${b.num}" rows="${k === "acoes" ? 12 : 5}">${esc(pe.editado?.[k] ?? tx[k])}</textarea></div>`;
@@ -2720,6 +2725,11 @@ document.addEventListener("click", async e => {
   // sem a lista do perfil (aberto sem internet) não oferece a entrevista: um "Agora não" apagaria as respostas que já existem
   if (act === "bim-pe") return meuEstilo() || S.perfilIncerto ? dlgPlanoEscola(num) : dlgEntrevista(() => dlgPlanoEscola(num));
   if (act === "ia-planoescola") return iaPlanoEscola();
+  if (act === "pe-copiar-campo") {
+    const u = (bimPorNum(t, num)?.planoEscola?.unidades || [])[Number(b.dataset.i)] || {}, k = b.dataset.k, n = (CAMPOS_TAGNOS.find(x => x[0] === k) || [])[1] || "";
+    try { await navigator.clipboard.writeText(valorCampo(u, k)); toast(`${n} copiado. Agora cole no Tagnos (Ctrl+V).`); } catch (_) { toast("Não consegui copiar automaticamente neste aparelho."); }
+    return;
+  }
   if (act === "pe-copiar-aula" || act === "pe-copiar-tudo") {
     const pe = bimPorNum(t, num)?.planoEscola, us = pe?.unidades || [], txt = act === "pe-copiar-tudo" ? us.map(textoAula).join("\n\n") : textoAula(us[Number(b.dataset.i)] || {});
     try { await navigator.clipboard.writeText(txt); toast("Copiado. Agora cole no planejamento da escola (Ctrl+V)."); } catch (_) { toast("Não consegui copiar automaticamente neste aparelho."); }
