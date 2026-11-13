@@ -21,18 +21,22 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const semana = new Date(Date.now() - 7 * 864e5);
   const [profs, usoMes, usoTotal, porTipo, turmas, novos] = await Promise.all([
     prisma.professor.findMany({ orderBy: { criadoEm: "desc" }, select: { id: true, nome: true, email: true, escola: true, escolas: true, trocarSenha: true, criadoEm: true, limiteIA: true, bloqueado: true } }),
-    prisma.usoIA.groupBy({ by: ["professorId"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
-    prisma.usoIA.aggregate({ _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
+    // por função também, porque cada função pode usar um modelo com preço diferente
+    prisma.usoIA.groupBy({ by: ["professorId", "tipo"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
+    prisma.usoIA.groupBy({ by: ["tipo"], _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
     prisma.usoIA.groupBy({ by: ["tipo"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
     prisma.registro.groupBy({ by: ["professorId"], where: { colecao: "turmas" }, _count: true }),
     prisma.professor.count({ where: { criadoEm: { gte: semana } } }),
   ]);
   const bk = await listarBackupsDrive().catch((e) => ({ erro: "Não foi possível ver o Drive: " + (e instanceof Error ? e.message : ""), arquivos: [], email: undefined }));
-  const uso = new Map(usoMes.map((u) => [u.professorId, u]));
+  const custoDe = (u: { tipo: string; _sum: { tokensEntrada: number | null; tokensSaida: number | null } }) => custoUSD(u._sum.tokensEntrada ?? 0, u._sum.tokensSaida ?? 0, u.tipo);
+  const uso = new Map<string, { _count: number; custo: number }>();
+  for (const u of usoMes) { const a = uso.get(u.professorId) ?? { _count: 0, custo: 0 }; uso.set(u.professorId, { _count: a._count + u._count, custo: a.custo + custoDe(u) }); }
   const nTurmas = new Map(turmas.map((t) => [t.professorId, t._count]));
   const usosMes = usoMes.reduce((s, u) => s + u._count, 0);
-  const custoMes = usoMes.reduce((s, u) => s + custoUSD(u._sum.tokensEntrada ?? 0, u._sum.tokensSaida ?? 0), 0);
-  const custoTotal = custoUSD(usoTotal._sum.tokensEntrada ?? 0, usoTotal._sum.tokensSaida ?? 0);
+  const custoMes = usoMes.reduce((s, u) => s + custoDe(u), 0);
+  const custoTotal = usoTotal.reduce((s, u) => s + custoDe(u), 0);
+  const pedidosTotal = usoTotal.reduce((s, u) => s + u._count, 0);
   const padrao = limitePadrao();
   const mesNome = mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
@@ -48,14 +52,14 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <div className="stat"><span className="eyebrow">Professores</span><span className="v">{profs.length}</span><span className="small muted">{novos} novos nos últimos 7 dias</span></div>
         <div className="stat"><span className="eyebrow">Pedidos de IA no mês</span><span className="v">{usosMes}</span><span className="small muted">limite padrão: {padrao} por professor</span></div>
         <div className="stat"><span className="eyebrow">Custo estimado no mês</span><span className="v">{usd(custoMes)}</span><span className="small muted">média {usd(usosMes ? custoMes / usosMes : 0)} por pedido</span></div>
-        <div className="stat"><span className="eyebrow">Custo estimado total</span><span className="v">{usd(custoTotal)}</span><span className="small muted">{usoTotal._count} {usoTotal._count === 1 ? "pedido" : "pedidos"} desde o início</span></div>
+        <div className="stat"><span className="eyebrow">Custo estimado total</span><span className="v">{usd(custoTotal)}</span><span className="small muted">{pedidosTotal} {pedidosTotal === 1 ? "pedido" : "pedidos"} desde o início</span></div>
       </div>
       <Backup arquivos={bk.arquivos} email={"email" in bk ? bk.email : undefined} erro={"erro" in bk ? bk.erro : undefined} />
       <section className="panel">
         <h2>Uso da IA por função neste mês</h2>
         {porTipo.length ? <div className="list">{porTipo.sort((a, b) => b._count - a._count).map((t) => (
           <div className="row" key={t.tipo}><div className="grow"><div className="title">{NOMES[t.tipo] || t.tipo}</div></div>
-            <span className="num">{t._count} {t._count === 1 ? "pedido" : "pedidos"}</span><span className="chip num">{usd(custoUSD(t._sum.tokensEntrada ?? 0, t._sum.tokensSaida ?? 0))}</span></div>))}</div>
+            <span className="num">{t._count} {t._count === 1 ? "pedido" : "pedidos"}</span><span className="chip num">{usd(custoDe(t))}</span></div>))}</div>
           : <p className="muted">Nenhum pedido de IA neste mês ainda.</p>}
       </section>
       <section className="panel">
@@ -69,7 +73,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               <td className="num">{data(p.criadoEm)}</td>
               <td className="c num">{nTurmas.get(p.id) ?? 0}</td>
               <td className="c num"><span className={"chip " + (usados >= lim ? "bad" : usados >= lim * 0.8 ? "warn" : "")}>{usados} de {lim}</span></td>
-              <td className="c num">{usd(custoUSD(u?._sum.tokensEntrada ?? 0, u?._sum.tokensSaida ?? 0))}</td>
+              <td className="c num">{usd(u?.custo ?? 0)}</td>
               <td><form action="/api/admin/professor" method="post" className="toolbar" style={{ flexWrap: "nowrap" }}>
                 <input type="hidden" name="id" value={p.id} /><input type="hidden" name="acao" value="limite" />
                 <input className="input" name="limite" type="number" min={0} max={10000} defaultValue={p.limiteIA ?? ""} placeholder={String(padrao)} aria-label={"Limite mensal de " + p.nome} style={{ width: 90, minHeight: 36, padding: "4px 8px" }} />

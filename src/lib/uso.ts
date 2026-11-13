@@ -1,8 +1,19 @@
 import { prisma } from "@/lib/db";
 
-// Preço do modelo usado (US$ por milhão de tokens). Usado só para estimar o custo no painel.
-export const PRECO = { entrada: 4, saida: 20 };
-export const custoUSD = (entrada: number, saida: number) => (entrada * PRECO.entrada + saida * PRECO.saida) / 1_000_000;
+// Modelo de IA por função: Opus em todo conteúdo criativo; as instruções de atividade são texto curto e simples, então vão para um modelo mais barato
+export const PRECOS = {
+  "claude-opus-5-5": { entrada: 4, saida: 20 },
+  "claude-sonnet-5-5": { entrada: 2, saida: 10 },
+} as const; // US$ por milhão de tokens, só para estimar o custo no painel
+export type Modelo = keyof typeof PRECOS;
+const MODELO_PADRAO: Modelo = "claude-opus-5-5";
+const MODELO_POR_TIPO: Partial<Record<string, Modelo>> = { atividade: "claude-sonnet-5-5" };
+export const modeloDe = (tipo: string): Modelo => MODELO_POR_TIPO[tipo] ?? MODELO_PADRAO;
+// Estimativa: pedidos antigos de atividade (feitos com Opus) aparecem pelo preço do modelo atual
+export const custoUSD = (entrada: number, saida: number, tipo: string) => {
+  const p = PRECOS[modeloDe(tipo)];
+  return (entrada * p.entrada + saida * p.saida) / 1_000_000;
+};
 
 export const limitePadrao = () => {
   const n = Number(process.env.LIMITE_IA_MENSAL);

@@ -76,7 +76,7 @@ Para criar uma função de IA nova:
 5. No navegador, use `comIA(async (signal, st) => { const r = await iaJSON({ tipo: ... }, signal); ... })`. Ela já mostra o status, o botão Parar e atualiza o contador de uso. Os botões de IA do diálogo têm `data-act="ia-..."`, e o status fica em `#iaStatus`.
 6. O resultado da IA é sempre uma sugestão: mostre para o professor conferir antes de salvar.
 
-O modelo e o cálculo de custo estão em `MODELO` (`api/ia/route.ts`) e `PRECO` (`src/lib/uso.ts`).
+O modelo de cada função e o cálculo de custo ficam em `src/lib/uso.ts` (`modeloDe()` e `PRECOS`): Opus em todo conteúdo criativo; só as instruções de atividade usam um modelo mais barato. Ao trocar ou incluir um modelo, atualize os dois.
 
 ### Padrões do `public/app.js`
 - O estado global fica em `S`. As telas são funções `vNome()` que devolvem HTML em string, e `render()` redesenha.
