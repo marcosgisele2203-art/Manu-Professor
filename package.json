@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate deploy",
+    "db:migrar": "prisma migrate deploy",
+    "db:nova-migracao": "prisma migrate dev --name",
     "postinstall": "prisma generate",
     "verificar": "prisma generate && tsc --noEmit && node --check public/app.js && node --check public/sw.js && next build"
   },

@@ -8,6 +8,16 @@ on:
 jobs:
   verificar:
     runs-on: ubuntu-latest
+    services:
+      # banco descartável só para conferir se as migrações batem com o schema
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: sombra
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,6 +26,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      - name: Migrações em dia com o schema
+        run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url postgresql://ci:ci@localhost:5432/sombra --exit-code
       - name: Tipos (TypeScript)
         run: npx tsc --noEmit
       - name: Sintaxe dos scripts do navegador

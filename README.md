@@ -27,7 +27,7 @@ Cada professor cria a própria conta (e-mail e senha, ou "Continuar com Google")
    ANTHROPIC_API_KEY=<sua chave em console.anthropic.com>
    ```
 5. Na aba **Domains**, aponte seu domínio para a **porta 3000** (o EasyPanel gera o HTTPS).
-6. Clique em **Deploy**. Na primeira subida o app cria as tabelas sozinho (`prisma db push`).
+6. Clique em **Deploy**. Na primeira subida o app cria as tabelas sozinho, aplicando as migrações de `prisma/migrations` (`prisma/migrar.sh`).
 7. Ative **Auto Deploy** para publicar a cada push no GitHub.
 
 Verificação: `https://seu-dominio/api/saude` deve responder `{"ok":true}`.
@@ -45,7 +45,7 @@ Todo dia às 3h (Brasília), e 10 minutos depois de cada implantação, o sistem
 ```bash
 cp .env.example .env   # preencha DATABASE_URL e AUTH_SECRET
 npm install
-npx prisma db push
+npm run db:migrar
 npm run dev
 ```
 
@@ -61,4 +61,4 @@ npm run dev
 - `src/lib/backup.ts` backup diário (agendado em `src/instrumentation.ts`)
 - `public/app.js` e `public/app.css` a interface principal (cores e fonte do design system da Manu)
 - `public/manu/` as artes da Manu
-- `prisma/schema.prisma` o banco
+- `prisma/schema.prisma` o banco; `prisma/migrations` as mudanças do banco, aplicadas em ordem a cada deploy

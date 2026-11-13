@@ -25,8 +25,8 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
 COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
-# Prisma CLI completo (com dependências) só para criar/atualizar as tabelas ao subir
+# Prisma CLI completo (com dependências) só para aplicar as migrações do banco ao subir
 RUN npm install -g prisma@6.19.3 && npm cache clean --force
 EXPOSE 3000
-# Cria/atualiza as tabelas no Postgres e sobe o servidor
-CMD ["sh", "-c", "prisma db push --skip-generate --schema prisma/schema.prisma && node server.js"]
+# Aplica as migrações (prisma/migrations) e sobe o servidor; se as migrações falharem, o servidor não sobe
+CMD ["sh", "-c", "sh prisma/migrar.sh && node server.js"]
