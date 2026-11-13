@@ -544,3 +544,8 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .pe-campo{display:grid;gap:6px}.pe-campo-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .pe-aulas{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
 .pe-aula{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:6px;background:var(--surface)}.pe-aula p{margin:0}
+.sgde-print{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}.sgde-print p{margin:0}
+.sgde-ou{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:6px 0}.sgde-ou::before,.sgde-ou::after{content:"";flex:1;border-top:1px solid var(--line)}
+.sgde-lidas{margin:6px 0 0;padding-left:18px;display:grid;gap:3px;max-height:30vh;overflow:auto}
+.hab-form{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.hab-form .field{margin:0}.hab-form label{font-size:.78rem}.hab-form .btn{justify-self:start}

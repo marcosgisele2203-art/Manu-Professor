@@ -2368,9 +2368,13 @@ function bimExtras(b) {
   const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
   const aberto = S.bimAberto[chave] ?? (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim));
   return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b>Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia</span></summary><div class="bim-extras">
-    <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><div class="toolbar"><button class="btn sm" data-act="bim-hab-colar" data-num="${b.num}">Colar do SGDE</button><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div></div>
-      ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}${h.objeto ? `<small class="hab-obj">Objeto: ${esc(h.objeto)}</small>` : ""}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
-      <form class="perfil-add" data-form="bim-hab" data-num="${b.num}"><input class="input" name="hab" placeholder="Ex.: EF07MA01 – Resolver problemas com números naturais" maxlength="400" aria-label="Nova habilidade"><button class="btn sm" type="submit">${ico("plus")}Adicionar</button></form></div>
+    <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><div class="toolbar"><button class="btn sm" data-act="bim-hab-colar" data-num="${b.num}">Importar habilidades</button><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div></div>
+      ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}${h.objeto ? `<small class="hab-obj"><b>Objeto de conhecimento:</b> ${esc(h.objeto)}</small>` : ""}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
+      <form class="hab-form" data-form="bim-hab" data-num="${b.num}">
+        <div class="field"><label>Código da habilidade</label><input class="input" name="habCod" placeholder="Ex.: EF07MA01" maxlength="40"></div>
+        <div class="field hab-desc"><label>Descrição da habilidade</label><input class="input" name="hab" placeholder="Ex.: Resolver e elaborar problemas com números naturais" maxlength="500"></div>
+        <div class="field hab-desc"><label>Objeto de conhecimento</label><input class="input" name="habObj" placeholder="Ex.: Múltiplos e divisores de um número natural" maxlength="200"></div>
+        <button class="btn sm" type="submit">${ico("plus")}Adicionar</button></form></div>
     <div class="bim-box"><div class="bim-box-h"><h3>O que vou usar nas aulas</h3></div>
       ${RECURSOS.map(([g, xs]) => `<div class="rec-grupo"><span class="small muted">${g}</span><div class="chips-esc">${xs.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="${rec.includes(x)}">${rec.includes(x) ? "✓ " : ""}${esc(x)}</button>`).join("")}</div></div>`).join("")}
       ${outros.length ? `<div class="chips-esc">${outros.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="true">✓ ${esc(x)} ×</button>`).join("")}</div>` : ""}
@@ -2385,12 +2389,34 @@ function bimExtras(b) {
 }
 function dlgColarSGDE(num) {
   const b = bimPorNum(turmaAtual(), num); dlg._bim = num;
-  abrirDlg(`Colar habilidades do SGDE · ${esc(b.nome)}`, `<ol class="small"><li>No SGDE, abra o planejamento do bimestre.</li><li>Selecione a tabela <b>Organização Curricular Bimestral</b> (código, descrição e unidade), copie (Ctrl+C) e cole abaixo.</li><li>Se quiser, copie também a tabela <b>Disciplina/Unidade Curricular</b> (objeto de conhecimento) e cole embaixo.</li></ol>
+  dlg._sgdeHabs = null;
+  abrirDlg(`Importar habilidades · ${esc(b.nome)}`, `<div class="sgde-print"><b>Enviar print, foto ou PDF</b><p class="small muted">Das habilidades do bimestre: do sistema da escola ou da rede (estadual ou municipal), do referencial curricular, do planejamento ou do livro. Pode enviar até 4 arquivos. A Manu lê e preenche.</p>
+      <input class="input" type="file" id="sgdeArq" accept="image/*,application/pdf" multiple>
+      <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-lerhabs">${ico("spark")}Ler o print</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Confira os códigos depois.</span></div></div></div>
+    <p class="sgde-ou"><span>ou copie e cole</span></p>
+    <p class="small muted">Selecione a tabela ou a lista de habilidades no sistema ou documento (código e descrição; se tiver, unidade curricular e objeto de conhecimento), copie (Ctrl+C) e cole abaixo. No SGDE, use a tabela <b>Organização Curricular Bimestral</b>.</p>
     <textarea class="input" id="sgdeTxt" rows="9" placeholder="Cole aqui (Ctrl+V)"></textarea><p class="small muted" id="sgdeInfo">Nada colado ainda.</p>`,
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-hab-colar-ok" disabled id="sgdeOk">Adicionar habilidades</button>`);
 }
+async function iaLerHabs() {
+  const fs = [...(document.getElementById("sgdeArq")?.files || [])].slice(0, 4), st0 = document.getElementById("iaStatus");
+  if (!fs.length) { st0.textContent = "Escolha o print (ou os prints) da tabela."; return; }
+  if (fs.some(f => f.size > 4.3 * 1024 * 1024)) { st0.textContent = "Cada arquivo pode ter até 4 MB."; return; }
+  const arquivos = [];
+  for (const f of fs) { const mime = f.type === "application/pdf" ? f.type : ["image/jpeg", "image/png", "image/webp"].includes(f.type) ? f.type : ""; if (!mime) { st0.textContent = "Use imagens (PNG ou JPG) ou PDF."; return; } arquivos.push({ dados: await lerBase64(f), mime }); }
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "lerhabs", arquivos }, signal);
+    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").trim().slice(0, 40), descricao: String(h.descricao || "").trim().slice(0, 500), unidade: String(h.unidade || "").trim().slice(0, 60), objeto: String(h.objeto || "").replace(/^[•\s]+/, "").trim().slice(0, 200) }))
+      .filter(h => h.codigo || h.descricao).map(h => { for (const k of ["unidade", "objeto"]) if (!h[k]) delete h[k]; return h; });
+    if (!hs.length) throw { message: "Não encontrei habilidades no print. Tente um print mais nítido, só da tabela." };
+    dlg._sgdeHabs = hs;
+    document.getElementById("sgdeInfo").innerHTML = `<b>${hs.length}</b> habilidades lidas do print:<ul class="sgde-lidas">${hs.map(h => `<li><span class="bncc">${esc(h.codigo)}</span> ${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}</li>`).join("")}</ul>`;
+    document.getElementById("sgdeOk").disabled = false; st.textContent = "Confira e toque em Adicionar.";
+  });
+}
 document.addEventListener("input", e => {
   if (e.target.id !== "sgdeTxt") return;
+  dlg._sgdeHabs = null;
   const hs = lerTabelaSGDE(e.target.value), ok = document.getElementById("sgdeOk");
   document.getElementById("sgdeInfo").innerHTML = hs.length ? `<b>${hs.length}</b> habilidades encontradas: ${hs.slice(0, 6).map(h => `<span class="bncc">${esc(h.codigo)}</span>`).join(" ")}${hs.length > 6 ? " …" : ""}${hs.some(h => h.objeto) ? " · com objeto de conhecimento" : ""}` : "Não encontrei códigos de habilidade. Confira se copiou a tabela inteira.";
   ok.disabled = !hs.length;
@@ -2525,17 +2551,27 @@ async function iaTec() {
 }
 document.addEventListener("submit", async e => {
   const f = e.target.closest("[data-form='bim-hab'],[data-form='bim-rec']"); if (!f) return; e.preventDefault();
-  const num = Number(f.dataset.num), v = (f.elements.hab || f.elements.rec).value.trim(); if (!v) return;
-  if (f.dataset.form === "bim-hab") await mudarBim(num, nb => { nb.habs = [...habsDe(nb), lerHab(v)]; }, "Habilidade adicionada");
+  const num = Number(f.dataset.num), v = (f.elements.hab || f.elements.rec).value.trim();
+  if (f.dataset.form === "bim-hab") {
+    const cod = f.elements.habCod.value.trim(), obj = f.elements.habObj.value.trim();
+    if (!v && !cod) { toast("Preencha o código ou a descrição da habilidade."); return; }
+    // código digitado junto da descrição também funciona ("EF07MA01 – Resolver...")
+    const h = cod ? { codigo: cod, descricao: v } : lerHab(v); if (obj) h.objeto = obj;
+    await mudarBim(num, nb => { nb.habs = [...habsDe(nb).filter(x => !h.codigo || x.codigo !== h.codigo), h]; }, "Habilidade adicionada");
+    document.querySelector(`[data-form='bim-hab'][data-num='${num}'] input`)?.focus(); return;
+  }
+  if (!v) return;
+  if (f.dataset.form === "bim-hab") return;
   else await mudarBim(num, nb => { const rc = nb.recursos || []; if (!rc.includes(v)) nb.recursos = [...rc, v]; }, "Recurso adicionado");
   document.querySelector(`[data-form='${f.dataset.form}'][data-num='${num}'] input`)?.focus();
 });
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act^='bim-hab'],[data-act='bim-rec'],[data-act^='bim-tec'],[data-act='ia-habs'],[data-act='ia-tec'],[data-act='bim-pe'],[data-act='ia-planoescola'],[data-act^='pe-copiar'],[data-act='pe-planos']"); if (!b) return;
+  const b = e.target.closest("[data-act^='bim-hab'],[data-act='bim-rec'],[data-act^='bim-tec'],[data-act='ia-habs'],[data-act='ia-tec'],[data-act='bim-pe'],[data-act='ia-planoescola'],[data-act^='pe-copiar'],[data-act='pe-planos'],[data-act='ia-lerhabs']"); if (!b) return;
   const act = b.dataset.act, num = Number(b.dataset.num || dlg._bim), t = turmaAtual(); if (!t) return;
   if (act === "bim-hab-ia") return dlgHabIA(num);
   if (act === "bim-hab-colar") return dlgColarSGDE(num);
-  if (act === "bim-hab-colar-ok") { const hs = lerTabelaSGDE(val("sgdeTxt")); fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades do SGDE adicionadas`); }
+  if (act === "ia-lerhabs") return iaLerHabs();
+  if (act === "bim-hab-colar-ok") { const hs = dlg._sgdeHabs || lerTabelaSGDE(val("sgdeTxt")); fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades adicionadas`); }
   if (act === "bim-pe") return dlgPlanoEscola(num);
   if (act === "ia-planoescola") return iaPlanoEscola();
   if (act === "pe-copiar-aula" || act === "pe-copiar-tudo") {
