@@ -48,6 +48,7 @@ Não há testes automatizados. Antes de entregar, rode `npm run verificar`; ele 
 - Os alunos ficam dentro do registro da turma (`turma.alunos = [{ id, nome }]`). Turmas com o mesmo nome em disciplinas diferentes ("irmãs") compartilham a lista de alunos (`irmasDe`, `salvarAlunos`).
 - A coleção `perfil` guarda as respostas da entrevista "Meu jeito de dar aula" (um registro com `tipo: "estilo"` por professor; `meuEstilo()` e `textoEstilo()` no `app.js`). O texto vai no campo `perfil` dos pedidos de planejamento à IA.
 - A mesma coleção `perfil` guarda a rede de cada escola (registro `tipo: "redes"`, marcado em Meu perfil): `redeEscolhida()`; sem marcação, `modeloDaEscola()` adivinha pelo nome. Estadual = SGDE; municipal = Tagnos (plano por aula).
+- O livro didático fica na turma (`turma.livro = { titulo, colecao, volume, capitulos: [{ id, nome, pIni, pFim }] }`, lido do sumário com a IA `lersumario`); cada bimestre guarda os capítulos marcados em `livroCaps`. `textoLivro()` monta o texto que vai no campo `livro` dos pedidos de planejamento.
 - Campo novo no JSON não precisa de migração. Campo novo no `schema.prisma` precisa.
 
 ## Regras importantes
