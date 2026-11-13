@@ -551,3 +551,6 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .hab-form .field{margin:0}.hab-form label{font-size:.78rem}.hab-form .btn{justify-self:start}
 .passo-n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.8rem;font-weight:800;margin-right:8px;vertical-align:middle;flex:none}
 .bim-det>summary b{display:inline-flex;align-items:center}
+.bim-preparo .bim-det{border:0}.bim-preparo .bim-det>summary{display:none}.bim-preparo .bim-det>.bim-extras{padding:0}
+.prep-fim{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}.prep-fim .small{margin-right:auto}
+a.per{text-decoration:none;color:inherit}
