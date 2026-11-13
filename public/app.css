@@ -605,3 +605,6 @@ a.per{text-decoration:none;color:inherit}
 .pe-escolher p{margin:4px 0}
 .pe-colar{border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
 .pe-colar p{margin:4px 0 0}
+/* rede de cada escola em Meu perfil */
+.esc-rede{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px;flex-basis:100%}
+#pfRede{max-width:220px}

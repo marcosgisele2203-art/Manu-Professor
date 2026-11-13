@@ -436,7 +436,7 @@ function vPerfil() {
   const es = S.escolas || [], ds = S.disciplinas || [], et = S.etapas || [];
   const sug = [...new Set((et.length ? et : Object.keys(COMPONENTES)).flatMap(e => COMPONENTES[e] || []))].filter(c => !ds.includes(c));
   const turmasDa = x => S.turmas.filter(t => escolaDe(t) === x);
-  const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li${act === "perfil-tira-esc" ? ' class="esc"' : ""}><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button>${act === "perfil-tira-esc" ? `<div class="esc-turmas">${turmasDa(x).map(t => `<a class="esc-turma" href="${linkTurma(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)}<small>${esc(t.disciplina)}${t.turno ? " · " + esc(t.turno) : ""}</small></a>`).join("")}<button type="button" class="btn sm" data-act="nova-turma" data-escola="${esc(x)}">${ico("plus")}Turma nesta escola</button></div>` : ""}</li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
+  const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li${act === "perfil-tira-esc" ? ' class="esc"' : ""}><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button>${act === "perfil-tira-esc" ? `<div class="esc-rede" role="group" aria-label="Rede da escola ${esc(x)}">${REDES.map(([r, n]) => `<button type="button" class="tn-op" data-act="perfil-rede" data-v="${esc(x)}" data-r="${r}" aria-pressed="${redeEscolhida(x) === r}">${n}</button>`).join("")}${redeEscolhida(x) ? "" : `<small class="muted">Qual é a rede desta escola?</small>`}</div><div class="esc-turmas">${turmasDa(x).map(t => `<a class="esc-turma" href="${linkTurma(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)}<small>${esc(t.disciplina)}${t.turno ? " · " + esc(t.turno) : ""}</small></a>`).join("")}<button type="button" class="btn sm" data-act="nova-turma" data-escola="${esc(x)}">${ico("plus")}Turma nesta escola</button></div>` : ""}</li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
   return `<div class="page-head"><div><h1>Meu perfil</h1><p class="muted">Suas escolas e disciplinas aparecem prontas para escolher quando você cria uma turma.</p></div></div>
   <section class="panel"><div class="panel-head"><h2>Sua foto</h2></div><div class="perfil-foto"><div class="brand-mark grande">${S.foto ? `<img src="${esc(S.foto)}" alt="Sua foto" referrerpolicy="no-referrer">` : `<span class="iniciais">${esc((S.nome || "?").trim().split(/\s+/).map(x => x[0]).filter(Boolean).slice(0, 2).join("").toUpperCase())}</span>`}</div>
     <div class="toolbar"><label class="btn">Escolher foto<input type="file" id="pfFoto" accept="image/*" hidden></label>${S.foto ? `<button type="button" class="btn ghost" data-act="perfil-foto-tirar">Tirar foto</button>` : ""}</div>
@@ -444,7 +444,7 @@ function vPerfil() {
   <section class="panel"><div class="panel-head"><h2>Seu nome</h2></div><form class="perfil-add" data-form="perfil-nome"><input class="input" id="pfNome" value="${esc(S.nome)}" maxlength="120" aria-label="Seu nome"><button class="btn" type="submit">Salvar nome</button></form></section>
   <section class="panel"><div class="panel-head"><h2>Escolas onde você leciona</h2><span class="small muted">${es.length} de 10</span></div>
     ${lista(es, "perfil-tira-esc", "Nenhuma escola cadastrada ainda.")}
-    <form class="perfil-add" data-form="perfil-esc"><input class="input" id="pfEscola" placeholder="Nome da escola. Ex.: EM Rio Azul" maxlength="120" aria-label="Nome da escola"><button class="btn primary" type="submit">${ico("plus")}Adicionar escola</button></form></section>
+    <form class="perfil-add" data-form="perfil-esc"><input class="input" id="pfEscola" placeholder="Nome da escola. Ex.: EM Rio Azul" maxlength="120" aria-label="Nome da escola"><select class="input" id="pfRede" aria-label="Rede da escola"><option value="">Rede da escola…</option>${REDES.map(([r, n]) => `<option value="${r}">${n}</option>`).join("")}</select><button class="btn primary" type="submit">${ico("plus")}Adicionar escola</button></form></section>
   <section class="panel"><div class="panel-head"><h2>Etapas em que você leciona</h2><span class="small muted">Ao criar turma, a lista mostra só as séries dessas etapas</span></div>
     <div class="chips-esc">${ETAPAS.map(([id, n]) => `<button type="button" class="tn-op" data-act="perfil-etapa" data-v="${id}" aria-pressed="${et.includes(id)}">${et.includes(id) ? "✓ " : ""}${n}</button>`).join("")}</div></section>
   <section class="panel"><div class="panel-head"><h2>Disciplinas que você leciona</h2></div>
@@ -482,7 +482,9 @@ document.addEventListener("submit", async e => {
     const v = val2("pfEscola").trim(); if (!v) return;
     if ((S.escolas || []).some(x => x.toLowerCase() === v.toLowerCase())) { toast("Essa escola já está na lista."); return; }
     if ((S.escolas || []).length >= 10) { toast("Limite de 10 escolas."); return; }
-    await salvarPerfil({ escolas: [...(S.escolas || []), v] }, "Escola adicionada"); document.getElementById("pfEscola")?.focus(); return;
+    const rede = val2("pfRede");
+    if (await salvarPerfil({ escolas: [...(S.escolas || []), v] }, "Escola adicionada") && rede) await salvarRede(v, rede);
+    document.getElementById("pfEscola")?.focus(); return;
   }
   const v = val2("pfDisc").trim(); if (!v) return;
   if ((S.disciplinas || []).some(x => x.toLowerCase() === v.toLowerCase())) { toast("Essa disciplina já está na lista."); return; }
@@ -498,6 +500,7 @@ document.addEventListener("click", async e => {
   if (b.dataset.act === "perfil-principal") { for (const t of S.turmas.filter(t => !t.escola && es[0])) { t.escola = es[0]; api("PUT", "/api/dados/turmas", t).catch(() => {}); } }
   if (b.dataset.act === "perfil-principal") return salvarPerfil({ escolas: [v, ...es.filter(x => x !== v)] }, `${v} agora é a principal`);
   if (b.dataset.act === "perfil-tira-esc") return dlgTirarEscola(v);
+  if (b.dataset.act === "perfil-rede") { await salvarRede(v, b.dataset.r); toast(`${v}: ${(REDES.find(x => x[0] === b.dataset.r) || [])[1] || b.dataset.r}`); return render(); }
   if (b.dataset.act === "perfil-tira-esc-ok") {
     const ts = S.turmas.filter(t => escolaDe(t) === v), modo = dlg.querySelector('input[name="teModo"]:checked')?.value;
     let destino = val2("teDest") === "__nova" ? val2("teNova").trim() : val2("teDest");
@@ -2562,17 +2565,27 @@ document.addEventListener("click", async e => {
 
 // modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano por aula no Tagnos
 const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
+// rede de cada escola marcada em Meu perfil (registro "redes" na coleção perfil); sem marcação, vale o palpite pelo nome
+const REDES = [["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (Tagnos)"]];
+const registroRedes = () => (S.perfil || []).filter(x => x.tipo === "redes").sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")))[0];
+const chaveEscola = e => String(e || "").trim().toLocaleLowerCase("pt-BR");
+const redeEscolhida = e => (registroRedes()?.redes || {})[chaveEscola(e)] || "";
+async function salvarRede(escola, rede) {
+  const r = registroRedes();
+  await salvar("perfil", { id: r?.id || "pr" + uid(), tipo: "redes", redes: { ...(r?.redes || {}), [chaveEscola(escola)]: rede }, atualizadoEm: new Date().toISOString() });
+}
 // a habilidade é do componente da turma? (Matemática x Matemática - RA)
 const habDaTurma = (h, t) => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
 const ehRA = x => /(^|[^a-z])ra([^a-z]|$)/i.test(String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 const INSTRUMENTOS = ["Prova bimestral", "Trabalho", "Participação nas atividades", "Lista de exercícios", "Atividade em grupo", "Seminário", "Avaliação diagnóstica", "Registro no caderno"];
 function dlgPlanoEscola(num) {
   const t = turmaAtual(), b = bimPorNum(t, num), hs = habsDe(b); dlg._bim = num;
-  const pe = b.planoEscola || {}, m0 = pe.modelo || modeloDaEscola(escolaDe(t)), f0 = m0 === "municipal" ? "diario" : pe.formato || "quinzenal", ins0 = pe.instrumentos || ["Prova bimestral", "Trabalho"];
+  const pe = b.planoEscola || {}, m0 = redeEscolhida(escolaDe(t)) || pe.modelo || modeloDaEscola(escolaDe(t)), f0 = m0 === "municipal" ? "diario" : pe.formato || "quinzenal", ins0 = pe.instrumentos || ["Prova bimestral", "Trabalho"];
   const marca = h => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
   const tot = unidadesDoBim(t, b, "semanal").reduce((a, u) => a + u.aulas, 0);
   abrirDlg(`Planejamento para a escola · ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)} · ${fmtData(b.inicio)} a ${fmtData(b.fim)} · <b>${tot} aulas</b> pelo seu horário e pelo calendário${horarioDe(t).length ? "" : ` <span class="chip warn">cadastre o horário desta turma em Meu horário para contar as aulas certo</span>`}</p>
-    <div class="field"><span class="small muted">Rede da escola</span><div class="chips-esc">${[["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (Tagnos, por aula)"]].map(([v, n]) => `<label class="check"><input type="radio" name="peMod" value="${v}" ${m0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
+    <div class="field"><span class="small muted">Rede da escola</span><div class="chips-esc">${[["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (Tagnos, por aula)"]].map(([v, n]) => `<label class="check"><input type="radio" name="peMod" value="${v}" ${m0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div>
+      <small class="muted">${redeEscolhida(escolaDe(t)) ? "Pela rede que você marcou para esta escola em Meu perfil." : `Dica: marque a rede de cada escola em <a href="#perfil" data-act="fechar">Meu perfil</a> para a Manu já abrir certo.`}</small></div>
     <div class="field" id="peFmtBox" ${m0 === "municipal" ? "hidden" : ""}><span class="small muted">Como a escola pede o planejamento?</span><div class="chips-esc">${[["diario", "Por aula (diário)"], ["semanal", "Semanal"], ["quinzenal", "Quinzenal"]].map(([v, n]) => `<label class="check"><input type="radio" name="peFmt" value="${v}" ${f0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
     <div class="field"><span class="small muted">Habilidades deste planejamento ${hs.length ? "" : "(nenhuma no bimestre: a Manu escolhe as da série)"}</span>${hs.length ? `<div class="pe-habs">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="peHab" value="${i}" ${marca(h) ? "checked" : ""}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}</span></label>`).join("")}</div>` : ""}</div>
     <div class="field"><span class="small muted">Instrumentos avaliativos</span><div class="chips-esc">${INSTRUMENTOS.map(x => `<label class="check"><input type="checkbox" name="peIns" value="${esc(x)}" ${ins0.includes(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div></div>
@@ -2622,6 +2635,12 @@ function textosPlanoEscola(pe) {
     acoes: [pe.acoesIntro, ...(pe.unidades || []).map(u => `${u.rotulo}${(u.habilidades || []).length ? ` — Habilidades: ${u.habilidades.map(h => `(${h})`).join(" e ")}` : ""}${u.objetos ? `. Objetos de conhecimento: ${u.objetos}` : ""}\n${u.desenvolvimento}`)].filter(Boolean).join("\n\n"),
     recuperar: pe.recuperar || "", criterios: [(pe.instrumentos || []).join("\n"), pe.criterios].filter(Boolean).join("\n"), observacoes: pe.observacoes || "", nomeU,
   };
+}
+// no formato do Tagnos o objetivo vem no começo da ação didática ("Objetivo: ..."), depois de um eventual "TEMA DA AULA: ..."
+function objetivoDaAcao(txt) {
+  const s = String(txt || "").replace(/^\s*TEMA DA AULA:[^.\n]*[.\n]\s*/i, "");
+  const m = s.match(/^\s*Objetivos?(?: da aula)?\s*:\s*([^\n]+?[.!?])(?=\s|$)/i) || s.match(/^\s*([^\n]+?[.!?])(?=\s|$)/);
+  return m ? m[1].trim().slice(0, 400) : "";
 }
 // campos do plano de aulas do Tagnos, na ordem das colunas de lá
 const CAMPOS_TAGNOS = [["unidadeTematica", "Unidade Temática"], ["objetos", "Conteúdo (Objeto de Conhecimento)"], ["habilidades", "Habilidades"], ["desenvolvimento", "Ação didática (Metodologia)"], ["avaliacao", "Avaliação"], ["recursos", "Recursos"]];
@@ -2739,7 +2758,7 @@ document.addEventListener("click", async e => {
     const bi = bimPorNum(t, num), pe = bi?.planoEscola; if (!pe) return;
     const ja = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === num).map(p => p.data)); let n = 0; b.disabled = true;
     for (const u of pe.unidades || []) { if (!u.data || ja.has(u.data)) continue;
-      await salvar("planos", { id: uid(), turmaId: t.id, data: u.data, titulo: u.objetos ? u.objetos.slice(0, 120) : u.rotulo, duracao: `${u.aulas || 1} aula${(u.aulas || 1) > 1 ? "s" : ""} de 50 min`, bncc: (u.habilidades || []).join(", "), objetivos: u.objetivos || "", conteudo: u.objetos || "", metodologia: u.desenvolvimento || "", recursos: u.recursos || "", avaliacao: u.avaliacao || "", status: "planejado", origem: { pe: num } }); n++; }
+      await salvar("planos", { id: uid(), turmaId: t.id, data: u.data, titulo: u.objetos ? u.objetos.slice(0, 120) : u.rotulo, duracao: `${u.aulas || 1} aula${(u.aulas || 1) > 1 ? "s" : ""} de 50 min`, bncc: (u.habilidades || []).join(", "), objetivos: u.objetivos || objetivoDaAcao(u.desenvolvimento), conteudo: u.objetos || "", metodologia: u.desenvolvimento || "", recursos: u.recursos || "", avaliacao: u.avaliacao || "", status: "planejado", origem: { pe: num } }); n++; }
     toast(`${n} planos de aula criados no Planejamento, um por dia de aula.`); return;
   }
   if (act === "pe-copiar") { const ta = document.querySelector(`.pe-txt[data-campo="${b.dataset.campo}"][data-num="${num}"]`); if (!ta) return; try { await navigator.clipboard.writeText(ta.value); } catch (_) { ta.select(); document.execCommand("copy"); } toast("Copiado. Agora cole no campo do SGDE (Ctrl+V)."); return; }
