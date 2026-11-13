@@ -196,7 +196,10 @@ async function iniciar() {
   try {
     const eu = await api("GET", "/api/eu");
     S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; S.foto = eu.foto || ""; S.trocarSenha = !!eu.trocarSenha; S.temSenha = !!eu.temSenha; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
-    const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
+    // "perfil" é opcional: app instalado antes dela, aberto sem internet, ainda não tem essa lista guardada
+    S.perfilIncerto = false;
+    const listas = await Promise.all(COLS.map(c => c !== "perfil" ? api("GET", "/api/dados/" + c)
+      : api("GET", "/api/dados/" + c).catch(e => { if (e && e.code === "auth") throw e; S.perfilIncerto = true; return []; })));
     COLS.forEach((c, i) => S[c] = listas[i]);
     // aplica por cima o que ainda está na fila (feito sem internet)
     for (const op of lerFila()) { if (!S[op.col]) continue; S[op.col] = S[op.col].filter(x => x.id !== op.id); if (op.tipo === "put") S[op.col].push(op.obj); }
@@ -2492,7 +2495,8 @@ const ENTREVISTA = [
   { k: "livre", p: "Tem mais alguma coisa que eu deva saber sobre o seu jeito de dar aula?", tipo: "texto", ph: "Ex.: gosto de terminar a aula com uma pergunta para casa; a coordenação pede o planejamento bem detalhado" }
 ];
 const ROTULO_ENT = { inicio: "Começa a aula", organizacao: "Organiza a turma", metodologias: "Jeitos de ensinar", atividades: "Atividades que funcionam", avaliacao: "Avalia com", tecnologia: "Tecnologia", escolaTem: "A escola tem", turmas: "Desafios das turmas", livre: "Observações" };
-const meuEstilo = () => (S.perfil || []).find(x => x.tipo === "estilo");
+// vale a resposta mais recente (se um dia houver duas, por ter salvo sem internet)
+const meuEstilo = () => (S.perfil || []).filter(x => x.tipo === "estilo").sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")))[0];
 const opsDe = q => typeof q.ops === "function" ? q.ops() : q.ops || [];
 // texto das respostas: vai para a IA e aparece no resumo
 function textoEstilo(e) {
@@ -2713,7 +2717,8 @@ document.addEventListener("click", async e => {
   if (act === "bim-hab-filtrar") return mudarBim(num, nb => { const n0 = habsDe(nb).length; nb.habs = habsDe(nb).filter(h => habDaTurma(h, t)); toast(`${n0 - nb.habs.length} habilidades de outra unidade retiradas`); });
   if (act === "ia-lerhabs") return iaLerHabs();
   if (act === "bim-hab-colar-ok") { const todas = dlg._sgdeHabs || lerTabelaSGDE(val("sgdeTxt")), sel = dlg.querySelectorAll('input[name="sgdeSel"]'), hs = sel.length ? [...sel].filter(x => x.checked).map(x => todas[Number(x.value)]) : todas; if (!hs.length) { toast("Marque pelo menos uma habilidade."); return; } fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades adicionadas`); }
-  if (act === "bim-pe") return meuEstilo() ? dlgPlanoEscola(num) : dlgEntrevista(() => dlgPlanoEscola(num));
+  // sem a lista do perfil (aberto sem internet) não oferece a entrevista: um "Agora não" apagaria as respostas que já existem
+  if (act === "bim-pe") return meuEstilo() || S.perfilIncerto ? dlgPlanoEscola(num) : dlgEntrevista(() => dlgPlanoEscola(num));
   if (act === "ia-planoescola") return iaPlanoEscola();
   if (act === "pe-copiar-aula" || act === "pe-copiar-tudo") {
     const pe = bimPorNum(t, num)?.planoEscola, us = pe?.unidades || [], txt = act === "pe-copiar-tudo" ? us.map(textoAula).join("\n\n") : textoAula(us[Number(b.dataset.i)] || {});

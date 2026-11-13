@@ -14,7 +14,9 @@ export async function GET() {
   ]);
   const dados: Record<string, unknown[]> = {};
   for (const r of registros) (dados[r.colecao] ||= []).push(r.dados);
-  const corpo = JSON.stringify({ app: "manu-professor", exportadoEm: new Date().toISOString(), perfil, ...dados }, null, 2);
+  // a coleção "perfil" guarda a entrevista "Meu jeito de dar aula": sai com outro nome para não sobrescrever o perfil acima
+  const { perfil: jeitoDeDarAula, ...colecoes } = dados;
+  const corpo = JSON.stringify({ app: "manu-professor", exportadoEm: new Date().toISOString(), perfil, ...(jeitoDeDarAula ? { jeitoDeDarAula } : {}), ...colecoes }, null, 2);
   const dia = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   return new Response(corpo, { headers: { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": `attachment; filename="meus-dados-manu-professor-${dia}.json"`, "Cache-Control": "no-store" } });
 }
