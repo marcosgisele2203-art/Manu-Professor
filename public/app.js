@@ -2649,6 +2649,21 @@ function cardBimestre(t, b) {
     </section>`;
   }
 }
+// Formulário leve do passo 1: habilidades e recursos
+function formPreparo(b) {
+  const hs = habsDe(b), rec = b.recursos || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
+  return `<div class="prep-sec"><h3>1. Habilidades que vou trabalhar</h3>
+    ${hs.length ? `<table class="prep-habs"><thead><tr><th>Código</th><th>Descrição da habilidade</th><th>Objeto de conhecimento</th><th></th></tr></thead><tbody>${hs.map((h, i) => `<tr><td class="num"><b>${esc(h.codigo || "—")}</b></td><td>${esc(h.descricao)}</td><td>${esc(h.objeto || "")}</td><td><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar">×</button></td></tr>`).join("")}</tbody></table>` : ""}
+    <form class="prep-linha" data-form="bim-hab" data-num="${b.num}"><input class="input" name="habCod" placeholder="Código" maxlength="40" aria-label="Código da habilidade"><input class="input" name="hab" placeholder="Descrição da habilidade" maxlength="500" aria-label="Descrição da habilidade"><input class="input" name="habObj" placeholder="Objeto de conhecimento" maxlength="200" aria-label="Objeto de conhecimento"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form>
+    <p class="small muted">Tem as habilidades em outro lugar? <button type="button" class="link-btn" data-act="bim-hab-colar" data-num="${b.num}">Importar de print, foto ou PDF</button> · <button type="button" class="link-btn" data-act="bim-hab-ia" data-num="${b.num}">Sugerir com IA</button></p></div>
+  <div class="prep-sec"><h3>2. O que vou usar nas aulas</h3><div class="prep-recs">${RECURSOS.map(([g, xs]) => `<fieldset><legend>${g}</legend>${xs.map(x => `<label><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" ${rec.includes(x) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</fieldset>`).join("")}</div>
+    ${outros.length ? `<p class="small">Outros: ${outros.map(x => `<label class="prep-outro"><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" checked> ${esc(x)}</label>`).join(" ")}</p>` : ""}
+    <form class="prep-linha curta" data-form="bim-rec" data-num="${b.num}"><input class="input" name="rec" placeholder="Outro recurso (opcional)" maxlength="80" aria-label="Outro recurso"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form></div>`;
+}
+document.addEventListener("change", e => {
+  const c = e.target.closest("[data-prep-rec]"); if (!c) return;
+  const v = c.dataset.prepRec; mudarBim(Number(c.dataset.num), nb => { const rc = nb.recursos || []; nb.recursos = c.checked ? [...new Set([...rc, v])] : rc.filter(x => x !== v); });
+});
 // Página de um bimestre: primeiro o professor prepara (passo 1); depois vê o bimestre e cria com a IA
 function vBimestre() {
   const t = turmaAtual(), bs = bimestresDe(t);
@@ -2658,7 +2673,7 @@ function vBimestre() {
   if (!b.preparado || S.bimEditar === b.num) {
     S.bimAberto[t.id + ":" + b.num] = true;
     return `<div class="page-head"><div><span class="eyebrow">${esc(b.nome)} · ${fmtData(b.inicio)} a ${fmtData(b.fim)}</span><h1>Preparar o ${esc(b.nome)}</h1><p class="muted">Passo 1: diga as habilidades que vai trabalhar e o que vai usar nas aulas. A Manu usa isso para planejar e criar tudo do bimestre.</p></div></div>
-      ${chips}<section class="panel bim-preparo">${bimExtras(b)}
+      ${chips}<section class="panel bim-preparo">${formPreparo(b)}
       <div class="prep-fim"><span class="small muted">${habsDe(b).length} habilidade${habsDe(b).length === 1 ? "" : "s"} · ${(b.recursos || []).length} recurso${(b.recursos || []).length === 1 ? "" : "s"}</span>
         ${b.preparado ? `<button class="btn" data-act="bim-prep-cancelar" data-num="${b.num}">Voltar ao bimestre</button>` : ""}<button class="btn primary" data-act="bim-prep-ok" data-num="${b.num}">Salvar e continuar</button></div></section>`;
   }

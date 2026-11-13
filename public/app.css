@@ -554,3 +554,12 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .bim-preparo .bim-det{border:0}.bim-preparo .bim-det>summary{display:none}.bim-preparo .bim-det>.bim-extras{padding:0}
 .prep-fim{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}.prep-fim .small{margin-right:auto}
 a.per{text-decoration:none;color:inherit}
+/* Preparar o bimestre: formulário leve */
+.prep-sec{display:grid;gap:10px;padding-bottom:16px}.prep-sec+.prep-sec{padding-top:16px;border-top:1px solid var(--line)}.prep-sec h3{margin:0;font-size:1.05rem}.prep-sec p{margin:0}
+.prep-linha{display:grid;grid-template-columns:140px minmax(0,2fr) minmax(0,1.3fr) auto;gap:8px}.prep-linha.curta{grid-template-columns:minmax(0,1fr) auto;max-width:520px}
+@media (max-width:760px){.prep-linha{grid-template-columns:1fr}}
+.prep-habs{width:100%;border-collapse:collapse;font-size:.88rem}.prep-habs th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:4px 6px}.prep-habs td{padding:6px;border-top:1px solid var(--line);vertical-align:top}
+.prep-recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.prep-recs fieldset{border:1px solid var(--line);border-radius:12px;padding:8px 12px 10px;margin:0;display:grid;gap:4px}.prep-recs legend{font-size:.8rem;font-weight:700;color:var(--muted);padding:0 4px}
+.prep-recs label,.prep-outro{display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;min-height:30px}.prep-outro{display:inline-flex;margin-right:10px}
+.prep-recs input,.prep-outro input{width:18px;height:18px;accent-color:var(--accent)}
