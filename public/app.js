@@ -2629,7 +2629,7 @@ const val2 = id => { const el = document.getElementById(id); return el ? el.valu
 // Meu horário: a semana do professor, com todas as turmas
 const TURNO_SIN = { Manhã: "Matutino", Tarde: "Vespertino", Noite: "Noturno" }, ORDEM_TURNO = ["Matutino", "Vespertino", "Noturno", "Integral"];
 const turnoGrupo = t => TURNO_SIN[t.turno] || t.turno || "";
-function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(["Matutino", "Vespertino", "Noturno", "Integral", ...S.turmas.map(turnoGrupo)])].sort((a, b) => o(a) - o(b)); }
+function gruposTurno() { const o = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; }; return [...new Set(S.turmas.map(turnoGrupo))].sort((a, b) => o(a) - o(b)); }
 function turnoHor() { const gs = gruposTurno(); return gs.includes(S.horTurno) ? S.horTurno : gs.find(x => turmasDoTurno(x).length) || gs[0]; }
 function gradeTurno(tn) { const t = turmasDoTurno(tn)[0]; return t ? gradeDe(t) : gradeDe({ turno: tn }); }
 const turmasDoTurno = tn => S.turmas.filter(t => turnoGrupo(t) === tn);
