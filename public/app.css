@@ -314,6 +314,9 @@ td .grade{border-radius:8px;min-height:36px}
 .tn-letra{min-width:42px}
 .tn-fim{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:10px}
 .al-colar summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.al-pdf{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px}
+.al-lidos{display:grid;gap:2px;max-height:46vh;overflow:auto;margin-top:8px;padding-right:4px}
+.al-lidos .check{border:0;padding:4px 0}
 .al-ren{gap:8px}.al-ren .input{min-height:40px}
 .tn-dica{text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent)}
 .tn-multi{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:12px;background:var(--accent-soft)}

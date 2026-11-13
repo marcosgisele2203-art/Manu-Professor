@@ -2852,6 +2852,7 @@ function vAlunos() {
     <details class="al-colar"><summary>Colar a lista da secretaria (vários nomes de uma vez)</summary>
       <div class="field" style="margin-top:8px"><label for="alLista">Um nome por linha. Números no começo são ignorados.</label><textarea class="input" id="alLista" rows="6" placeholder="1. Ana Beatriz Souza&#10;2. Bruno Henrique Lima"></textarea></div>
       <div><button class="btn" data-act="al-colar">Adicionar todos</button></div></details>
+    <div class="al-pdf"><button class="btn ai" data-act="al-pdf">${ico("spark")}Enviar a lista em PDF ou foto</button><span class="small muted">A Manu lê os nomes e você confere antes de salvar.</span></div>
   </section>
   ${al.length ? `<section class="panel"><div class="list">${al.map((a, i) => { const m = mediaAluno(t, a.id, bim), f = freqAluno(t, a.id, bim);
     return S.alEdit === a.id
@@ -2859,7 +2860,7 @@ function vAlunos() {
       : `<div class="row"><span class="num muted small" style="width:26px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Média ${fmtNota(m)} · Frequência ${f === null ? "—" : f + "%"}</div></div>
         <button class="btn sm ghost" data-act="al-renomear" data-id="${esc(a.id)}">Renomear</button><button class="btn sm ghost danger" data-act="al-remover" data-id="${esc(a.id)}">Remover</button></div>`; }).join("")}</div>
     <p class="small muted">Remover um aluno tira o nome dele da chamada, das notas e das entregas desta turma.</p></section>`
-    : `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima ou cole a lista da secretaria.</p></div>`}`;
+    : `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima, cole a lista da secretaria ou envie o PDF ou a foto da lista.</p></div>`}`;
 }
 async function salvarAlunos(alunos, msg) {
   const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)); nt.alunos = alunos; S.alEdit = null;
@@ -2875,6 +2876,41 @@ function adicionarNomes(nomes) {
   salvarAlunos([...atuais, ...novos.map(n => ({ id: uid(), nome: n }))], novos.length === 1 ? `${novos[0]} adicionado(a)` : `${novos.length} alunos adicionados`);
   return true;
 }
+// Lista da secretaria em PDF ou foto: a IA lê os nomes e o professor confere
+function dlgLerAlunos() {
+  dlg._nomes = null;
+  abrirDlg("Ler lista de alunos", `<p class="small muted">Envie a relação de alunos da turma em PDF, print ou foto (até 4 arquivos). A Manu copia só os nomes; números, datas e documentos são ignorados. Os arquivos não ficam guardados.</p>
+    <div class="field"><label for="alArq">Arquivos da lista</label><input class="input" type="file" id="alArq" accept="application/pdf,image/*" multiple></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-alunos">${ico("spark")}Ler os nomes</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto.</span></div></div>
+    <div id="alRes"></div>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="al-pdf-ok" id="alOk" disabled>Adicionar marcados</button>`);
+}
+async function iaLerAlunos() {
+  const fs = [...(document.getElementById("alArq")?.files || [])].slice(0, 4), st0 = document.getElementById("iaStatus");
+  if (!fs.length) { st0.textContent = "Escolha o PDF ou a foto da lista."; return; }
+  if (fs.some(f => f.size > 4.3 * 1024 * 1024)) { st0.textContent = "Cada arquivo pode ter até 4 MB."; return; }
+  const arquivos = [];
+  for (const f of fs) { const mime = f.type === "application/pdf" ? f.type : ["image/jpeg", "image/png", "image/webp"].includes(f.type) ? f.type : ""; if (!mime) { st0.textContent = "Use PDF ou imagens (PNG ou JPG)."; return; } arquivos.push({ dados: await lerBase64(f), mime }); }
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "lernomes", arquivos }, signal);
+    // nome todo em MAIÚSCULAS (comum nas listas da secretaria) vira "Ana Beatriz de Souza"
+    const capitalizar = n => n !== n.toLocaleUpperCase("pt-BR") ? n : n.toLocaleLowerCase("pt-BR").split(" ").map((p, i) => i && /^(d[aeo]s?|e)$/.test(p) ? p : p.charAt(0).toLocaleUpperCase("pt-BR") + p.slice(1)).join(" ");
+    const limpa = xs => (Array.isArray(xs) ? xs : []).map(n => capitalizar(limparNome(n)).slice(0, 120)).filter(Boolean);
+    const saiu = new Set(limpa(r?.saiu).map(n => n.toLowerCase()));
+    const ja = new Set((turmaAtual().alunos || []).map(a => a.nome.toLowerCase())), vistos = new Set();
+    const nomes = limpa(r?.alunos).filter(n => !vistos.has(n.toLowerCase()) && vistos.add(n.toLowerCase()));
+    if (!nomes.length) throw { message: "Não encontrei nomes de alunos. Tente um PDF ou uma foto mais nítida, só da lista." };
+    dlg._nomes = nomes;
+    const novos = nomes.filter(n => !ja.has(n.toLowerCase())).length;
+    document.getElementById("alRes").innerHTML = `<p class="small"><b>${nomes.length}</b> ${nomes.length === 1 ? "nome encontrado" : "nomes encontrados"}${novos < nomes.length ? ` (${nomes.length - novos} já ${nomes.length - novos === 1 ? "está" : "estão"} na turma)` : ""}. Confira a grafia e desmarque quem não deve entrar.</p>
+      <div class="al-lidos">${nomes.map((n, i) => { const tem = ja.has(n.toLowerCase()), sai = saiu.has(n.toLowerCase());
+        return `<label class="check"><input type="checkbox" name="alSel" value="${i}" ${tem ? "disabled" : sai ? "" : "checked"}><span><span class="num muted">${String(i + 1).padStart(2, "0")}</span> ${esc(n)}${tem ? ' <small class="muted">· já na turma</small>' : sai ? ' <small class="muted">· marcado como transferido ou desistente</small>' : ""}</span></label>`; }).join("")}</div>`;
+    document.getElementById("alOk").disabled = !novos;
+    st.textContent = novos ? "Confira e toque em Adicionar marcados." : "Todos esses alunos já estão na turma.";
+  });
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-act='ia-alunos']")) iaLerAlunos(); });
+
 document.addEventListener("submit", e => {
   if (e.target.id === "alForm") { e.preventDefault(); const i = $("#alNome"); if (adicionarNomes([i.value])) { i.value = ""; i.blur(); setTimeout(() => $("#alNome")?.focus(), 50); } }
   if (e.target.classList.contains("al-ren")) { e.preventDefault(); const n = limparNome($("#alRen").value); if (!n) return; const id = e.target.dataset.id;
@@ -2884,6 +2920,12 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act^='al-']"); if (!b) return;
   const t = turmaAtual(); if (!t) return;
   const act = b.dataset.act;
+  if (act === "al-pdf") return dlgLerAlunos();
+  if (act === "al-pdf-ok") {
+    const nomes = dlg._nomes || [], sel = [...dlg.querySelectorAll('input[name="alSel"]:checked')].map(x => nomes[Number(x.value)]).filter(Boolean);
+    if (!sel.length) { toast("Marque os alunos que quer adicionar."); return; }
+    fechar(); adicionarNomes(sel); return;
+  }
   if (act === "al-colar") { const l = $("#alLista"); if (adicionarNomes(l.value.split(/\n+/))) l.value = ""; }
   else if (act === "al-ordenar") salvarAlunos(t.alunos.slice().sort((a, c) => a.nome.localeCompare(c.nome, "pt-BR")), "Lista em ordem alfabética");
   else if (act === "al-renomear") { S.alEdit = b.dataset.id; render(); setTimeout(() => { const i = $("#alRen"); if (i) { i.focus(); i.select(); } }, 30); }
