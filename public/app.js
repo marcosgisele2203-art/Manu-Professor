@@ -1430,7 +1430,7 @@ async function iaTexto(pedido, signal, onText) {
 async function iaPlano() {
   const tema = val("iaTema"); if (!tema) { dlg.querySelector("#iaStatus").textContent = "Escreva o tema da aula primeiro."; return; }
   await comIA(async (signal, st) => {
-    const r = await iaJSON({ tipo: "plano", tema, duracao: val("pDur"), detalhes: val("iaExtra"), turma: turmaIA(val("pTurma")), perfil: textoEstilo(meuEstilo()) || undefined }, signal);
+    const r = await iaJSON({ tipo: "plano", tema, duracao: val("pDur"), detalhes: val("iaExtra"), turma: turmaIA(val("pTurma")), perfil: textoEstilo(meuEstilo()) || undefined, livro: livroDoDia(val("pTurma"), val("pData")) }, signal);
     const set = (id, v) => { const el = dlg.querySelector("#" + id); if (el && v) el.value = String(v); };
     set("pTitulo", r.titulo); set("pBncc", r.bncc); set("pObj", r.objetivos); set("pCont", r.conteudo); set("pMet", r.metodologia); set("pRec", r.recursos); set("pAval", r.avaliacao);
     st.textContent = "Pronto. Revise e ajuste antes de salvar.";
@@ -2409,6 +2409,96 @@ document.addEventListener("click", e => {
   const a = e.target.closest("[data-bim-ir]"); if (a) { const t = turmaAtual(); if (t) S.bimSel[t.id] = String(a.dataset.bimIr); }
   const at = e.target.closest("[data-act='bim-ativar']"); if (at) { const t = turmaAtual(); S.bimSel[t.id] = String(at.dataset.num); render(); setTimeout(() => document.getElementById("bim-" + at.dataset.num)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
 }, true);
+/* ---------- Livro didático da turma ---------- */
+// Fica na turma (t.livro); cada bimestre guarda os capítulos que serão usados (b.livroCaps).
+// A Manu conhece o livro só pelo sumário: título, capítulos e páginas.
+const fmtPags = c => c.pIni ? `p. ${c.pIni}${c.pFim && c.pFim !== c.pIni ? "–" + c.pFim : ""}` : "";
+// plano de uma aula: usa os capítulos do bimestre em que cai a data
+const livroDoDia = (tid, d) => { const t = turma(tid); if (!t) return undefined; return textoLivro(t, bimestresDe(t).find(b => d && d >= b.inicio && d <= b.fim)) || undefined; };
+function textoLivro(t, b) {
+  const l = t && t.livro; if (!l || !l.titulo) return "";
+  const marc = b ? (l.capitulos || []).filter(c => (b.livroCaps || []).includes(c.id)) : [];
+  return ([l.titulo, l.colecao, l.volume].filter(Boolean).join(" · ") + "\n" + (marc.length
+    ? "Capítulos que o professor vai usar neste período:\n" + marc.map(c => `- ${c.nome}${fmtPags(c) ? ` (${fmtPags(c)})` : ""}`).join("\n")
+    : "O professor não marcou capítulos para este período: cite o livro só de forma geral, sem capítulo nem página.")).slice(0, 3000);
+}
+function boxLivro(t, b) {
+  const l = t.livro, caps = l?.capitulos || [], sel = b.livroCaps || [];
+  return `<div class="bim-box"><div class="bim-box-h"><h3>Livro didático</h3><button class="btn sm" data-act="livro-abrir">${l ? "Editar livro" : ico("plus") + "Cadastrar livro"}</button></div>
+    ${!l ? `<p class="small muted">Cadastre o livro que a escola deu para esta turma. Com a foto do sumário, a Manu cita capítulo e páginas no planejamento.</p>`
+      : `<p class="small"><b>${esc(l.titulo)}</b>${[l.colecao, l.volume].filter(Boolean).map(x => " · " + esc(x)).join("")}</p>
+        ${caps.length ? `<p class="small muted">Marque os capítulos que você vai usar no ${esc(b.nome)}:</p><div class="chips-esc livro-caps">${caps.map(c => `<button type="button" class="tn-op" data-act="livro-cap" data-num="${b.num}" data-id="${esc(c.id)}" aria-pressed="${sel.includes(c.id)}">${sel.includes(c.id) ? "✓ " : ""}${esc(c.nome)}${fmtPags(c) ? ` <small>${fmtPags(c)}</small>` : ""}</button>`).join("")}</div>`
+          : `<p class="small muted">Sem capítulos ainda. Em <b>Editar livro</b>, mande a foto do sumário.</p>`}`}</div>`;
+}
+function dlgLivro() {
+  const t = turmaAtual(), l = t.livro || {};
+  dlg._caps = JSON.parse(JSON.stringify(l.capitulos || []));
+  abrirDlg(`Livro didático · ${esc(t.nome)} · ${esc(t.disciplina)}`, `<div class="grid3"><div class="field"><label for="lvTit">Nome do livro</label><input class="input" id="lvTit" maxlength="120" value="${esc(l.titulo || "")}" placeholder="Ex.: Buriti Mais Arte"></div>
+      <div class="field"><label for="lvCol">Coleção ou autores (opcional)</label><input class="input" id="lvCol" maxlength="120" value="${esc(l.colecao || "")}"></div>
+      <div class="field"><label for="lvVol">Volume ou ano (opcional)</label><input class="input" id="lvVol" maxlength="40" value="${esc(l.volume || "")}" placeholder="Ex.: 4º ano"></div></div>
+    <div class="sgde-print"><b>Sumário</b><p class="small muted">Tire foto do sumário (ou mande o PDF), até 4 arquivos. A Manu lê os capítulos e as páginas, e você confere abaixo. O livro inteiro não é enviado.</p>
+      <input class="input" type="file" id="lvArq" accept="image/*,application/pdf" multiple>
+      <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-sumario">${ico("spark")}Ler o sumário</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Confira os nomes e as páginas depois.</span></div></div></div>
+    <div id="lvCaps"></div>`,
+    `${t.livro ? `<button type="button" class="btn ghost danger" data-act="livro-tirar">Tirar livro</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="livro-salvar">Salvar livro</button>`);
+  desenharCaps();
+}
+// guarda o que foi digitado nas linhas antes de redesenhar a lista
+function lerCaps() {
+  dlg.querySelectorAll(".lv-cap").forEach((r, i) => { const c = dlg._caps[i]; if (!c) return;
+    c.nome = r.querySelector("[name=lvNome]").value.trim().slice(0, 160); c.pIni = parseInt(r.querySelector("[name=lvIni]").value) || null; c.pFim = parseInt(r.querySelector("[name=lvFim]").value) || null; });
+}
+function desenharCaps() {
+  const box = document.getElementById("lvCaps"); if (!box) return;
+  box.innerHTML = `<h3 class="ci-h">Capítulos (${dlg._caps.length})</h3>${dlg._caps.map((c, i) => `<div class="lv-cap"><input class="input" name="lvNome" value="${esc(c.nome)}" maxlength="160" aria-label="Nome do capítulo ${i + 1}" placeholder="Nome do capítulo"><input class="input" name="lvIni" inputmode="numeric" value="${esc(c.pIni ?? "")}" aria-label="Página inicial" placeholder="pág."><span>a</span><input class="input" name="lvFim" inputmode="numeric" value="${esc(c.pFim ?? "")}" aria-label="Página final" placeholder="pág."><button type="button" class="btn ghost sm" data-act="livro-cap-tirar" data-i="${i}" aria-label="Tirar capítulo">×</button></div>`).join("")}
+    <button type="button" class="btn sm" data-act="livro-cap-add">${ico("plus")}Adicionar capítulo</button>`;
+}
+async function iaSumario() {
+  const fs = [...(document.getElementById("lvArq")?.files || [])].slice(0, 4), st0 = document.getElementById("iaStatus");
+  if (!fs.length) { st0.textContent = "Escolha a foto (ou o PDF) do sumário."; return; }
+  if (fs.some(f => f.size > 4.3 * 1024 * 1024)) { st0.textContent = "Cada arquivo pode ter até 4 MB."; return; }
+  const arquivos = [];
+  for (const f of fs) { const mime = f.type === "application/pdf" ? f.type : ["image/jpeg", "image/png", "image/webp"].includes(f.type) ? f.type : ""; if (!mime) { st0.textContent = "Use fotos (JPG ou PNG) ou PDF."; return; } arquivos.push({ dados: await lerBase64(f), mime }); }
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "lersumario", arquivos }, signal);
+    const pg = x => { const n = parseInt(x); return n > 0 && n < 2000 ? n : null; };
+    lerCaps();
+    // ler de novo o mesmo sumário mantém os capítulos já marcados nos bimestres
+    // e não apaga a página que o professor completou à mão quando a leitura nova não traz esse número
+    // nomes repetidos (ex.: "Revendo o que aprendi" em cada unidade): cada novo pega o antigo de mesmo nome na ordem
+    const antigos = new Map();
+    for (const c of dlg._caps) { const k = c.nome.toLocaleLowerCase("pt-BR"); antigos.set(k, [...(antigos.get(k) || []), c]); }
+    const caps = (Array.isArray(r?.capitulos) ? r.capitulos : []).map(c => { const nome = String(c?.nome || "").trim().slice(0, 160), a = (antigos.get(nome.toLocaleLowerCase("pt-BR")) || []).shift();
+      return { id: a?.id || "c" + uid(), nome, pIni: pg(c?.paginaInicial) ?? a?.pIni ?? null, pFim: pg(c?.paginaFinal) ?? a?.pFim ?? null }; }).filter(c => c.nome).slice(0, 80);
+    if (!caps.length) throw { message: "Não encontrei capítulos. Tente uma foto mais nítida, só do sumário." };
+    dlg._caps = caps;
+    const pre = (id, v, n) => { const el = document.getElementById(id); if (el && !el.value.trim() && v) el.value = String(v).slice(0, n); };
+    pre("lvTit", r.titulo, 120); pre("lvCol", r.colecao, 120); pre("lvVol", r.volume, 40);
+    desenharCaps(); st.textContent = `${caps.length} capítulos lidos. Confira e toque em Salvar livro.`;
+  });
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='livro-'],[data-act='ia-sumario']"); if (!b) return;
+  const act = b.dataset.act, t = turmaAtual(); if (!t) return;
+  if (act === "livro-abrir") return dlgLivro();
+  if (act === "ia-sumario") return iaSumario();
+  if (act === "livro-cap") { const id = b.dataset.id; return mudarBim(Number(b.dataset.num), nb => { const s = nb.livroCaps || []; nb.livroCaps = s.includes(id) ? s.filter(x => x !== id) : [...s, id]; }); }
+  if (act === "livro-cap-add") { lerCaps(); dlg._caps.push({ id: "c" + uid(), nome: "", pIni: null, pFim: null }); desenharCaps(); [...dlg.querySelectorAll("[name=lvNome]")].pop()?.focus(); return; }
+  if (act === "livro-cap-tirar") { lerCaps(); dlg._caps.splice(Number(b.dataset.i), 1); return desenharCaps(); }
+  if (act === "livro-tirar") {
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: tirar o livro"; return; }
+    const nt = JSON.parse(JSON.stringify(t)); delete nt.livro; (nt.bimestres || []).forEach(x => delete x.livroCaps);
+    fechar(); await salvar("turmas", nt); toast("Livro retirado da turma"); return;
+  }
+  if (act === "livro-salvar") {
+    lerCaps(); const titulo = val("lvTit").slice(0, 120);
+    if (!titulo) { toast("Escreva o nome do livro."); dlg.querySelector("#lvTit")?.focus(); return; }
+    const capitulos = dlg._caps.filter(c => c.nome), ids = new Set(capitulos.map(c => c.id));
+    const nt = JSON.parse(JSON.stringify(t)); nt.livro = { titulo, colecao: val("lvCol").slice(0, 120), volume: val("lvVol").slice(0, 40), capitulos };
+    (nt.bimestres || []).forEach(x => { if (x.livroCaps) x.livroCaps = x.livroCaps.filter(id => ids.has(id)); });
+    fechar(); await salvar("turmas", nt); toast("Livro salvo"); return;
+  }
+});
 function bimExtras(b) {
   const hs = habsDe(b), rec = b.recursos || [], ids = b.ideiasTec || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
   const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
@@ -2421,6 +2511,7 @@ function bimExtras(b) {
         <div class="field hab-desc"><label>Descrição da habilidade</label><input class="input" name="hab" placeholder="Ex.: Resolver e elaborar problemas com números naturais" maxlength="500"></div>
         <div class="field hab-desc"><label>Objeto de conhecimento</label><input class="input" name="habObj" placeholder="Ex.: Múltiplos e divisores de um número natural" maxlength="200"></div>
         <button class="btn sm" type="submit">${ico("plus")}Adicionar</button></form></div>
+    ${boxLivro(t, b)}
     <div class="bim-box"><div class="bim-box-h"><h3>O que vou usar nas aulas</h3></div>
       ${RECURSOS.map(([g, xs]) => `<div class="rec-grupo"><span class="small muted">${g}</span><div class="chips-esc">${xs.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="${rec.includes(x)}">${rec.includes(x) ? "✓ " : ""}${esc(x)}</button>`).join("")}</div></div>`).join("")}
       ${outros.length ? `<div class="chips-esc">${outros.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="true">✓ ${esc(x)} ×</button>`).join("")}</div>` : ""}
@@ -2616,7 +2707,7 @@ async function iaPlanoEscola() {
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "planoescola", periodo: b.nome, formato, modelo, unidades: unidades.map(u => ({ rotulo: u.rotulo, aulas: u.aulas })), habilidades: sel.map(h => [h.codigo, h.descricao, h.unidade, h.objeto && "objeto: " + h.objeto].filter(Boolean).join(" – ").slice(0, 700)).slice(0, 60),
       recursos: recursos.slice(0, 50), eventos: eventos.slice(0, 40), instrumentos, observacoes: obs || undefined, turma: turmaIA(t.id),
-      perfil: textoEstilo(meuEstilo()) || undefined, sugerirTec, escolaTem: (meuEstilo()?.escolaTem || []).slice(0, 30) }, signal);
+      perfil: textoEstilo(meuEstilo()) || undefined, livro: textoLivro(t, b) || undefined, sugerirTec, escolaTem: (meuEstilo()?.escolaTem || []).slice(0, 30) }, signal);
     if (!r || !Array.isArray(r.unidades) || !r.unidades.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const txt = (x, n) => String(x || "").slice(0, n);
     const tecnologias = (sugerirTec && Array.isArray(r.tecnologias) ? r.tecnologias : []).slice(0, 6).map(x => ({ nome: txt(x?.nome, 80), onde: txt(x?.onde, 200), porque: txt(x?.porque, 300) })).filter(x => x.nome);
@@ -2884,7 +2975,7 @@ async function iaBimestre() {
   await comIA(async (signal, st) => {
     const fer = []; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) { const x = semAula(d, escolaDe(t)); if (x && diaSemana(d) <= 5) fer.push(`${fmtData(d)} (${x.nome})`); }
     const extras = [fer.length ? "Dias sem aula no período: " + fer.join(", ") + "." : "", habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHab).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
-    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id), perfil: textoEstilo(meuEstilo()) || undefined }, signal);
+    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id), perfil: textoEstilo(meuEstilo()) || undefined, livro: textoLivro(t, b) || undefined }, signal);
     if (!r || !Array.isArray(r.semanas) || !r.semanas.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const nt = JSON.parse(JSON.stringify(t)); nt.aulasSemana = aulas;
     const nb = bimPorNum(nt, b.num); nb.conteudos = cont;

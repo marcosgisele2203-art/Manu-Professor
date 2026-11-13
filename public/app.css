@@ -608,3 +608,7 @@ a.per{text-decoration:none;color:inherit}
 /* rede de cada escola em Meu perfil */
 .esc-rede{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px;flex-basis:100%}
 #pfRede{max-width:220px}
+/* livro didático */
+.lv-cap{display:grid;grid-template-columns:1fr 64px auto 64px auto;gap:6px;align-items:center;margin:6px 0}
+.lv-cap span{color:var(--muted);font-size:.85rem}
+.livro-caps .tn-op small{font-weight:500;opacity:.8}
