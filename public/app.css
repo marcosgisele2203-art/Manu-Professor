@@ -577,3 +577,8 @@ a.per{text-decoration:none;color:inherit}
 @media (max-width:760px){.nav a.nav-sub{display:none}}
 .sgde-lidas{list-style:none;padding:0}.sgde-lidas .check{align-items:flex-start;border:0;padding:4px 0}
 .prep-fora{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0}
+.prep-habs{table-layout:fixed}.prep-habs th,.prep-habs td{white-space:normal;overflow-wrap:anywhere}
+.prep-habs th:nth-child(1),.prep-habs td:nth-child(1){width:150px}.prep-habs th:nth-child(3),.prep-habs td:nth-child(3){width:28%}.prep-habs th:nth-child(4),.prep-habs td:nth-child(4){width:48px;text-align:right}
+.hab-excluir{color:#b42318;padding:0 8px;min-height:32px}.hab-excluir svg{width:16px;height:16px}.hab-excluir:hover{background:#fde8e6;border-color:#f0b4ad}
+.prep-acoes-habs{display:flex;justify-content:space-between;align-items:center}.excluir-todas{color:#b42318}
+@media (max-width:760px){.prep-habs{table-layout:auto}.prep-habs td:nth-child(1),.prep-habs td:nth-child(3),.prep-habs td:nth-child(4){width:auto}}
