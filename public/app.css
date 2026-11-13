@@ -560,6 +560,18 @@ a.per{text-decoration:none;color:inherit}
 @media (max-width:760px){.prep-linha{grid-template-columns:1fr}}
 .prep-habs{width:100%;border-collapse:collapse;font-size:.88rem}.prep-habs th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:4px 6px}.prep-habs td{padding:6px;border-top:1px solid var(--line);vertical-align:top}
 .prep-recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.prep-recs fieldset{border:1px solid var(--line);border-radius:12px;padding:8px 12px 10px;margin:0;display:grid;gap:4px}.prep-recs legend{font-size:.8rem;font-weight:700;color:var(--muted);padding:0 4px}
+.prep-recs details{border:1px solid var(--line);border-radius:12px;padding:0}.prep-recs summary{cursor:pointer;padding:10px 12px;font-weight:700;font-size:.92rem}.prep-recs summary small{font-weight:500;color:var(--accent);margin-left:6px}.prep-recs details>div{display:grid;gap:2px;padding:0 12px 10px}
 .prep-recs label,.prep-outro{display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer;min-height:30px}.prep-outro{display:inline-flex;margin-right:10px}
 .prep-recs input,.prep-outro input{width:18px;height:18px;accent-color:var(--accent)}
+.prep-recs{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start}
+.prep-passos{list-style:none;margin:0 0 14px;padding:0;display:flex;gap:8px;flex-wrap:wrap}
+.prep-passos li{display:flex;align-items:center;gap:8px;padding:6px 14px 6px 6px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-weight:700;font-size:.9rem}
+.prep-passos li span{display:grid;place-items:center;width:26px;height:26px;border-radius:999px;background:var(--line);color:var(--ink)}
+.prep-passos li.on{background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--ink)}.prep-passos li.on span{background:var(--accent);color:var(--accent-ink)}
+.prep-passos li.feito span{background:#1d7a46;color:#fff}.prep-passos small{font-weight:500}
+@media (max-width:760px){
+  .prep-habs thead{display:none}.prep-habs,.prep-habs tbody,.prep-habs tr,.prep-habs td{display:block;width:100%}
+  .prep-habs tr{position:relative;border-top:1px solid var(--line);padding:6px 36px 6px 0}.prep-habs td{border:0;padding:1px 0}
+  .prep-habs td:last-child{position:absolute;top:4px;right:0;width:auto}.prep-habs td:nth-child(3):not(:empty)::before{content:"Objeto: ";color:var(--muted)}
+}
+@media (max-width:760px){.nav a.nav-sub{display:none}}

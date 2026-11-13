@@ -357,7 +357,7 @@ function cabecalhoTurma() {
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(bimSelecionado(t)) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${bimSelecionado(t) === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
   <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
-  ${DO_BIMESTRE.includes(S.view) && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestres")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
+  ${DO_BIMESTRE.includes(S.view) && S.view !== "bimestre" && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestre")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act='ia-mat']"); if (!b) return;
@@ -2650,15 +2650,18 @@ function cardBimestre(t, b) {
   }
 }
 // Formulário leve do passo 1: habilidades e recursos
-function formPreparo(b) {
+S.prepEtapa = {};
+function formPreparo(b, etapa) {
   const hs = habsDe(b), rec = b.recursos || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
-  return `<div class="prep-sec"><h3>1. Habilidades que vou trabalhar</h3>
-    ${hs.length ? `<table class="prep-habs"><thead><tr><th>Código</th><th>Descrição da habilidade</th><th>Objeto de conhecimento</th><th></th></tr></thead><tbody>${hs.map((h, i) => `<tr><td class="num"><b>${esc(h.codigo || "—")}</b></td><td>${esc(h.descricao)}</td><td>${esc(h.objeto || "")}</td><td><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar">×</button></td></tr>`).join("")}</tbody></table>` : ""}
-    <form class="prep-linha" data-form="bim-hab" data-num="${b.num}"><input class="input" name="habCod" placeholder="Código" maxlength="40" aria-label="Código da habilidade"><input class="input" name="hab" placeholder="Descrição da habilidade" maxlength="500" aria-label="Descrição da habilidade"><input class="input" name="habObj" placeholder="Objeto de conhecimento" maxlength="200" aria-label="Objeto de conhecimento"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form>
-    <p class="small muted">Tem as habilidades em outro lugar? <button type="button" class="link-btn" data-act="bim-hab-colar" data-num="${b.num}">Importar de print, foto ou PDF</button> · <button type="button" class="link-btn" data-act="bim-hab-ia" data-num="${b.num}">Sugerir com IA</button></p></div>
-  <div class="prep-sec"><h3>2. O que vou usar nas aulas</h3><div class="prep-recs">${RECURSOS.map(([g, xs]) => `<fieldset><legend>${g}</legend>${xs.map(x => `<label><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" ${rec.includes(x) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</fieldset>`).join("")}</div>
+  const passos = `<ol class="prep-passos"><li class="${etapa === 1 ? "on" : "feito"}"><span>1</span>Habilidades${hs.length ? ` <small>(${hs.length})</small>` : ""}</li><li class="${etapa === 2 ? "on" : ""}"><span>2</span>O que vou usar${rec.length ? ` <small>(${rec.length})</small>` : ""}</li></ol>`;
+  if (etapa === 2) return passos + `<div class="prep-sec"><h3>O que vou usar nas aulas</h3><p class="small muted">Marque os recursos. Toque num grupo para abrir.</p>
+    <div class="prep-recs">${RECURSOS.map(([g, xs]) => { const n = xs.filter(x => rec.includes(x)).length; return `<details ${g === "Tecnologia" || n ? "open" : ""}><summary>${g}${n ? ` <small>${n} marcado${n > 1 ? "s" : ""}</small>` : ""}</summary><div>${xs.map(x => `<label><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" ${rec.includes(x) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</div></details>`; }).join("")}</div>
     ${outros.length ? `<p class="small">Outros: ${outros.map(x => `<label class="prep-outro"><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" checked> ${esc(x)}</label>`).join(" ")}</p>` : ""}
     <form class="prep-linha curta" data-form="bim-rec" data-num="${b.num}"><input class="input" name="rec" placeholder="Outro recurso (opcional)" maxlength="80" aria-label="Outro recurso"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form></div>`;
+  return passos + `<div class="prep-sec"><h3>Habilidades que vou trabalhar</h3>
+    ${hs.length ? `<table class="prep-habs"><thead><tr><th>Código</th><th>Descrição da habilidade</th><th>Objeto de conhecimento</th><th></th></tr></thead><tbody>${hs.map((h, i) => `<tr><td class="num"><b>${esc(h.codigo || "—")}</b></td><td>${esc(h.descricao)}</td><td>${esc(h.objeto || "")}</td><td><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar">×</button></td></tr>`).join("")}</tbody></table>` : ""}
+    <form class="prep-linha" data-form="bim-hab" data-num="${b.num}"><input class="input" name="habCod" placeholder="Código" maxlength="40" aria-label="Código da habilidade"><input class="input" name="hab" placeholder="Descrição da habilidade" maxlength="500" aria-label="Descrição da habilidade"><input class="input" name="habObj" placeholder="Objeto de conhecimento" maxlength="200" aria-label="Objeto de conhecimento"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form>
+    <p class="small muted">Tem as habilidades em outro lugar? <button type="button" class="link-btn" data-act="bim-hab-colar" data-num="${b.num}">Importar de print, foto ou PDF</button> · <button type="button" class="link-btn" data-act="bim-hab-ia" data-num="${b.num}">Sugerir com IA</button></p></div>`;
 }
 document.addEventListener("change", e => {
   const c = e.target.closest("[data-prep-rec]"); if (!c) return;
@@ -2673,20 +2676,23 @@ function vBimestre() {
   if (!b.preparado || S.bimEditar === b.num) {
     S.bimAberto[t.id + ":" + b.num] = true;
     return `<div class="page-head"><div><span class="eyebrow">${esc(b.nome)} · ${fmtData(b.inicio)} a ${fmtData(b.fim)}</span><h1>Preparar o ${esc(b.nome)}</h1><p class="muted">Passo 1: diga as habilidades que vai trabalhar e o que vai usar nas aulas. A Manu usa isso para planejar e criar tudo do bimestre.</p></div></div>
-      ${chips}<section class="panel bim-preparo">${formPreparo(b)}
+      ${(et => `${chips}<section class="panel bim-preparo">${formPreparo(b, et)}
       <div class="prep-fim"><span class="small muted">${habsDe(b).length} habilidade${habsDe(b).length === 1 ? "" : "s"} · ${(b.recursos || []).length} recurso${(b.recursos || []).length === 1 ? "" : "s"}</span>
-        ${b.preparado ? `<button class="btn" data-act="bim-prep-cancelar" data-num="${b.num}">Voltar ao bimestre</button>` : ""}<button class="btn primary" data-act="bim-prep-ok" data-num="${b.num}">Salvar e continuar</button></div></section>`;
+        ${b.preparado ? `<button class="btn ghost" data-act="bim-prep-cancelar" data-num="${b.num}">Voltar ao bimestre</button>` : ""}
+        ${et === 1 ? `<button class="btn primary" data-act="bim-prep-prox" data-num="${b.num}">Próximo</button>` : `<button class="btn" data-act="bim-prep-voltar" data-num="${b.num}">Voltar</button><button class="btn primary" data-act="bim-prep-ok" data-num="${b.num}">Salvar e continuar</button>`}</div></section>`)(S.prepEtapa[t.id + ":" + b.num] || 1)}`;
   }
   return `<div class="page-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)}</span><h1>${esc(b.nome)}</h1><p class="muted">${habsDe(b).length} habilidades · ${(b.recursos || []).length} recursos · pronto para criar com a IA.</p></div><div class="toolbar"><button class="btn" data-act="bim-prep-editar" data-num="${b.num}">Editar habilidades e recursos</button></div></div>
     ${chips}${cardBimestre(t, b)}`;
 }
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act='bim-prep-ok'],[data-act='bim-prep-editar'],[data-act='bim-prep-cancelar']"); if (!b) return;
-  const num = Number(b.dataset.num), t = turmaAtual(), bi = bimPorNum(t, num);
-  if (b.dataset.act === "bim-prep-editar") { S.bimEditar = num; render(); window.scrollTo(0, 0); return; }
+  const b = e.target.closest("[data-act='bim-prep-ok'],[data-act='bim-prep-editar'],[data-act='bim-prep-cancelar'],[data-act='bim-prep-prox'],[data-act='bim-prep-voltar']"); if (!b) return;
+  const num = Number(b.dataset.num), t = turmaAtual(), bi = bimPorNum(t, num), ch = t.id + ":" + num;
+  if (b.dataset.act === "bim-prep-prox") { S.prepEtapa[ch] = 2; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.act === "bim-prep-voltar") { S.prepEtapa[ch] = 1; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.act === "bim-prep-editar") { S.bimEditar = num; S.prepEtapa[ch] = 1; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.act === "bim-prep-cancelar") { S.bimEditar = null; render(); window.scrollTo(0, 0); return; }
   if (!habsDe(bi).length && !(bi.recursos || []).length) { toast("Coloque pelo menos uma habilidade ou um recurso antes de continuar."); return; }
-  S.bimEditar = null; S.bimAberto[t.id + ":" + num] = false;
+  S.bimEditar = null; S.bimAberto[t.id + ":" + num] = false; S.prepEtapa[ch] = 1;
   await mudarBim(num, nb => { nb.preparado = true; }, `${bi.nome} preparado. Agora é só criar com a IA.`); window.scrollTo(0, 0);
 });
 
