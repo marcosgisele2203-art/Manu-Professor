@@ -45,7 +45,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["calendario", "Calendário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Diário"], ["notas", "Notas"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
@@ -305,7 +305,9 @@ function renderNav() {
   if (tt) { // dentro da turma: só Início e as seções da turma
     const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]));
     $("#nav").innerHTML = `<a href="#inicio">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("");
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`
+        + (k === "bimestres" ? bimestresDe(tt).map(b => { const at = S.view === "bimestres" && String(bimSelecionado(tt)) === String(b.num), agora = hoje() >= b.inicio && hoje() <= b.fim;
+          return `<a href="${linkTurma(tt.id, "bimestres")}" class="nav-sub so-pc${agora ? " agora" : ""}" data-bim-nav="${b.num}" ${at ? 'aria-current="true"' : ""}><span>${esc(b.nome)}</span>${agora ? '<small>atual</small>' : ""}</a>`; }).join("") : "")).join("");
     document.body.classList.add("na-turma");
   } else {
     document.body.classList.remove("na-turma");
@@ -753,6 +755,14 @@ function vTurmas() {
 // botão de bimestre no cartão: abre a turma já naquele período
 document.addEventListener("click", e => { const b = e.target.closest(".card-bim[data-bim]"); if (!b) return; S.bimSel[b.dataset.turma] = String(b.dataset.bim); });
 // o cartão inteiro abre a turma (menos os botões dentro dele)
+document.addEventListener("click", e => {
+  const mg = e.target.closest("[data-media-geral]"); if (mg) { S.notasGeral = true; if (location.hash === mg.getAttribute("href")) { e.preventDefault(); render(); } return; }
+  const bn = e.target.closest("[data-bim-nav]"); if (!bn) return;
+  const t = turmaAtual(); if (!t) return; e.preventDefault();
+  S.bimSel[t.id] = String(bn.dataset.bimNav);
+  const ir = () => { const el = document.getElementById("bim-" + bn.dataset.bimNav); if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); el.querySelector(".bim-det")?.setAttribute("open", ""); } };
+  if (location.hash === bn.getAttribute("href")) { render(); setTimeout(ir, 30); } else { location.hash = bn.getAttribute("href"); setTimeout(ir, 80); }
+});
 document.addEventListener("click", e => { const b = e.target.closest("[data-act='turmas-turno']"); if (b) { S.turmasTurno = b.dataset.v; render(); } });
 document.addEventListener("click", e => { const c = e.target.closest(".card-turma[data-abrir]"); if (!c || e.target.closest("a,button")) return; irTurma(c.dataset.abrir); });
 
@@ -912,9 +922,9 @@ function imprimirDiario(t) {
 /* ----- Notas ----- */
 function vNotas() {
   const t = turmaAtual();
-  const head = `<div class="page-head"><div><h1>Notas</h1><p class="muted">Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
+  const head = `<div class="page-head"><div><h1>${S.notasGeral ? "Média geral" : "Notas"}</h1><p class="muted">${S.notasGeral ? "As médias de todos os bimestres, a média final e, embaixo, as notas de cada bimestre." : `Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.`}</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
   if (!t) return head + semTurma();
-  const bim = bimSelecionado(t), bs = bimestresDe(t);
+  const bim = S.notasGeral ? "" : bimSelecionado(t), bs = bimestresDe(t);
   const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim))).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const al = t.alunos || [];
   if (bs.length && !bim) {
@@ -929,7 +939,14 @@ function vNotas() {
       ${al.map(s => { const mf = mediaAnual(t, s.id), f = freqAluno(t, s.id);
         const sit = mf === null ? `<span class="chip">sem notas</span>` : (mf >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">aprovado até aqui</span>` : (mf < MEDIA_MIN ? `<span class="chip warn">abaixo da média</span>` : `<span class="chip bad">frequência</span>`);
         return `<tr><td class="sticky-col">${esc(s.nome)}</td>${bs.map(b => { const m = mediaAluno(t, s.id, b.num); return `<td class="c num" style="color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td>`; }).join("")}<td class="c num" style="font-weight:700;color:${mf !== null && mf < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(mf)}</td><td class="c num" style="color:${f !== null && f < FREQ_MIN ? "var(--bad)" : "inherit"}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td></tr>`; }).join("")}
-      </tbody></table></div><p class="small muted">Média final = média das médias dos períodos que já têm nota. Para lançar notas, escolha um período acima.</p>`;
+      </tbody></table></div><p class="small muted">Média final = média das médias dos bimestres que já têm nota. Para lançar notas, toque no bimestre acima ou em "Lançar notas" abaixo.</p>
+      ${bs.map(b => {
+        const avsB = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(b.num)).sort((x, y) => (x.data || "").localeCompare(y.data || ""));
+        const mt = mediaTurma(t, b.num);
+        return `<section class="panel notas-bim"><div class="panel-head"><div><h2>${esc(b.nome)}</h2><span class="small muted">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${avsB.length} ${avsB.length === 1 ? "avaliação" : "avaliações"}${mt !== null ? ` · média da turma ${fmtNota(mt)}` : ""}</span></div><button class="btn sm" data-act="bim-sel" data-v="${b.num}">${avsB.length ? "Editar notas" : "Lançar notas"}</button></div>
+          ${avsB.length ? `<div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${avsB.map(x => `<th class="c">${esc(x.nome)}<div class="num" style="text-transform:none;font-weight:500">peso ${esc(x.peso)}</div></th>`).join("")}<th class="c">Média</th></tr></thead><tbody>
+            ${al.map(s => { const m = mediaAluno(t, s.id, b.num); return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avsB.map(x => { const v = x.notas?.[s.id]; return `<td class="c num" style="color:${v != null && v !== "" && Number(v) < MEDIA_MIN ? "var(--warn)" : "inherit"}">${v == null || v === "" ? "—" : fmtNota(v)}</td>`; }).join("")}<td class="c num" style="font-weight:700;color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted small">Nenhuma nota lançada neste bimestre.</p>`}</section>`;
+      }).join("")}`;
   }
   if (!avs.length) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma avaliação ${bim ? "no " + esc(bimPorNum(t, bim)?.nome || "") : "em " + esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.${bim ? " Se o bimestre já passou e você só tem a média final de cada aluno, lance direto a média." : ""}</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>${bim ? `<button class="btn" data-act="nota-media-bim">Já tenho a média do bimestre</button>` : ""}</div></div>`;
   const B = bim ? bimPorNum(t, bim) : null;
@@ -2262,8 +2279,8 @@ const mediaTurma = (t, bim) => { const ms = (t.alunos || []).map(a => mediaAluno
 const freqTurma = (t, bim) => { const fs = (t.alunos || []).map(a => freqAluno(t, a.id, bim)).filter(x => x !== null); return fs.length ? Math.round(fs.reduce((a, b) => a + b, 0) / fs.length) : null; };
 function chipsPeriodo(t) {
   const bs = bimestresDe(t); if (!bs.length) return "";
-  const sel = String(bimSelecionado(t));
-  return `<div class="periodos" role="group" aria-label="Período">${bs.map(b => `<button type="button" class="per" data-act="bim-sel" data-v="${b.num}" aria-pressed="${sel === String(b.num)}">${esc(b.nome)}</button>`).join("")}<button type="button" class="per" data-act="bim-sel" data-v="" aria-pressed="${sel === ""}">Ano todo</button></div>`;
+  const sel = S.view === "notas" && S.notasGeral ? "" : String(bimSelecionado(t));
+  return `<div class="periodos" role="group" aria-label="Período">${bs.map(b => `<button type="button" class="per" data-act="bim-sel" data-v="${b.num}" aria-pressed="${sel === String(b.num)}">${esc(b.nome)}</button>`).join("")}<button type="button" class="per" data-act="bim-sel" data-v="" aria-pressed="${sel === ""}">${S.view === "notas" ? "Média geral" : "Ano todo"}</button></div>`;
 }
 
 /* Habilidades, recursos e tecnologia de cada bimestre */
@@ -2474,7 +2491,10 @@ document.addEventListener("change", e => {
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act^='bim-'],[data-act='ia-bimestre']"); if (!b) return;
   const act = b.dataset.act, t = turmaAtual(); if (!t) return;
-  if (act === "bim-sel") { S.bimSel[t.id] = b.dataset.v; render(); return; }
+  if (act === "bim-sel") {
+    if (S.view === "notas") { S.notasGeral = b.dataset.v === ""; if (b.dataset.v !== "") S.bimSel[t.id] = b.dataset.v; render(); return; }
+    S.bimSel[t.id] = b.dataset.v; render(); return;
+  }
   if (act === "bim-ia") { dlgBimIA(Number(b.dataset.num)); return; }
   if (act === "ia-bimestre") { iaBimestre(); return; }
   if (act === "bim-editar") { dlgBimDatas(); return; }

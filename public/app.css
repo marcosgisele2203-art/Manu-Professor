@@ -531,3 +531,9 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .grupo-etapa.etapa-em::before{background:#7a4a8c}.grupo-etapa.etapa-ef1::before{background:#b08900}.grupo-etapa.etapa-ei::before{background:#c2410c}.grupo-etapa.etapa-eja::before{background:#3d5a98}
 .grupo-etapa small{text-transform:none;letter-spacing:0;font-weight:500}
 .turnos-turmas{margin:0 0 16px}.turnos-turmas button{font-size:1rem;padding:8px 18px}.turnos-turmas small{opacity:.7;font-weight:600;margin-left:4px}
+/* Menu da turma: bimestres e média geral */
+.nav a.nav-sub{padding:6px 12px 6px 44px;font-size:.86rem;font-weight:600;opacity:.85;display:flex;justify-content:space-between;align-items:center}
+.nav a.nav-sub small{font-size:.68rem;background:rgba(255,255,255,.14);padding:1px 6px;border-radius:999px}
+.nav a.nav-sub[aria-current="true"]{opacity:1;background:rgba(255,255,255,.12)}
+.nav a.nav-sub.agora{opacity:1}
+.notas-bim h2{margin:0}
