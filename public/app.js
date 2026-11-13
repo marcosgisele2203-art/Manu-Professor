@@ -135,11 +135,16 @@ const FILA = "manu_fila";
 const lerFila = () => { try { return JSON.parse(localStorage.getItem(FILA) || "[]"); } catch (_) { return []; } };
 const gravarFila = f => { try { localStorage.setItem(FILA, JSON.stringify(f)); } catch (_) { toast("A memória do aparelho está cheia: conecte à internet para enviar o que falta."); } };
 const semRede = e => e instanceof TypeError || (typeof navigator !== "undefined" && navigator.onLine === false && !(e && e.code));
+// vale tentar de novo: sem rede, servidor fora do ar (5xx), tempo esgotado (408) ou muitas requisições (429)
+const temporario = e => semRede(e) || !e || typeof e.code !== "number" || e.code >= 500 || e.code === 408 || e.code === 429;
+// o que o servidor recusou de vez (dado inválido) não é apagado: fica guardado à parte no aparelho
+const RECUSADOS = "manu_fila_recusados";
+function guardarRecusado(op, e) { try { const l = JSON.parse(localStorage.getItem(RECUSADOS) || "[]"); l.push({ ...op, erro: (e && e.message) || String(e && e.code || ""), recusadoEm: Date.now() }); localStorage.setItem(RECUSADOS, JSON.stringify(l.slice(-100))); } catch (_) {} }
 function enfileirar(op) { gravarFila([...lerFila().filter(x => !(x.col === op.col && x.id === op.id)), { ...op, em: Date.now() }]); mostrarSync(); }
 function mostrarSync(txt) {
   const n = lerFila().length, el = $("#syncState");
   document.body.classList.toggle("sem-rede", n > 0);
-  if (el) el.textContent = txt || (n ? `Sem internet · ${n} ${n === 1 ? "alteração guardada" : "alterações guardadas"} no aparelho` : "Tudo salvo");
+  if (el) el.textContent = txt || (n ? `Aguardando envio · ${n} ${n === 1 ? "alteração guardada" : "alterações guardadas"} no aparelho` : "Tudo salvo");
 }
 let enviandoFila = false;
 async function enviarFila() {
@@ -152,9 +157,11 @@ async function enviarFila() {
         else await api("DELETE", "/api/dados/" + op.col + "/" + encodeURIComponent(op.id));
         enviados++;
       } catch (e) {
-        if (semRede(e) || (e && e.code === "auth")) throw e;
-        // o servidor recusou (dado inválido): não adianta tentar de novo
-        toast("Uma alteração feita sem internet não pôde ser salva: " + ((e && e.message) || "dado recusado"));
+        // erro passageiro: a alteração continua na fila e é tentada de novo depois
+        if (temporario(e) || (e && e.code === "auth")) throw e;
+        // recusa definitiva (dado inválido): sai da fila, mas fica guardada à parte, não é perdida
+        guardarRecusado(op, e);
+        toast("Uma alteração feita sem internet não pôde ser salva: " + ((e && e.message) || "dado recusado") + ". Ela ficou guardada no aparelho.");
       }
       gravarFila(lerFila().filter(x => !(x.col === op.col && x.id === op.id && x.em === op.em)));
     }
@@ -170,13 +177,13 @@ async function salvar(col, obj) {
   if (lerFila().length) { enfileirar({ tipo: "put", col, id: obj.id, obj }); enviarFila(); return true; } // mantém a ordem
   mostrarSync("Salvando…");
   try { await api("PUT", "/api/dados/" + col, obj); mostrarSync(); return true; }
-  catch (e) { if (semRede(e)) { enfileirar({ tipo: "put", col, id: obj.id, obj }); return true; } erroDb(e); return false; }
+  catch (e) { if (temporario(e)) { enfileirar({ tipo: "put", col, id: obj.id, obj }); return true; } erroDb(e); return false; }
 }
 async function apagar(col, id) {
   S[col] = S[col].filter(x => x.id !== id); render();
   if (lerFila().length) { enfileirar({ tipo: "del", col, id }); enviarFila(); return; }
   try { await api("DELETE", "/api/dados/" + col + "/" + encodeURIComponent(id)); }
-  catch (e) { if (semRede(e)) enfileirar({ tipo: "del", col, id }); else erroDb(e); }
+  catch (e) { if (temporario(e)) enfileirar({ tipo: "del", col, id }); else erroDb(e); }
 }
 function erroDb(e) {
   if (e && e.code === "auth") return;
@@ -2203,7 +2210,7 @@ function renderCorrecao() {
     const duvidas = obj.filter(o => !c.marcadas[o.n]).length;
     if (c.nota === "") c.nota = String(Math.round(acertos / obj.length * 100) / 10).replace(".", ",");
     corpo += `${c.leitura.observacao ? `<div class="banner"><span>${esc(c.leitura.observacao)}</span></div>` : ""}
-      ${c.leitura.nome ? `<p class="small">Nome lido na folha: <b>${esc(c.leitura.nome)}</b></p>` : ""}
+
       <div class="table-wrap"><table><thead><tr><th class="c">Questão</th><th class="c">Marcada</th><th class="c">Gabarito</th><th class="c">Resultado</th></tr></thead><tbody>
       ${obj.map(o => { const m = c.marcadas[o.n] || ""; const ok = m && m === o.certa;
         return `<tr><td class="c num">${o.n}</td><td class="c"><select class="input cor-sel" data-n="${o.n}" aria-label="Resposta marcada na questão ${o.n}" style="width:auto;min-height:34px;padding:2px 8px"><option value="">—</option>${[...o.opcoes].map(l => `<option ${m === l ? "selected" : ""}>${l}</option>`).join("")}</select></td><td class="c num">${o.certa || "?"}</td><td class="c">${!m ? '<span class="chip warn">conferir</span>' : ok ? '<span class="chip ok">certa</span>' : '<span class="chip bad">errada</span>'}</td></tr>`; }).join("")}

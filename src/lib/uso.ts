@@ -22,7 +22,11 @@ export async function registrarUso(professorId: string, tipo: string, entrada: n
   await prisma.usoIA.create({ data: { professorId, tipo, tokensEntrada: entrada, tokensSaida: saida } }).catch(() => {});
 }
 
-// Administradores: e-mails listados em ADMIN_EMAILS (separados por vírgula)
+// Administradores: e-mails listados em ADMIN_EMAILS (separados por vírgula).
+// Só vale com e-mail confirmado: conta ligada ao Google e sessão aberta pelo Google (ver adminAtual)
+export function ehAdminConfirmado(p: { email: string; googleSub?: string | null }, sessaoGoogle: boolean) {
+  return Boolean(p.googleSub) && sessaoGoogle && ehAdmin(p.email);
+}
 export function ehAdmin(email: string) {
   return (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean).includes(email.toLowerCase());
 }

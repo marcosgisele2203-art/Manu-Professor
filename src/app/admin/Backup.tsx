@@ -21,7 +21,7 @@ export default function Backup({ arquivos, email, erro }: { arquivos: Arq[]; ema
     e.preventDefault(); setOcupado(true); setMsg(null);
     const r = await fetch("/api/admin/backup/restaurar", { method: "POST", body: new FormData(e.currentTarget) }).then((x) => x.json()).catch(() => ({ erro: "Sem conexão." }));
     setOcupado(false);
-    setMsg(r.ok ? { tipo: "ok", txt: `Restaurado o backup de ${quando(r.de)}: ${r.professores} professores e ${r.registros} registros recolocados${r.pulados ? `, ${r.pulados} itens pulados` : ""}.` } : { tipo: "erro", txt: r.erro || "Não foi possível restaurar." });
+    setMsg(r.ok ? { tipo: "ok", txt: `Restaurado o backup de ${quando(r.de)}: ${r.professores} professores, ${r.registros} registros e ${r.usos ?? 0} usos de IA recolocados${r.pulados ? `, ${r.pulados} itens pulados` : ""}.` } : { tipo: "erro", txt: r.erro || "Não foi possível restaurar." });
   }
 
   return (
@@ -39,7 +39,7 @@ export default function Backup({ arquivos, email, erro }: { arquivos: Arq[]; ema
       <details style={{ marginTop: 16 }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>Restaurar um backup</summary>
         <form onSubmit={restaurar} style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          <p className="small muted">Use só se algo se perdeu. Restaurar <b>não apaga nada</b>: recoloca o que falta e volta ao conteúdo do arquivo o que já existe. Antes, o sistema guarda uma cópia do estado atual no Drive.</p>
+          <p className="small muted">Use só se algo se perdeu. Restaurar <b>não apaga nada</b>: recoloca o que falta (inclusive o histórico de uso da IA) e volta ao conteúdo do arquivo o que já existe. É tudo ou nada: se der erro no meio, nada é alterado. Antes, o sistema guarda uma cópia do estado atual no Drive.</p>
           <input className="input" type="file" name="arquivo" accept=".gz,.json,application/gzip,application/json" required />
           <label className="check" style={{ border: 0 }}><input type="checkbox" name="confirmo" value="sim" required /><span>Entendo e quero restaurar este backup</span></label>
           <div><button className="btn danger" type="submit" disabled={ocupado}>Restaurar</button></div>

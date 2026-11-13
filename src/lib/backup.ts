@@ -27,25 +27,31 @@ export function lerArquivo(buf: Buffer): Backup {
   return b;
 }
 
-// Restaurar nunca apaga nada: só recoloca o que falta e atualiza o que veio no arquivo
+// Restaurar nunca apaga nada: recoloca o que falta e atualiza o que veio no arquivo.
+// Tudo numa transação só: se algo falhar no meio, nada é aplicado.
 export async function restaurar(b: Backup) {
-  let professores = 0, registros = 0, pulados = 0;
-  for (const p of b.professores) {
-    const outro = await prisma.professor.findUnique({ where: { email: p.email }, select: { id: true } });
-    if (outro && outro.id !== p.id) { pulados++; continue; } // mesmo e-mail em outra conta: não mexe
-    const { id, ...dados } = p;
-    const d = { ...dados, criadoEm: new Date(dados.criadoEm), aceitouTermosEm: dados.aceitouTermosEm ? new Date(dados.aceitouTermosEm) : null };
-    await prisma.professor.upsert({ where: { id }, create: { id, ...d }, update: d });
-    professores++;
-  }
-  const ids = new Set((await prisma.professor.findMany({ select: { id: true } })).map((p) => p.id));
-  for (const r of b.registros) {
-    if (!ids.has(r.professorId)) { pulados++; continue; }
-    const d = { colecao: r.colecao, dados: r.dados as Prisma.InputJsonValue, professorId: r.professorId };
-    await prisma.registro.upsert({ where: { id: r.id }, create: { id: r.id, ...d, criadoEm: new Date(r.criadoEm) }, update: d });
-    registros++;
-  }
-  return { professores, registros, pulados };
+  return prisma.$transaction(async (tx) => {
+    let professores = 0, registros = 0, usos = 0, pulados = 0;
+    for (const p of b.professores) {
+      const outro = await tx.professor.findUnique({ where: { email: p.email }, select: { id: true } });
+      if (outro && outro.id !== p.id) { pulados++; continue; } // mesmo e-mail em outra conta: não mexe
+      const { id, ...dados } = p;
+      const d = { ...dados, criadoEm: new Date(dados.criadoEm), aceitouTermosEm: dados.aceitouTermosEm ? new Date(dados.aceitouTermosEm) : null };
+      await tx.professor.upsert({ where: { id }, create: { id, ...d }, update: d });
+      professores++;
+    }
+    const ids = new Set((await tx.professor.findMany({ select: { id: true } })).map((p) => p.id));
+    for (const r of b.registros) {
+      if (!ids.has(r.professorId)) { pulados++; continue; }
+      const d = { colecao: r.colecao, dados: r.dados as Prisma.InputJsonValue, professorId: r.professorId };
+      await tx.registro.upsert({ where: { id: r.id }, create: { id: r.id, ...d, criadoEm: new Date(r.criadoEm) }, update: d });
+      registros++;
+    }
+    // histórico de uso da IA (conta o limite do mês): só acrescenta o que não existe
+    const listaUsos = (b.usosIA || []).filter((u) => ids.has(u.professorId)).map((u) => ({ id: u.id, professorId: u.professorId, tipo: u.tipo, tokensEntrada: u.tokensEntrada, tokensSaida: u.tokensSaida, criadoEm: new Date(u.criadoEm) }));
+    for (let i = 0; i < listaUsos.length; i += 500) usos += (await tx.usoIA.createMany({ data: listaUsos.slice(i, i + 500), skipDuplicates: true })).count;
+    return { professores, registros, usos, pulados };
+  }, { timeout: 5 * 60 * 1000, maxWait: 30 * 1000 });
 }
 
 /* ---------- Google Drive do administrador ---------- */

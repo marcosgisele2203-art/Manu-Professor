@@ -10,8 +10,9 @@ function segredo() {
   return new TextEncoder().encode(s);
 }
 
-export async function criarSessao(professorId: string) {
-  const token = await new SignJWT({ sub: professorId })
+// google: true quando a pessoa entrou pelo Google (o Google confirmou que ela é dona do e-mail)
+export async function criarSessao(professorId: string, opcoes: { google?: boolean } = {}) {
+  const token = await new SignJWT({ sub: professorId, ...(opcoes.google ? { g: 1 } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${DIAS}d`)
@@ -23,6 +24,18 @@ export async function criarSessao(professorId: string) {
     path: "/",
     maxAge: DIAS * 24 * 3600,
   });
+}
+
+// sessão com o jeito de entrar: admin só vale para quem entrou pelo Google
+export async function lerSessaoCompleta(): Promise<{ id: string; google: boolean } | null> {
+  const t = (await cookies()).get(COOKIE)?.value;
+  if (!t) return null;
+  try {
+    const { payload } = await jwtVerify(t, segredo());
+    return typeof payload.sub === "string" ? { id: payload.sub, google: payload.g === 1 } : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function lerSessao(token?: string): Promise<string | null> {

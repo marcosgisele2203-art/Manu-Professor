@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/db";
-import { lerSessao } from "@/lib/auth";
-import { ehAdmin } from "@/lib/uso";
+import { lerSessaoCompleta } from "@/lib/auth";
+import { ehAdminConfirmado } from "@/lib/uso";
 
+// Administrador: e-mail em ADMIN_EMAILS, confirmado pelo Google (conta ligada ao Google e sessão aberta pelo Google).
+// Quem cadastra com senha um e-mail da lista não vira administrador.
 export async function adminAtual() {
-  const id = await lerSessao();
-  if (!id) return null;
-  const p = await prisma.professor.findUnique({ where: { id }, select: { id: true, email: true, nome: true } });
-  return p && ehAdmin(p.email) ? p : null;
+  const s = await lerSessaoCompleta();
+  if (!s) return null;
+  const p = await prisma.professor.findUnique({ where: { id: s.id }, select: { id: true, email: true, nome: true, googleSub: true } });
+  return p && ehAdminConfirmado(p, s.google) ? { id: p.id, email: p.email, nome: p.nome } : null;
 }

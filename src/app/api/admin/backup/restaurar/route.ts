@@ -13,6 +13,12 @@ export async function POST(req: Request) {
   try { b = lerArquivo(Buffer.from(await arq.arrayBuffer())); } catch (e) { return NextResponse.json({ erro: e instanceof Error ? e.message : "Arquivo inválido." }, { status: 400 }); }
   // antes de mexer, guarda uma cópia do estado atual no Drive (se der)
   await backupParaDrive().catch(() => null);
-  const r = await restaurar(b);
-  return NextResponse.json({ ok: true, ...r, de: b.geradoEm });
+  try {
+    const r = await restaurar(b);
+    return NextResponse.json({ ok: true, ...r, de: b.geradoEm });
+  } catch (e) {
+    // a restauração é uma transação só: com erro, nada foi alterado
+    console.error("[restaurar]", e instanceof Error ? e.message.slice(0, 300) : e);
+    return NextResponse.json({ erro: "O arquivo tem dados com problema e não foi restaurado. Nada foi alterado no sistema." }, { status: 422 });
+  }
 }

@@ -10,8 +10,8 @@ export async function POST(req: Request) {
   if (!g) return NextResponse.json({ erro: "O tempo para concluir o cadastro acabou. Clique de novo em Continuar com Google." }, { status: 410 });
   let p = await prisma.professor.findFirst({ where: { OR: [{ googleSub: g.sub }, { email: g.email }] } });
   if (!p) p = await prisma.professor.create({ data: { nome: g.nome, email: g.email, googleSub: g.sub, googleRefresh: g.refresh, foto: g.foto, aceitouTermosEm: new Date() } });
-  else p = await prisma.professor.update({ where: { id: p.id }, data: { googleSub: g.sub, ...(g.refresh ? { googleRefresh: g.refresh } : {}), ...(!p.foto && g.foto ? { foto: g.foto } : {}) } });
+  else { const primeiraVez = !p.googleSub && Boolean(p.senhaHash); p = await prisma.professor.update({ where: { id: p.id }, data: { googleSub: g.sub, ...(primeiraVez ? { senhaHash: null, trocarSenha: false } : {}), ...(g.refresh ? { googleRefresh: g.refresh } : {}), ...(!p.foto && g.foto ? { foto: g.foto } : {}) } }); }
   await limparGooglePendente();
-  await criarSessao(p.id);
+  await criarSessao(p.id, { google: true });
   return NextResponse.json({ ok: true });
 }
