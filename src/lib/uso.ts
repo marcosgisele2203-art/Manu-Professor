@@ -9,7 +9,11 @@ export const limitePadrao = () => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 60;
 };
 
-export const inicioDoMes = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); };
+// Dia 1º à meia-noite no horário de Brasília (UTC-3, sem horário de verão desde 2019), seja qual for o fuso do servidor
+export const inicioDoMes = () => {
+  const br = new Date(Date.now() - 3 * 3600_000);
+  return new Date(Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), 1, 3));
+};
 
 export async function situacaoIA(professorId: string) {
   const p = await prisma.professor.findUnique({ where: { id: professorId }, select: { limiteIA: true, bloqueado: true } });

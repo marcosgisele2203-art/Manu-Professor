@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/db";
 
 export const COOKIE = "manu_sessao";
 const DIAS = 30;
@@ -11,8 +12,10 @@ function segredo() {
 }
 
 // google: true quando a pessoa entrou pelo Google (o Google confirmou que ela é dona do e-mail)
+// v: versão da sessão do professor; quando ela muda (troca de senha, senha provisória), os logins antigos deixam de valer
 export async function criarSessao(professorId: string, opcoes: { google?: boolean } = {}) {
-  const token = await new SignJWT({ sub: professorId, ...(opcoes.google ? { g: 1 } : {}) })
+  const p = await prisma.professor.findUnique({ where: { id: professorId }, select: { sessaoVersao: true } });
+  const token = await new SignJWT({ sub: professorId, v: p?.sessaoVersao ?? 0, ...(opcoes.google ? { g: 1 } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${DIAS}d`)
@@ -26,27 +29,28 @@ export async function criarSessao(professorId: string, opcoes: { google?: boolea
   });
 }
 
-// sessão com o jeito de entrar: admin só vale para quem entrou pelo Google
-export async function lerSessaoCompleta(): Promise<{ id: string; google: boolean } | null> {
-  const t = (await cookies()).get(COOKIE)?.value;
+// sessão com o jeito de entrar: admin só vale para quem entrou pelo Google.
+// Confere no banco que a conta ainda existe e que o login não foi encerrado (versão da sessão).
+export async function lerSessaoCompleta(token?: string): Promise<{ id: string; google: boolean } | null> {
+  const t = token ?? (await cookies()).get(COOKIE)?.value;
   if (!t) return null;
+  let id: string, versao: number, google: boolean;
   try {
     const { payload } = await jwtVerify(t, segredo());
-    return typeof payload.sub === "string" ? { id: payload.sub, google: payload.g === 1 } : null;
+    if (typeof payload.sub !== "string") return null;
+    id = payload.sub;
+    versao = typeof payload.v === "number" ? payload.v : 0; // logins antigos, sem versão, valem como 0
+    google = payload.g === 1;
   } catch {
     return null;
   }
+  const p = await prisma.professor.findUnique({ where: { id }, select: { sessaoVersao: true } });
+  if (!p || p.sessaoVersao !== versao) return null;
+  return { id, google };
 }
 
 export async function lerSessao(token?: string): Promise<string | null> {
-  const t = token ?? (await cookies()).get(COOKIE)?.value;
-  if (!t) return null;
-  try {
-    const { payload } = await jwtVerify(t, segredo());
-    return typeof payload.sub === "string" ? payload.sub : null;
-  } catch {
-    return null;
-  }
+  return (await lerSessaoCompleta(token))?.id ?? null;
 }
 
 const PENDENTE = "manu_google_pendente";
