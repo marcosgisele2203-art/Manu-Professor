@@ -246,8 +246,24 @@ function freqAluno(t, alunoId, bim) {
   const pres = ch.filter(c => c.presencas[alunoId] !== "F").length;
   return Math.round(pres / ch.length * 100);
 }
+// Tipo de média do bimestre (como no SGDE): "aritmetica" (média com pesos) ou "somatoria" (soma das avaliações)
+const tipoMediaBim = (t, bim) => (bim && bimPorNum(t, bim)?.tipoMedia) || "aritmetica";
+const notaOk = n => n !== undefined && n !== null && n !== "" && !isNaN(n);
 function mediaAluno(t, alunoId, bim) {
-  const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim)));
+  const todas = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim)));
+  const avs = todas.filter(a => a.tipo !== "recuperacao"), recs = todas.filter(a => a.tipo === "recuperacao" && notaOk(a.notas?.[alunoId]));
+  let m = tipoMediaBim(t, bim) === "somatoria" ? mediaSoma(avs, alunoId) : mediaPond(avs, alunoId);
+  // recuperação: fica a maior entre a média e a nota da recuperação
+  for (const r of recs) { const n = Number(r.notas[alunoId]); m = m === null ? n : Math.max(m, n); }
+  return m;
+}
+function mediaSoma(avs, alunoId) {
+  const ns = avs.map(a => a.notas?.[alunoId]).filter(notaOk);
+  return ns.length ? Math.min(10, ns.reduce((x, y) => x + Number(y), 0)) : null;
+}
+// todas as avaliações normais do bimestre já têm nota deste aluno?
+const bimCompleto = (t, alunoId, bim) => S.avaliacoes.filter(a => a.turmaId === t.id && String(a.bimestre) === String(bim) && a.tipo !== "recuperacao").every(a => notaOk(a.notas?.[alunoId]));
+function mediaPond(avs, alunoId) {
   let soma = 0, pesos = 0;
   avs.forEach(a => { const n = a.notas && a.notas[alunoId]; if (n !== undefined && n !== null && n !== "" && !isNaN(n)) { soma += Number(n) * (Number(a.peso) || 1); pesos += (Number(a.peso) || 1); } });
   return pesos ? soma / pesos : null;
@@ -943,8 +959,8 @@ function vNotas() {
       ${bs.map(b => {
         const avsB = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(b.num)).sort((x, y) => (x.data || "").localeCompare(y.data || ""));
         const mt = mediaTurma(t, b.num);
-        return `<section class="panel notas-bim"><div class="panel-head"><div><h2>${esc(b.nome)}</h2><span class="small muted">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${avsB.length} ${avsB.length === 1 ? "avaliação" : "avaliações"}${mt !== null ? ` · média da turma ${fmtNota(mt)}` : ""}</span></div><button class="btn sm" data-act="bim-sel" data-v="${b.num}">${avsB.length ? "Editar notas" : "Lançar notas"}</button></div>
-          ${avsB.length ? `<div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${avsB.map(x => `<th class="c">${esc(x.nome)}<div class="num" style="text-transform:none;font-weight:500">peso ${esc(x.peso)}</div></th>`).join("")}<th class="c">Média</th></tr></thead><tbody>
+        return `<section class="panel notas-bim"><div class="panel-head"><div><h2>${esc(b.nome)}</h2><span class="small muted">${fmtData(b.inicio)} a ${fmtData(b.fim)} · média ${tipoMediaBim(t, b.num) === "somatoria" ? "somatória" : "aritmética"} · ${avsB.length} ${avsB.length === 1 ? "avaliação" : "avaliações"}${mt !== null ? ` · média da turma ${fmtNota(mt)}` : ""}</span></div><button class="btn sm" data-act="bim-sel" data-v="${b.num}">${avsB.length ? "Editar notas" : "Lançar notas"}</button></div>
+          ${avsB.length ? `<div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${avsB.map(x => `<th class="c">${x.sigla ? `<b>${esc(x.sigla)}</b> ` : ""}${esc(x.nome)}<div class="num" style="text-transform:none;font-weight:500">${x.tipo === "recuperacao" ? "recuperação" : tipoMediaBim(t, b.num) === "somatoria" ? `vale ${fmtNota(x.valor)}` : `peso ${esc(x.peso)}`}</div></th>`).join("")}<th class="c">Média</th></tr></thead><tbody>
             ${al.map(s => { const m = mediaAluno(t, s.id, b.num); return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avsB.map(x => { const v = x.notas?.[s.id]; return `<td class="c num" style="color:${v != null && v !== "" && Number(v) < MEDIA_MIN ? "var(--warn)" : "inherit"}">${v == null || v === "" ? "—" : fmtNota(v)}</td>`; }).join("")}<td class="c num" style="font-weight:700;color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted small">Nenhuma nota lançada neste bimestre.</p>`}</section>`;
       }).join("")}`;
   }
@@ -952,12 +968,13 @@ function vNotas() {
   const B = bim ? bimPorNum(t, bim) : null;
   // "Para passar": só faz sentido quando as médias dos outros bimestres já estão lançadas
   const temPara = B && al.some(s => precisaNoBim(t, s.id, bim) !== null);
-  const rec = al.map(s => ({ s, m: mediaAluno(t, s.id, bim) })).filter(x => x.m !== null && x.m < MEDIA_MIN);
+  // na somatória, só conta depois de todas as notas lançadas (antes disso a soma ainda está incompleta)
+  const rec = al.map(s => ({ s, m: mediaAluno(t, s.id, bim) })).filter(x => x.m !== null && x.m < MEDIA_MIN && (tipoMediaBim(t, bim) !== "somatoria" || bimCompleto(t, x.s.id, bim)));
   const paraTxt = p => p === null ? "—" : p <= 0 ? `<span class="chip ok">já passou</span>` : p > 10 ? `<span class="chip bad">exame final</span>` : `<span class="chip ${p > MEDIA_MIN ? "warn" : ""} num">${fmtNota(p)}</span>`;
   const painel = rec.length ? `<section class="panel rec-aviso"><div class="rec-tit">${ico("notas")}<div><b>${rec.length} ${rec.length === 1 ? "aluno em recuperação" : "alunos em recuperação"}${B ? " no " + esc(B.nome) : ""}</b><span class="small muted">Média abaixo de ${MEDIA_MIN} com as notas lançadas até agora.</span></div></div>
     <div class="chips-esc">${rec.map(x => `<span class="chip warn">${esc(x.s.nome)} · ${fmtNota(x.m)}</span>`).join("")}</div></section>` : "";
   return head + chipsPeriodo(t) + painel + `<div class="table-wrap"><table>
-    <thead><tr><th class="sticky-col">Aluno</th>${avs.map(a => `<th class="c"><button class="btn sm ghost" data-act="editar-avaliacao" data-id="${esc(a.id)}" title="Editar avaliação">${esc(a.nome)}</button><div class="num" style="text-transform:none">peso ${esc(a.peso)} · ${fmtData(a.data)}</div></th>`).join("")}<th class="c">Média</th><th class="c">Freq.</th><th class="c">Situação</th>${temPara ? `<th class="c" title="Média mínima neste bimestre para fechar o ano com ${MEDIA_MIN}">Para passar</th>` : ""}</tr></thead>
+    <thead><tr><th class="sticky-col">Aluno</th>${avs.map(a => `<th class="c"><button class="btn sm ghost" data-act="editar-avaliacao" data-id="${esc(a.id)}" title="Editar avaliação">${a.sigla ? `<b>${esc(a.sigla)}</b> ` : ""}${esc(a.nome)}</button><div class="num" style="text-transform:none">${a.tipo === "recuperacao" ? "recuperação" : tipoMediaBim(t, a.bimestre) === "somatoria" ? `vale ${fmtNota(a.valor)}` : `peso ${esc(a.peso)}`} · ${fmtData(a.data)}</div></th>`).join("")}<th class="c">Média</th><th class="c">Freq.</th><th class="c">Situação</th>${temPara ? `<th class="c" title="Média mínima neste bimestre para fechar o ano com ${MEDIA_MIN}">Para passar</th>` : ""}</tr></thead>
     <tbody>${al.map(s => { const m = mediaAluno(t, s.id, bim), f = freqAluno(t, s.id, bim);
       const sit = m === null ? `<span class="chip">sem notas</span>` : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">em dia</span>` : (m < MEDIA_MIN ? `<span class="chip warn">recuperação</span>` : `<span class="chip bad">frequência</span>`);
       return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avs.map(a => { const n = a.notas?.[s.id]; return `<td class="c"><input class="grade" type="text" inputmode="decimal" aria-label="Nota de ${esc(s.nome)} em ${esc(a.nome)}" data-av="${esc(a.id)}" data-aluno="${esc(s.id)}" value="${n === undefined || n === null ? "" : esc(String(n).replace(".", ","))}"></td>`; }).join("")}
@@ -1233,16 +1250,27 @@ function dlgVerPlano(p) {
     `<button type="button" class="btn ai" data-act="sl-do-plano" data-id="${esc(p.id)}">${ico("spark")}Gerar slides</button>${botoesExport(`data-plano="${esc(p.id)}"`)}<button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
+document.addEventListener("change", e => {
+  if (e.target.id !== "aTipoMedia" && e.target.id !== "aTipo") return;
+  const soma = val2("aTipoMedia") === "somatoria", rec = val2("aTipo") === "recuperacao";
+  document.getElementById("aPesoBox").hidden = soma || rec; document.getElementById("aValorBox").hidden = !soma || rec;
+});
 function dlgAvaliacao(a) {
   const t = turmaAtual();
   a = a || { id: uid(), turmaId: t.id, nome: "", peso: 1, data: hoje(), bimestre: String(bimSelecionado(t) || bimDaData(t, hoje())?.num || "1"), notas: {} };
   const opcoesBim = bimestresDe(t).length ? bimestresDe(t).map(b => [String(b.num), b.nome]) : ["1", "2", "3", "4"].map(b => [b, b + "º bimestre"]);
   dlg._obj = a;
+  const tm = tipoMediaBim(t, a.bimestre);
   abrirDlg(S.avaliacoes.some(x => x.id === a.id) ? "Editar avaliação" : "Nova avaliação", `
-    <div class="field"><label for="aNome">Nome</label><input class="input" id="aNome" value="${esc(a.nome)}" placeholder="Prova 2 — Equações"></div>
-    <div class="grid3"><div class="field"><label for="aPeso">Peso na média</label><input class="input" id="aPeso" type="number" min="0" step="0.5" value="${esc(a.peso)}"></div>
-    <div class="field"><label for="aData">Data</label><input class="input" id="aData" type="date" value="${esc(a.data)}"></div>
-    <div class="field"><label for="aBim">Período</label><select class="input" id="aBim">${opcoesBim.map(([v, n]) => `<option value="${v}" ${String(a.bimestre) === v ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div></div>`,
+    <div class="grid3"><div class="field"><label for="aTipo">Tipo de avaliação</label><select class="input" id="aTipo"><option value="normal">Normal</option><option value="recuperacao" ${a.tipo === "recuperacao" ? "selected" : ""}>Recuperação</option></select></div>
+    <div class="field" style="grid-column:span 2"><label for="aNome">Nome da avaliação</label><input class="input" id="aNome" value="${esc(a.nome)}" placeholder="Prova 2 — Equações"></div></div>
+    <div class="grid3"><div class="field"><label for="aSigla">Sigla</label><input class="input" id="aSigla" maxlength="6" value="${esc(a.sigla || "")}" placeholder="P2"></div>
+    <div class="field"><label for="aTipoMedia">Tipo média do bimestre</label><select class="input" id="aTipoMedia"><option value="aritmetica">Aritmética</option><option value="somatoria" ${tm === "somatoria" ? "selected" : ""}>Somatória</option></select></div>
+    <div class="field"><label for="aBim">Bimestre</label><select class="input" id="aBim">${opcoesBim.map(([v, n]) => `<option value="${v}" ${String(a.bimestre) === v ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div></div>
+    <div class="grid3"><div class="field" id="aPesoBox" ${tm === "somatoria" ? "hidden" : ""}><label for="aPeso">Peso na média</label><input class="input" id="aPeso" type="number" min="0" step="0.5" value="${esc(a.peso)}"></div>
+    <div class="field" id="aValorBox" ${tm === "somatoria" ? "" : "hidden"}><label for="aValor">Vale até</label><input class="input" id="aValor" type="text" inputmode="decimal" value="${a.valor != null ? esc(String(a.valor).replace(".", ",")) : ""}" placeholder="Ex.: 4,0"></div>
+    <div class="field"><label for="aData">Data</label><input class="input" id="aData" type="date" value="${esc(a.data)}"></div></div>
+    <p class="small muted" id="aDica">${tm === "somatoria" ? "Somatória: a nota do bimestre é a soma das avaliações (máximo 10)." : "Aritmética: a nota do bimestre é a média das avaliações, considerando o peso."} O tipo de média vale para todas as avaliações do bimestre. Recuperação: fica a maior nota entre a média do bimestre e a recuperação.</p>`,
     `${S.avaliacoes.some(x => x.id === a.id) ? `<button type="button" class="btn danger" data-act="apagar-avaliacao" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-avaliacao">Salvar</button>`);
 }
 
@@ -2793,7 +2821,17 @@ document.addEventListener("click", async e => {
       await salvar("avaliacoes", { id: uid(), turmaId: t.id, nome: "Média do bimestre", peso: 1, data: bi.fim, bimestre: String(bi.num), notas: {} });
       toast("Digite a média de cada aluno na coluna e saia do campo para salvar."); break; }
     case "editar-avaliacao": dlgAvaliacao(JSON.parse(JSON.stringify(S.avaliacoes.find(a => a.id === id)))); break;
-    case "salvar-avaliacao": { const o = dlg._obj; o.nome = val("aNome"); if (!o.nome) { toast("Dê um nome à avaliação."); return; } o.peso = Number(val("aPeso")) || 1; o.data = val("aData"); o.bimestre = val("aBim"); delete o.exemplo; fechar(); await salvar("avaliacoes", o); toast("Avaliação salva"); break; }
+    case "salvar-avaliacao": {
+      const o = dlg._obj; o.nome = val("aNome"); if (!o.nome) { toast("Dê um nome à avaliação."); return; }
+      o.tipo = val("aTipo") || "normal"; o.sigla = val("aSigla").toUpperCase(); o.peso = Number(val("aPeso")) || 1; o.data = val("aData"); o.bimestre = val("aBim");
+      const tmNovo = val("aTipoMedia"), vRaw = val("aValor").replace(",", ".");
+      if (tmNovo === "somatoria" && o.tipo !== "recuperacao") { const v = Number(vRaw); if (!vRaw || isNaN(v) || v <= 0 || v > 10) { toast("Diga quanto a avaliação vale (de 0,5 a 10)."); return; } o.valor = v; } else delete o.valor;
+      delete o.exemplo; fechar(); await salvar("avaliacoes", o);
+      // tipo de média é do bimestre: guarda na turma
+      const bi = bimPorNum(t, o.bimestre);
+      if (bi && (bi.tipoMedia || "aritmetica") !== tmNovo) await mudarBim(bi.num, nb => { nb.tipoMedia = tmNovo; });
+      if (tmNovo === "somatoria") { const tot = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(o.bimestre) && x.tipo !== "recuperacao").reduce((a, x) => a + (Number(x.valor) || 0), 0); toast(`Avaliação salva. Total do bimestre: ${fmtNota(tot)} de 10.`); }
+      else toast("Avaliação salva"); break; }
     case "apagar-avaliacao": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar com as notas"; return; } { const aid = dlg._obj.id; fechar(); await apagar("avaliacoes", aid); toast("Avaliação apagada"); } break;
     case "exportar-notas": {
       const avs = S.avaliacoes.filter(a => a.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
@@ -2853,13 +2891,12 @@ document.addEventListener("change", async e => {
     const a = JSON.parse(JSON.stringify(S.avaliacoes.find(x => x.id === el.dataset.av))); a.notas = a.notas || {};
     const raw = el.value.trim().replace(",", ".");
     if (raw === "") delete a.notas[el.dataset.aluno];
-    else { const n = Number(raw); if (isNaN(n) || n < 0 || n > 10) { toast("A nota deve ser um número de 0 a 10."); el.value = ""; return; } a.notas[el.dataset.aluno] = n; }
+    else { const n = Number(raw), max = a.tipo !== "recuperacao" && a.valor ? Number(a.valor) : 10; if (isNaN(n) || n < 0 || n > max) { toast(`A nota deve ser um número de 0 a ${fmtNota(max)}.`); el.value = ""; return; } a.notas[el.dataset.aluno] = n; }
     await salvar("avaliacoes", a);
     // aviso de recuperação quando o aluno já tem todas as notas do bimestre
     const t = turma(a.turmaId), al = (t?.alunos || []).find(x => x.id === el.dataset.aluno);
     if (t && al && raw !== "") {
-      const avsB = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(a.bimestre));
-      const completo = avsB.every(x => x.notas && x.notas[al.id] != null && x.notas[al.id] !== "");
+      const completo = bimCompleto(t, al.id, a.bimestre);
       const m = mediaAluno(t, al.id, a.bimestre), sit = situacaoAno(t, al.id), B = bimPorNum(t, a.bimestre);
       if (completo && sit.estado === "exame" && !sit.faltam) toast(`Atenção: ${al.nome} fechou o ano com média ${fmtNota(sit.ms.reduce((x, y) => x + y, 0) / sit.ms.length)} e vai para o exame final.`);
       else if (completo && m !== null && m < MEDIA_MIN) toast(`Atenção: ${al.nome} ficou em recuperação${B ? " no " + B.nome : ""} (média ${fmtNota(m)}).`);
