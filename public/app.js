@@ -8,7 +8,7 @@ const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d
 const fmtData = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
 const fmtDataLonga = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) : "—";
 const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides", "calendario"];
+const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides", "calendario", "perfil"];
 const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
 const MEDIA_MIN = 6, FREQ_MIN = 75;
 
@@ -126,7 +126,7 @@ function exemplo() {
     { id: "exq4", disciplina: "Ciências", tema: "Sistema circulatório", serie: "8º ano EF", tipo: "vf", dificuldade: "facil", enunciado: "As artérias levam o sangue do coração para o resto do corpo.", alternativas: ["Verdadeiro", "Falso"], correta: 0, resposta: "", bncc: "EF08CI08", exemplo: true }
   ];
   const provas = [{ id: "expr1", titulo: "Avaliação — Frações", turmaId: t1.id, data: addDias(d0, 8), instrucoes: "Leia com atenção. Use caneta azul ou preta. Duração: 50 minutos.", questaoIds: ["exq1", "exq2", "exq3"], exemplo: true }];
-  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [], slides: [], calendario: [] };
+  return { turmas: [t1, t2], planos, chamadas, avaliacoes, atividades, questoes, provas, materiais: [], slides: [], calendario: [], perfil: [] };
 }
 
 /* ---------- camada de dados ---------- */
@@ -448,6 +448,9 @@ function vPerfil() {
     ${lista(ds, "perfil-tira-disc", "Nenhuma disciplina cadastrada ainda.")}
     <form class="perfil-add" data-form="perfil-disc"><input class="input" id="pfDisc" placeholder="Digite ou escolha. Ex.: Matemática" list="pfDiscLista" maxlength="80" aria-label="Disciplina" autocomplete="off"><datalist id="pfDiscLista">${sug.map(c => `<option value="${esc(c)}">`).join("")}</datalist><button class="btn primary" type="submit">${ico("plus")}Adicionar disciplina</button></form>
     <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>
+  <section class="panel"><div class="panel-head"><h2>Meu jeito de dar aula</h2></div>${textoEstilo(meuEstilo())
+    ? listaEstilo(textoEstilo(meuEstilo())) + `<button type="button" class="btn" data-act="ent-abrir">Refazer a entrevista</button>`
+    : `<p class="small muted">Responda a uma entrevista rápida com a Manu (uns 2 minutos). Ela usa as suas respostas para criar planejamentos do seu jeito.</p><button type="button" class="btn primary" data-act="ent-abrir">${ico("spark")}Responder a entrevista</button>`}</section>
   <section class="panel"><div class="panel-head"><h2>${S.temSenha ? "Trocar senha" : "Criar uma senha"}</h2></div>
     <p class="small muted">${S.temSenha ? "Para trocar, digite a senha atual e a nova." : "Você entra com o Google. Se quiser, crie também uma senha para entrar com e-mail e senha."}</p>
     <div class="grid3">${S.temSenha ? `<div class="field"><label for="psAtual">Senha atual</label><input class="input" id="psAtual" type="password" autocomplete="current-password"></div>` : ""}
@@ -1421,7 +1424,7 @@ async function iaTexto(pedido, signal, onText) {
 async function iaPlano() {
   const tema = val("iaTema"); if (!tema) { dlg.querySelector("#iaStatus").textContent = "Escreva o tema da aula primeiro."; return; }
   await comIA(async (signal, st) => {
-    const r = await iaJSON({ tipo: "plano", tema, duracao: val("pDur"), detalhes: val("iaExtra"), turma: turmaIA(val("pTurma")) }, signal);
+    const r = await iaJSON({ tipo: "plano", tema, duracao: val("pDur"), detalhes: val("iaExtra"), turma: turmaIA(val("pTurma")), perfil: textoEstilo(meuEstilo()) || undefined }, signal);
     const set = (id, v) => { const el = dlg.querySelector("#" + id); if (el && v) el.value = String(v); };
     set("pTitulo", r.titulo); set("pBncc", r.bncc); set("pObj", r.objetivos); set("pCont", r.conteudo); set("pMet", r.metodologia); set("pRec", r.recursos); set("pAval", r.avaliacao);
     st.textContent = "Pronto. Revise e ajuste antes de salvar.";
@@ -2474,6 +2477,85 @@ function unidadesDoBim(t, b, formato) {
   const out = []; for (let i = 0; i < sem.length; i += 2) { const a = sem[i], z = sem[i + 1] || a; out.push({ rotulo: `${out.length + 1}ª quinzena (${fmtData(a.inicio)} a ${fmtData(z.fim)})`, aulas: a.aulas + (z !== a ? z.aulas : 0) }); }
   return out;
 }
+/* ---------- Entrevista "Meu jeito de dar aula" ---------- */
+// Formulário com cara de conversa: uma pergunta por vez e sem gastar a cota de IA.
+// As respostas ficam na coleção "perfil" e entram nos pedidos de planejamento.
+const ENTREVISTA = [
+  { k: "inicio", p: "Como você gosta de começar uma aula?", tipo: "multi", ops: ["Retomando a aula anterior", "Com uma pergunta ou desafio", "Com vídeo, imagem ou música", "Com a leitura de um texto", "Conversando sobre o dia a dia dos alunos"] },
+  { k: "organizacao", p: "E como você costuma organizar a turma?", tipo: "multi", ops: ["Individual", "Em duplas", "Em grupos", "Em roda", "Varia conforme a atividade"] },
+  { k: "metodologias", p: "Quais jeitos de ensinar você usa ou quer usar mais?", tipo: "multi", ops: ["Aula expositiva dialogada", "Resolução de problemas", "Projetos", "Jogos e gamificação", "Rotação por estações", "Sala de aula invertida", "Alunos ensinando uns aos outros"] },
+  { k: "atividades", p: "Que tipo de atividade funciona bem com você?", tipo: "multi", ops: ["Lista de exercícios", "Atividade em grupo", "Debate", "Produção de texto", "Material concreto", "Pesquisa", "Apresentação dos alunos", "Desafios e competições"] },
+  { k: "avaliacao", p: "Como você gosta de avaliar?", tipo: "multi", ops: ["Prova escrita", "Trabalho", "Observação e participação", "Autoavaliação", "Caderno ou portfólio", "Apresentação oral", "Avaliação diagnóstica"] },
+  { k: "tecnologia", p: "E com tecnologia, como você se sente?", tipo: "unica", ops: ["Quase não uso", "Uso o básico (projetor, vídeo)", "Gosto de usar e experimentar", "Uso bastante, inclusive com os alunos"] },
+  { k: "escolaTem", p: "O que a sua escola tem para você usar?", tipo: "multi", ops: () => RECURSOS[1][1] },
+  { k: "turmas", p: "Quais desafios aparecem mais nas suas turmas?", tipo: "multi", ops: ["Turmas agitadas", "Muita diferença de nível", "Dificuldade de leitura", "Alunos com deficiência", "Pouca participação", "Faltas frequentes"] },
+  { k: "livre", p: "Tem mais alguma coisa que eu deva saber sobre o seu jeito de dar aula?", tipo: "texto", ph: "Ex.: gosto de terminar a aula com uma pergunta para casa; a coordenação pede o planejamento bem detalhado" }
+];
+const ROTULO_ENT = { inicio: "Começa a aula", organizacao: "Organiza a turma", metodologias: "Jeitos de ensinar", atividades: "Atividades que funcionam", avaliacao: "Avalia com", tecnologia: "Tecnologia", escolaTem: "A escola tem", turmas: "Desafios das turmas", livre: "Observações" };
+const meuEstilo = () => (S.perfil || []).find(x => x.tipo === "estilo");
+const opsDe = q => typeof q.ops === "function" ? q.ops() : q.ops || [];
+// texto das respostas: vai para a IA e aparece no resumo
+function textoEstilo(e) {
+  if (!e || e.pulou) return "";
+  return ENTREVISTA.map(q => { const v = e[q.k], t = Array.isArray(v) ? v.join(", ") : String(v || "").trim(); return t ? `${ROTULO_ENT[q.k]}: ${t}` : ""; }).filter(Boolean).join("\n").slice(0, 2500);
+}
+const listaEstilo = txt => `<ul class="ent-resumo">${txt.split("\n").map(l => { const i = l.indexOf(": "); return `<li><b>${esc(l.slice(0, i))}:</b> ${esc(l.slice(i + 2))}</li>`; }).join("")}</ul>`;
+function dlgEntrevista(depois) {
+  const e = meuEstilo();
+  dlg._ent = { passo: 0, r: e && !e.pulou ? JSON.parse(JSON.stringify(e)) : {}, depois };
+  passoEntrevista();
+}
+function passoEntrevista() {
+  const st = dlg._ent, n = ENTREVISTA.length;
+  if (st.passo >= n) return resumoEntrevista();
+  const q = ENTREVISTA[st.passo], v = st.r[q.k];
+  const intro = st.passo ? "" : `<p>${st.depois ? "Antes de planejar, posso te conhecer melhor?" : "Oi!"} Quero entender o seu jeito de dar aula para planejar do seu jeito. Leva uns 2 minutos e dá para mudar depois.</p>`;
+  const outros = q.tipo === "multi" ? (Array.isArray(v) ? v : []).filter(x => !opsDe(q).includes(x)) : [];
+  const campo = q.tipo === "texto"
+    ? `<textarea class="input" id="entTxt" rows="4" maxlength="800" placeholder="${esc(q.ph)}">${esc(v || "")}</textarea>`
+    : `<div class="ent-ops" role="group" aria-label="${esc(q.p)}">${opsDe(q).map(o => `<button type="button" class="tn-op" data-act="ent-op" data-v="${esc(o)}" aria-pressed="${q.tipo === "unica" ? v === o : (Array.isArray(v) ? v : []).includes(o)}">${esc(o)}</button>`).join("")}</div>
+      ${q.tipo === "multi" ? `<input class="input" id="entOutro" maxlength="160" placeholder="Outro (opcional)" value="${esc(outros.join(", "))}">` : ""}<p class="small muted">${q.tipo === "multi" ? "Pode marcar mais de uma." : "Escolha uma."}</p>`;
+  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-ajuda.webp" alt=""><div class="ent-fala">${intro}<b>${esc(q.p)}</b></div></div>
+    <div class="ent-prog"><i style="width:${Math.round((st.passo + 1) / n * 100)}%"></i></div><p class="small muted">Pergunta ${st.passo + 1} de ${n}</p>${campo}</div>`,
+    `${st.passo ? `<button type="button" class="btn ghost" data-act="ent-voltar">Voltar</button>` : `<button type="button" class="btn ghost" data-act="ent-pular">Agora não</button>`}<button type="button" class="btn primary" data-act="ent-proxima">${st.passo === n - 1 ? "Ver resumo" : "Próxima"}</button>`);
+}
+function guardarPasso() {
+  const st = dlg._ent, q = ENTREVISTA[st.passo]; if (!q) return;
+  if (q.tipo === "texto") { st.r[q.k] = val("entTxt").slice(0, 800); return; }
+  const marcados = [...dlg.querySelectorAll('[data-act="ent-op"][aria-pressed="true"]')].map(b => b.dataset.v);
+  if (q.tipo === "unica") { st.r[q.k] = marcados[0] || ""; return; }
+  const outro = val("entOutro").split(",").map(x => x.trim().slice(0, 80)).filter(Boolean);
+  st.r[q.k] = [...new Set([...marcados, ...outro])].slice(0, 20);
+}
+function resumoEntrevista() {
+  const txt = textoEstilo(dlg._ent.r);
+  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-boas-vindas.webp" alt=""><div class="ent-fala"><b>${txt ? "Entendi! Vou planejar assim:" : "Você não marcou nada."}</b></div></div>
+    ${txt ? listaEstilo(txt) : `<p class="muted">Sem problema: a Manu planeja do jeito padrão.</p>`}<p class="small muted">Dá para refazer quando quiser em Meu perfil.</p></div>`,
+    `<button type="button" class="btn ghost" data-act="ent-voltar">Voltar</button><button type="button" class="btn primary" data-act="ent-salvar">Salvar</button>`);
+}
+async function salvarEstilo(dados) {
+  const e = meuEstilo();
+  await salvar("perfil", { ...dados, id: e?.id || "pf" + uid(), tipo: "estilo", atualizadoEm: new Date().toISOString() });
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act^='ent-']"); if (!b) return;
+  const act = b.dataset.act;
+  if (act === "ent-abrir") return dlgEntrevista();
+  const st = dlg._ent; if (!st) return;
+  if (act === "ent-op") {
+    if (ENTREVISTA[st.passo].tipo === "unica") dlg.querySelectorAll('[data-act="ent-op"]').forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    else b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+    return;
+  }
+  if (act === "ent-proxima") { guardarPasso(); st.passo++; return passoEntrevista(); }
+  if (act === "ent-voltar") { if (st.passo < ENTREVISTA.length) guardarPasso(); st.passo = Math.max(0, st.passo - 1); return passoEntrevista(); }
+  const depois = st.depois; dlg._ent = null;
+  // "Agora não" na primeira vez: não pergunta de novo a cada planejamento (fica em Meu perfil)
+  if (act === "ent-pular") { if (!meuEstilo()) await salvarEstilo({ pulou: true }); }
+  if (act === "ent-salvar") { await salvarEstilo({ ...st.r, pulou: false }); toast("Pronto! A Manu vai planejar do seu jeito."); }
+  if (depois) depois(); else { fechar(); render(); }
+});
+
 // modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano diário
 const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
 // a habilidade é do componente da turma? (Matemática x Matemática - RA)
@@ -2493,7 +2575,8 @@ function dlgPlanoEscola(num) {
     <div class="field"><span class="small muted">Recursos que você vai usar (inclusive os tecnológicos e a IA como apoio)</span>
       ${RECURSOS.map(([g, xs]) => `<div class="rec-grupo"><span class="small"><b>${g}</b></span><div class="chips-esc">${xs.map(x => `<label class="check"><input type="checkbox" name="peRec" value="${esc(x)}" ${(b.recursos || []).includes(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div></div>`).join("")}
       ${(b.recursos || []).filter(x => !RECURSOS.some(g => g[1].includes(x))).length ? `<div class="chips-esc">${(b.recursos || []).filter(x => !RECURSOS.some(g => g[1].includes(x))).map(x => `<label class="check"><input type="checkbox" name="peRec" value="${esc(x)}" checked><span>${esc(x)}</span></label>`).join("")}</div>` : ""}
-      <input class="input" id="peRecOutro" placeholder="Outro recurso (opcional). Ex.: Canva, horta da escola" maxlength="80"></div>
+      <input class="input" id="peRecOutro" placeholder="Outro recurso (opcional). Ex.: Canva, horta da escola" maxlength="80">
+      <label class="check pe-sugtec"><input type="checkbox" id="peSugTec" ${pe.sugerirTec ? "checked" : ""}><span><b>Não sei quais tecnologias usar: a Manu sugere</b><small class="muted">Ela escolhe entre o que a sua escola tem${(meuEstilo()?.escolaTem || []).length ? "" : ` (responda a <a href="#perfil" data-act="fechar">entrevista</a> para ela saber)`} e explica onde usar cada uma.</small></span></label></div>
     <div class="field"><label for="peObs">Algo a considerar (opcional)</label><input class="input" id="peObs" value="${esc(pe.obsProf || "")}" placeholder="Ex.: turma com dificuldade em frações; usar a lousa digital nas aulas de geometria"></div>
     <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-planoescola">${ico("spark")}Gerar planejamento</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto. Fica guardado no bimestre para você copiar.</span></div></div>`,
     `<button type="button" class="btn" data-act="fechar">Fechar</button>`);
@@ -2505,6 +2588,7 @@ async function iaPlanoEscola() {
   const formato = modelo === "municipal" ? "diario" : dlg.querySelector('input[name="peFmt"]:checked')?.value || "quinzenal";
   const sel = hs.length ? [...dlg.querySelectorAll('input[name="peHab"]:checked')].map(x => hs[Number(x.value)]) : [];
   const instrumentos = [...dlg.querySelectorAll('input[name="peIns"]:checked')].map(x => x.value), obs = val("peObs");
+  const sugerirTec = !!dlg.querySelector("#peSugTec")?.checked;
   const outroRec = val("peRecOutro").trim(), recursos = [...new Set([...dlg.querySelectorAll('input[name="peRec"]:checked')].map(x => x.value).concat(outroRec ? [outroRec] : []))];
   // os recursos marcados aqui ficam guardados no bimestre
   if (JSON.stringify(recursos) !== JSON.stringify(b.recursos || [])) await mudarBim(b.num, nb => { nb.recursos = recursos; });
@@ -2514,10 +2598,12 @@ async function iaPlanoEscola() {
   for (const e of [...eventosDoAno(Number(b.inicio.slice(0, 4)))]) { const fim = e.fim || e.data; if (fim < b.inicio || e.data > b.fim || (e.escola && e.escola !== escolaDe(t)) || e.tipo === "com-aula") continue; eventos.push(`${fmtData(e.data)}${e.fim ? " a " + fmtData(e.fim) : ""}: ${e.nome} (${TIPOS_CAL[e.tipo] || e.tipo})`); }
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "planoescola", periodo: b.nome, formato, modelo, unidades: unidades.map(u => ({ rotulo: u.rotulo, aulas: u.aulas })), habilidades: sel.map(h => [h.codigo, h.descricao, h.unidade, h.objeto && "objeto: " + h.objeto].filter(Boolean).join(" – ").slice(0, 700)).slice(0, 60),
-      recursos: recursos.slice(0, 50), eventos: eventos.slice(0, 40), instrumentos, observacoes: obs || undefined, turma: turmaIA(t.id) }, signal);
+      recursos: recursos.slice(0, 50), eventos: eventos.slice(0, 40), instrumentos, observacoes: obs || undefined, turma: turmaIA(t.id),
+      perfil: textoEstilo(meuEstilo()) || undefined, sugerirTec, escolaTem: (meuEstilo()?.escolaTem || []).slice(0, 30) }, signal);
     if (!r || !Array.isArray(r.unidades) || !r.unidades.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const txt = (x, n) => String(x || "").slice(0, n);
-    await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs,
+    const tecnologias = (sugerirTec && Array.isArray(r.tecnologias) ? r.tecnologias : []).slice(0, 6).map(x => ({ nome: txt(x?.nome, 80), onde: txt(x?.onde, 200), porque: txt(x?.porque, 300) })).filter(x => x.nome);
+    await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs, sugerirTec, tecnologias,
       acoesIntro: txt(r.acoesIntro, 3000), unidades: r.unidades.slice(0, 70).map((u, i) => ({ rotulo: txt(u.rotulo || unidades[i]?.rotulo, 120), data: unidades[i]?.data || "", aulas: unidades[i]?.aulas || 1, habilidades: (Array.isArray(u.habilidades) ? u.habilidades : []).map(String).slice(0, 12), objetos: txt(u.objetos, 600),
         objetivos: txt(u.objetivos, 1200), desenvolvimento: txt(u.desenvolvimento, 4000), recursos: txt(u.recursos, 600), avaliacao: txt(u.avaliacao, 800) })),
       recuperar: txt(r.recuperar, 4000), criterios: txt(r.criterios, 3000), observacoes: txt(r.observacoes, 1500) }; });
@@ -2537,12 +2623,14 @@ function textoAula(u) {
   return [u.rotulo, (u.habilidades || []).length ? "Habilidades: " + u.habilidades.join(", ") : "", u.objetos ? "Objeto de conhecimento: " + u.objetos : "", u.objetivos ? "Objetivos: " + u.objetivos : "",
     u.desenvolvimento ? "Desenvolvimento: " + u.desenvolvimento : "", u.recursos ? "Recursos: " + u.recursos : "", u.avaliacao ? "Avaliação: " + u.avaliacao : ""].filter(Boolean).join("\n");
 }
+// tecnologias que a Manu escolheu quando o professor pediu sugestão
+const blocoTecPE = pe => (pe.tecnologias || []).length ? `<div class="pe-tecs"><b>${ico("spark")}Tecnologias que a Manu escolheu</b><ul>${pe.tecnologias.map(x => `<li><b>${esc(x.nome)}</b>${x.onde ? ` · <span class="muted">${esc(x.onde)}</span>` : ""}${x.porque ? `<br><span class="small">${esc(x.porque)}</span>` : ""}</li>`).join("")}</ul></div>` : "";
 function painelPlanoEscola(b) {
   const pe = b.planoEscola; if (!pe) return "";
   if (pe.modelo === "municipal") {
     const t = turmaAtual(), criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === b.num).map(p => p.data));
     return `<details class="bim-det pe-painel" open><summary><b>Planejamento diário (rede municipal)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
-      <div class="pe-corpo"><div class="toolbar"><button class="btn sm" data-act="pe-copiar-tudo" data-num="${b.num}">Copiar tudo</button><button class="btn sm primary" data-act="pe-planos" data-num="${b.num}" ${(pe.unidades || []).every(u => !u.data || criados.has(u.data)) ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula no Planejamento"}</button><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div>
+      <div class="pe-corpo"><div class="toolbar"><button class="btn sm" data-act="pe-copiar-tudo" data-num="${b.num}">Copiar tudo</button><button class="btn sm primary" data-act="pe-planos" data-num="${b.num}" ${(pe.unidades || []).every(u => !u.data || criados.has(u.data)) ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula no Planejamento"}</button><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div>${blocoTecPE(pe)}
       <div class="pe-aulas">${(pe.unidades || []).map((u, i) => `<article class="pe-aula"><div class="pe-campo-h"><b>${esc(u.rotulo)}${u.aulas > 1 ? ` · ${u.aulas} aulas` : ""}</b><button type="button" class="btn sm" data-act="pe-copiar-aula" data-num="${b.num}" data-i="${i}">Copiar</button></div>
         ${(u.habilidades || []).length ? `<div class="tec-tags">${u.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         ${[["Objeto de conhecimento", u.objetos], ["Objetivos", u.objetivos], ["Desenvolvimento", u.desenvolvimento], ["Recursos", u.recursos], ["Avaliação", u.avaliacao]].filter(x => x[1]).map(([k, v]) => `<p class="small"><b>${k}:</b> ${esc(v)}</p>`).join("")}</article>`).join("")}</div></div></details>`;
@@ -2550,7 +2638,7 @@ function painelPlanoEscola(b) {
   const tx = textosPlanoEscola(pe), F = { diario: "por aula", semanal: "semanal", quinzenal: "quinzenal" }[pe.formato];
   const campo = (k, tit) => `<div class="pe-campo"><div class="pe-campo-h"><b>${tit}</b><button type="button" class="btn sm" data-act="pe-copiar" data-campo="${k}" data-num="${b.num}">Copiar</button></div><textarea class="input pe-txt" data-campo="${k}" data-num="${b.num}" rows="${k === "acoes" ? 12 : 5}">${esc(pe.editado?.[k] ?? tx[k])}</textarea></div>`;
   return `<details class="bim-det pe-painel" open><summary><b>Planejamento para a escola (SGDE)</b><span class="small muted">${F} · ${(pe.unidades || []).length} ${tx.nomeU.toLowerCase()}s · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
-    <div class="pe-corpo"><p class="small muted">Confira, ajuste se quiser (fica salvo) e use <b>Copiar</b> para colar em cada campo do planejamento da escola.</p>
+    <div class="pe-corpo"><p class="small muted">Confira, ajuste se quiser (fica salvo) e use <b>Copiar</b> para colar em cada campo do planejamento da escola.</p>${blocoTecPE(pe)}
     ${campo("acoes", "Ações didáticas e estratégias para aprendizagem")}${campo("recuperar", "Recuperar para Avançar")}${campo("criterios", "Critérios e instrumentos avaliativos")}${campo("observacoes", "Observações do docente")}
     <div class="toolbar"><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div></div></details>`;
 }
@@ -2591,7 +2679,7 @@ async function iaTec() {
   const t = turmaAtual(), b = bimPorNum(t, dlg._bim);
   const habs = habsDe(b).length ? habsDe(b).map(textoHab) : (b.plano?.habilidades || []);
   await comIA(async (signal, st) => {
-    const r = await iaJSON({ tipo: "tecnologia", periodo: b.nome, habilidades: habs.slice(0, 25).map(x => String(x).slice(0, 400)), recursos: (b.recursos || []).slice(0, 40), quantidade: Number(val("tcQtd")) || 4, observacoes: val("tcObs") || undefined, turma: turmaIA(t.id) }, signal);
+    const r = await iaJSON({ tipo: "tecnologia", periodo: b.nome, habilidades: habs.slice(0, 25).map(x => String(x).slice(0, 400)), recursos: ((b.recursos || []).length ? b.recursos : meuEstilo()?.escolaTem || []).slice(0, 40), quantidade: Number(val("tcQtd")) || 4, observacoes: val("tcObs") || undefined, turma: turmaIA(t.id), perfil: textoEstilo(meuEstilo()) || undefined }, signal);
     const ids = (r && Array.isArray(r.ideias) ? r.ideias : []).map(x => ({ id: uid(), titulo: String(x.titulo || "Atividade").slice(0, 160), eixo: String(x.eixo || "").slice(0, 60), habilidade: String(x.habilidade || "").slice(0, 40), precisa: String(x.precisa || "").slice(0, 60),
       ferramentas: String(x.ferramentas || "").slice(0, 300), objetivo: String(x.objetivo || "").slice(0, 400), passos: (Array.isArray(x.passos) ? x.passos : []).slice(0, 8).map(p => String(p).slice(0, 300)), duracao: String(x.duracao || "").slice(0, 80), avaliacao: String(x.avaliacao || "").slice(0, 300) }));
     if (!ids.length) throw { message: "A resposta veio vazia. Tente de novo." };
@@ -2625,7 +2713,7 @@ document.addEventListener("click", async e => {
   if (act === "bim-hab-filtrar") return mudarBim(num, nb => { const n0 = habsDe(nb).length; nb.habs = habsDe(nb).filter(h => habDaTurma(h, t)); toast(`${n0 - nb.habs.length} habilidades de outra unidade retiradas`); });
   if (act === "ia-lerhabs") return iaLerHabs();
   if (act === "bim-hab-colar-ok") { const todas = dlg._sgdeHabs || lerTabelaSGDE(val("sgdeTxt")), sel = dlg.querySelectorAll('input[name="sgdeSel"]'), hs = sel.length ? [...sel].filter(x => x.checked).map(x => todas[Number(x.value)]) : todas; if (!hs.length) { toast("Marque pelo menos uma habilidade."); return; } fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades adicionadas`); }
-  if (act === "bim-pe") return dlgPlanoEscola(num);
+  if (act === "bim-pe") return meuEstilo() ? dlgPlanoEscola(num) : dlgEntrevista(() => dlgPlanoEscola(num));
   if (act === "ia-planoescola") return iaPlanoEscola();
   if (act === "pe-copiar-aula" || act === "pe-copiar-tudo") {
     const pe = bimPorNum(t, num)?.planoEscola, us = pe?.unidades || [], txt = act === "pe-copiar-tudo" ? us.map(textoAula).join("\n\n") : textoAula(us[Number(b.dataset.i)] || {});
@@ -2762,7 +2850,7 @@ async function iaBimestre() {
   await comIA(async (signal, st) => {
     const fer = []; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) { const x = semAula(d, escolaDe(t)); if (x && diaSemana(d) <= 5) fer.push(`${fmtData(d)} (${x.nome})`); }
     const extras = [fer.length ? "Dias sem aula no período: " + fer.join(", ") + "." : "", habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHab).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
-    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id) }, signal);
+    const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id), perfil: textoEstilo(meuEstilo()) || undefined }, signal);
     if (!r || !Array.isArray(r.semanas) || !r.semanas.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const nt = JSON.parse(JSON.stringify(t)); nt.aulasSemana = aulas;
     const nb = bimPorNum(nt, b.num); nb.conteudos = cont;
