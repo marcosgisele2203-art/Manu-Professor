@@ -47,6 +47,7 @@ Não há testes automatizados. Antes de entregar, rode `npm run verificar`; ele 
 - O `id` do registro é criado no navegador e é chave global. O servidor recusa um id que já pertence a outro professor.
 - Os alunos ficam dentro do registro da turma (`turma.alunos = [{ id, nome }]`). Turmas com o mesmo nome em disciplinas diferentes ("irmãs") compartilham a lista de alunos (`irmasDe`, `salvarAlunos`).
 - A coleção `perfil` guarda as respostas da entrevista "Meu jeito de dar aula" (um registro com `tipo: "estilo"` por professor; `meuEstilo()` e `textoEstilo()` no `app.js`). O texto vai no campo `perfil` dos pedidos de planejamento à IA.
+- A mesma coleção `perfil` guarda a rede de cada escola (registro `tipo: "redes"`, marcado em Meu perfil): `redeEscolhida()`; sem marcação, `modeloDaEscola()` adivinha pelo nome. Estadual = SGDE; municipal = Tagnos (plano por aula).
 - Campo novo no JSON não precisa de migração. Campo novo no `schema.prisma` precisa.
 
 ## Regras importantes
