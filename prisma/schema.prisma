@@ -19,6 +19,7 @@ model Professor {
   escolas   String[] @default([]) // escolas onde leciona (a primeira é a principal)
   disciplinas String[] @default([])
   etapas    String[] @default([]) // ei, ef1, ef2, em, eja, outro
+  trocarSenha Boolean @default(false) // entrou com senha provisória: precisa criar uma nova
   foto      String?  // foto do professor: endereço da foto do Google ou imagem pequena enviada por ele
   criadoEm  DateTime @default(now())
   aceitouTermosEm DateTime?

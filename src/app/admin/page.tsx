@@ -20,7 +20,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const mes = inicioDoMes();
   const semana = new Date(Date.now() - 7 * 864e5);
   const [profs, usoMes, usoTotal, porTipo, turmas, novos] = await Promise.all([
-    prisma.professor.findMany({ orderBy: { criadoEm: "desc" }, select: { id: true, nome: true, email: true, escola: true, escolas: true, criadoEm: true, limiteIA: true, bloqueado: true } }),
+    prisma.professor.findMany({ orderBy: { criadoEm: "desc" }, select: { id: true, nome: true, email: true, escola: true, escolas: true, trocarSenha: true, criadoEm: true, limiteIA: true, bloqueado: true } }),
     prisma.usoIA.groupBy({ by: ["professorId"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
     prisma.usoIA.aggregate({ _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
     prisma.usoIA.groupBy({ by: ["tipo"], where: { criadoEm: { gte: mes } }, _count: true, _sum: { tokensEntrada: true, tokensSaida: true } }),
@@ -78,7 +78,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
                 <input type="hidden" name="id" value={p.id} /><input type="hidden" name="acao" value={p.bloqueado ? "liberar" : "bloquear"} />
                 {p.bloqueado ? <button className="btn sm" type="submit">Liberar</button> : <button className="btn sm danger" type="submit">Suspender</button>}
                 {p.bloqueado && <span className="chip bad" style={{ marginLeft: 6 }}>suspenso</span>}</form></td>
-              <td>{profs.length > 1 && <details><summary className="small" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>Juntar com…</summary>
+              <td><form action="/api/admin/professor" method="post" style={{ marginBottom: 6 }}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="acao" value="senha-provisoria" />
+                <button className="btn sm" type="submit" title="O professor esqueceu a senha">Senha provisória</button>{p.trocarSenha && <span className="chip warn" style={{ marginLeft: 6 }}>aguardando troca</span>}</form>
+                {profs.length > 1 && <details><summary className="small" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>Juntar com…</summary>
                 <form action="/api/admin/professor" method="post" style={{ display: "grid", gap: 6, marginTop: 6, minWidth: 220 }}>
                   <input type="hidden" name="id" value={p.id} /><input type="hidden" name="acao" value="juntar" />
                   <span className="small muted">Levar tudo desta conta para:</span>

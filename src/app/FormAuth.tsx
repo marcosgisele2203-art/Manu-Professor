@@ -97,7 +97,7 @@ export default function FormAuth({ titulo, sub, campos, url, botao, rodape, extr
         ))}
         {!cadastro && extra}
         <button className="btn primary" type="submit" disabled={enviando}>{enviando ? "Aguarde…" : botao}</button>
-        <p className="small muted">{rodape}</p>
+        <div className="small muted">{rodape}</div>
       </form>
     </div>
   );

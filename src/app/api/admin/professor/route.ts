@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { adminAtual } from "@/lib/admin";
 import { backupParaDrive } from "@/lib/backup";
+import bcrypt from "bcryptjs";
+import { randomInt } from "crypto";
 
 const voltar = (msg: string, id = "") => new Response(null, { status: 303, headers: { Location: "/admin?msg=" + encodeURIComponent(msg) + (id ? "#p-" + id : "") } });
 
@@ -46,6 +48,11 @@ export async function POST(req: Request) {
       prisma.professor.delete({ where: { id: p.id } }),
     ]);
     return voltar(`Contas juntadas: ${regs.length} ${regs.length === 1 ? "item" : "itens"} de ${p.email} agora ${regs.length === 1 ? "está" : "estão"} em ${destino.email}. A conta ${p.email} foi apagada.`, destino.id);
+  } else if (acao === "senha-provisoria") {
+    // senha fácil de ditar: manu-1234-5678; no próximo acesso o professor cria a dele
+    const prov = `manu-${randomInt(1000, 9999)}-${randomInt(1000, 9999)}`;
+    await prisma.professor.update({ where: { id }, data: { senhaHash: await bcrypt.hash(prov, 10), trocarSenha: true } });
+    return voltar(`Senha provisória de ${p.email}: ${prov} — entregue ao professor. Ao entrar, ele vai criar uma senha nova.`, id);
   } else if (acao === "bloquear" || acao === "liberar") {
     await prisma.professor.update({ where: { id }, data: { bloqueado: acao === "bloquear" } });
   }

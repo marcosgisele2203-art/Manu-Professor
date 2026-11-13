@@ -6,13 +6,13 @@ import { situacaoIA, ehAdmin } from "@/lib/uso";
 
 export async function GET() {
   const id = await lerSessao();
-  const p = id ? await prisma.professor.findUnique({ where: { id }, select: { nome: true, email: true, escola: true, escolas: true, disciplinas: true, etapas: true, foto: true, googleRefresh: true } }) : null;
+  const p = id ? await prisma.professor.findUnique({ where: { id }, select: { nome: true, email: true, escola: true, escolas: true, disciplinas: true, etapas: true, foto: true, trocarSenha: true, senhaHash: true, googleRefresh: true } }) : null;
   if (!p) return NextResponse.json({ erro: "Faça login para continuar." }, { status: 401 });
   const sit = await situacaoIA(id!);
-  const { googleRefresh: _g, ...dados } = p;
+  const { googleRefresh: _g, senhaHash: _s, ...dados } = p;
   // contas antigas: a escola do cadastro vira a primeira da lista
   const escolas = dados.escolas.length ? dados.escolas : dados.escola ? [dados.escola] : [];
-  return NextResponse.json({ ...dados, escolas, ia: Boolean(process.env.ANTHROPIC_API_KEY), usoIA: sit, admin: ehAdmin(p.email), googleClientId: process.env.GOOGLE_CLIENT_ID || "", googleConectado: Boolean(p.googleRefresh) });
+  return NextResponse.json({ ...dados, escolas, ia: Boolean(process.env.ANTHROPIC_API_KEY), usoIA: sit, temSenha: Boolean(p.senhaHash), admin: ehAdmin(p.email), googleClientId: process.env.GOOGLE_CLIENT_ID || "", googleConectado: Boolean(p.googleRefresh) });
 }
 
 const texto = (max: number) => z.string().trim().min(1).max(max);

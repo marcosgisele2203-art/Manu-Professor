@@ -188,7 +188,7 @@ async function iniciar() {
   render();
   try {
     const eu = await api("GET", "/api/eu");
-    S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; S.foto = eu.foto || ""; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
+    S.nome = eu.nome || ""; S.escola = eu.escola || ""; S.escolas = eu.escolas || []; S.disciplinas = eu.disciplinas || []; S.etapas = eu.etapas || []; S.foto = eu.foto || ""; S.trocarSenha = !!eu.trocarSenha; S.temSenha = !!eu.temSenha; cap.ia = !!eu.ia; S.usoIA = eu.usoIA; S.admin = !!eu.admin; S.googleClientId = eu.googleClientId || ""; S.googleConectado = !!eu.googleConectado;
     const listas = await Promise.all(COLS.map(c => api("GET", "/api/dados/" + c)));
     COLS.forEach((c, i) => S[c] = listas[i]);
     // aplica por cima o que ainda está na fila (feito sem internet)
@@ -196,6 +196,7 @@ async function iniciar() {
     S.mode = "live";
     for (const t of S.turmas.filter(x => !bimestresDe(x).length)) { t.bimestres = bimestresPadrao(t.ano); api("PUT", "/api/dados/turmas", t).catch(() => {}); }
     mostrarSync(); enviarFila();
+    if (S.trocarSenha) setTimeout(dlgNovaSenha, 300);
   } catch (e) {
     if (e && e.code === "auth") return;
     S.mode = "erro"; S.erroRede = semRede(e);
@@ -372,6 +373,28 @@ function semTurma(msg) {
   <div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button>${S.mode === "live" ? `<button class="btn" data-act="seed">Carregar exemplo</button>` : ""}</div></div>`;
 }
 
+/* ----- Senha ----- */
+// entrou com senha provisória: precisa criar uma nova antes de usar
+function dlgNovaSenha() {
+  abrirDlg("Crie sua senha nova", `<p>Você entrou com uma <b>senha provisória</b>. Crie agora a sua senha, com pelo menos 8 caracteres.</p>
+    <div class="field"><label for="nsNova">Senha nova</label><input class="input" id="nsNova" type="password" autocomplete="new-password" minlength="8"></div>
+    <div class="field"><label for="nsConf">Repita a senha nova</label><input class="input" id="nsConf" type="password" autocomplete="new-password"></div><p class="small" id="nsMsg"></p>`,
+    `<button type="button" class="btn primary" data-act="senha-salvar">Salvar senha</button>`);
+  dlg.addEventListener("cancel", e => { if (S.trocarSenha) e.preventDefault(); }, { once: true });
+}
+async function salvarSenha(atual, nova, conf, msgEl) {
+  if (nova.length < 8) { msgEl.textContent = "A senha nova precisa ter pelo menos 8 caracteres."; return false; }
+  if (nova !== conf) { msgEl.textContent = "As duas senhas novas não são iguais."; return false; }
+  try { await api("POST", "/api/eu/senha", { atual, nova }); S.trocarSenha = false; S.temSenha = true; toast("Senha salva"); return true; }
+  catch (e) { msgEl.textContent = e.message || "Não foi possível salvar a senha."; return false; }
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act='senha-salvar'],[data-act='perfil-senha']"); if (!b) return;
+  if (b.dataset.act === "senha-salvar") { if (await salvarSenha("", val2("nsNova"), val2("nsConf"), document.getElementById("nsMsg"))) fechar(); return; }
+  const ok = await salvarSenha(val2("psAtual"), val2("psNova"), val2("psConf"), document.getElementById("psMsg"));
+  if (ok) render();
+});
+
 /* ----- Meu perfil ----- */
 async function salvarPerfil(dados, msg) {
   $("#syncState").textContent = "Salvando…";
@@ -418,6 +441,12 @@ function vPerfil() {
     ${lista(ds, "perfil-tira-disc", "Nenhuma disciplina cadastrada ainda.")}
     <form class="perfil-add" data-form="perfil-disc"><input class="input" id="pfDisc" placeholder="Digite ou escolha. Ex.: Matemática" list="pfDiscLista" maxlength="80" aria-label="Disciplina" autocomplete="off"><datalist id="pfDiscLista">${sug.map(c => `<option value="${esc(c)}">`).join("")}</datalist><button class="btn primary" type="submit">${ico("plus")}Adicionar disciplina</button></form>
     <div class="chips-esc" style="margin-top:10px"><span class="small muted">Mais comuns:</span>${sug.slice(0, 14).map(c => `<button type="button" class="tn-op" data-act="perfil-add-disc" data-v="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div></section>
+  <section class="panel"><div class="panel-head"><h2>${S.temSenha ? "Trocar senha" : "Criar uma senha"}</h2></div>
+    <p class="small muted">${S.temSenha ? "Para trocar, digite a senha atual e a nova." : "Você entra com o Google. Se quiser, crie também uma senha para entrar com e-mail e senha."}</p>
+    <div class="grid3">${S.temSenha ? `<div class="field"><label for="psAtual">Senha atual</label><input class="input" id="psAtual" type="password" autocomplete="current-password"></div>` : ""}
+      <div class="field"><label for="psNova">Senha nova</label><input class="input" id="psNova" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="psConf">Repita a senha nova</label><input class="input" id="psConf" type="password" autocomplete="new-password"></div></div>
+    <p class="small" id="psMsg"></p><button class="btn" data-act="perfil-senha">Salvar senha</button></section>
   <section class="panel"><div class="panel-head"><h2>App no celular</h2></div><p class="small muted">${instalado() ? "Você está usando o Manu Professor instalado neste aparelho." : "Instale para abrir com um toque e usar o diário mesmo sem internet. O que você fizer sem conexão é enviado sozinho quando a internet voltar."}</p>${instalado() ? "" : `<button class="btn" data-act="instalar-app">${ico("dl")}Instalar no celular</button>`}</section>
   <section class="panel"><div class="panel-head"><h2>Seus dados</h2></div><p class="small muted">Baixe uma cópia de tudo o que você guardou aqui: turmas, alunos, chamadas, notas, planos, provas e materiais. Os dados também têm backup automático todos os dias.</p><a class="btn" href="/api/eu/exportar" download>Baixar meus dados</a></section>`;
 }
