@@ -2445,7 +2445,10 @@ function dlgPlanoEscola(num) {
     <div class="field" id="peFmtBox" ${m0 === "municipal" ? "hidden" : ""}><span class="small muted">Como a escola pede o planejamento?</span><div class="chips-esc">${[["diario", "Por aula (diário)"], ["semanal", "Semanal"], ["quinzenal", "Quinzenal"]].map(([v, n]) => `<label class="check"><input type="radio" name="peFmt" value="${v}" ${f0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
     <div class="field"><span class="small muted">Habilidades deste planejamento ${hs.length ? "" : "(nenhuma no bimestre: a Manu escolhe as da série)"}</span>${hs.length ? `<div class="pe-habs">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="peHab" value="${i}" ${marca(h) ? "checked" : ""}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}</span></label>`).join("")}</div>` : ""}</div>
     <div class="field"><span class="small muted">Instrumentos avaliativos</span><div class="chips-esc">${INSTRUMENTOS.map(x => `<label class="check"><input type="checkbox" name="peIns" value="${esc(x)}" ${ins0.includes(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div></div>
-    <p class="small muted">Recursos: ${(b.recursos || []).length ? b.recursos.map(esc).join(", ") : "nenhum marcado (marque em “O que vou usar nas aulas”)"}.</p>
+    <div class="field"><span class="small muted">Recursos que você vai usar (inclusive os tecnológicos e a IA como apoio)</span>
+      ${RECURSOS.map(([g, xs]) => `<div class="rec-grupo"><span class="small"><b>${g}</b></span><div class="chips-esc">${xs.map(x => `<label class="check"><input type="checkbox" name="peRec" value="${esc(x)}" ${(b.recursos || []).includes(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div></div>`).join("")}
+      ${(b.recursos || []).filter(x => !RECURSOS.some(g => g[1].includes(x))).length ? `<div class="chips-esc">${(b.recursos || []).filter(x => !RECURSOS.some(g => g[1].includes(x))).map(x => `<label class="check"><input type="checkbox" name="peRec" value="${esc(x)}" checked><span>${esc(x)}</span></label>`).join("")}</div>` : ""}
+      <input class="input" id="peRecOutro" placeholder="Outro recurso (opcional). Ex.: Canva, horta da escola" maxlength="80"></div>
     <div class="field"><label for="peObs">Algo a considerar (opcional)</label><input class="input" id="peObs" value="${esc(pe.obsProf || "")}" placeholder="Ex.: turma com dificuldade em frações; usar a lousa digital nas aulas de geometria"></div>
     <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-planoescola">${ico("spark")}Gerar planejamento</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto. Fica guardado no bimestre para você copiar.</span></div></div>`,
     `<button type="button" class="btn" data-act="fechar">Fechar</button>`);
@@ -2457,13 +2460,16 @@ async function iaPlanoEscola() {
   const formato = modelo === "municipal" ? "diario" : dlg.querySelector('input[name="peFmt"]:checked')?.value || "quinzenal";
   const sel = hs.length ? [...dlg.querySelectorAll('input[name="peHab"]:checked')].map(x => hs[Number(x.value)]) : [];
   const instrumentos = [...dlg.querySelectorAll('input[name="peIns"]:checked')].map(x => x.value), obs = val("peObs");
+  const outroRec = val("peRecOutro").trim(), recursos = [...new Set([...dlg.querySelectorAll('input[name="peRec"]:checked')].map(x => x.value).concat(outroRec ? [outroRec] : []))];
+  // os recursos marcados aqui ficam guardados no bimestre
+  if (JSON.stringify(recursos) !== JSON.stringify(b.recursos || [])) await mudarBim(b.num, nb => { nb.recursos = recursos; });
   const unidades = unidadesDoBim(t, b, formato);
   if (!unidades.length) { document.getElementById("iaStatus").textContent = "Não há dias de aula neste bimestre. Confira as datas do bimestre e o horário."; return; }
   const eventos = [];
   for (const e of [...eventosDoAno(Number(b.inicio.slice(0, 4)))]) { const fim = e.fim || e.data; if (fim < b.inicio || e.data > b.fim || (e.escola && e.escola !== escolaDe(t)) || e.tipo === "com-aula") continue; eventos.push(`${fmtData(e.data)}${e.fim ? " a " + fmtData(e.fim) : ""}: ${e.nome} (${TIPOS_CAL[e.tipo] || e.tipo})`); }
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "planoescola", periodo: b.nome, formato, modelo, unidades: unidades.map(u => ({ rotulo: u.rotulo, aulas: u.aulas })), habilidades: sel.map(h => [h.codigo, h.descricao, h.unidade, h.objeto && "objeto: " + h.objeto].filter(Boolean).join(" – ").slice(0, 700)).slice(0, 60),
-      recursos: (b.recursos || []).slice(0, 50), eventos: eventos.slice(0, 40), instrumentos, observacoes: obs || undefined, turma: turmaIA(t.id) }, signal);
+      recursos: recursos.slice(0, 50), eventos: eventos.slice(0, 40), instrumentos, observacoes: obs || undefined, turma: turmaIA(t.id) }, signal);
     if (!r || !Array.isArray(r.unidades) || !r.unidades.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const txt = (x, n) => String(x || "").slice(0, n);
     await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs,
