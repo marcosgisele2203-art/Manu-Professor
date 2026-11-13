@@ -2465,8 +2465,10 @@ async function iaSumario() {
     lerCaps();
     // ler de novo o mesmo sumário mantém os capítulos já marcados nos bimestres
     // e não apaga a página que o professor completou à mão quando a leitura nova não traz esse número
-    const antigos = new Map(dlg._caps.map(c => [c.nome.toLocaleLowerCase("pt-BR"), c]));
-    const caps = (Array.isArray(r?.capitulos) ? r.capitulos : []).map(c => { const nome = String(c?.nome || "").trim().slice(0, 160), a = antigos.get(nome.toLocaleLowerCase("pt-BR"));
+    // nomes repetidos (ex.: "Revendo o que aprendi" em cada unidade): cada novo pega o antigo de mesmo nome na ordem
+    const antigos = new Map();
+    for (const c of dlg._caps) { const k = c.nome.toLocaleLowerCase("pt-BR"); antigos.set(k, [...(antigos.get(k) || []), c]); }
+    const caps = (Array.isArray(r?.capitulos) ? r.capitulos : []).map(c => { const nome = String(c?.nome || "").trim().slice(0, 160), a = (antigos.get(nome.toLocaleLowerCase("pt-BR")) || []).shift();
       return { id: a?.id || "c" + uid(), nome, pIni: pg(c?.paginaInicial) ?? a?.pIni ?? null, pFim: pg(c?.paginaFinal) ?? a?.pFim ?? null }; }).filter(c => c.nome).slice(0, 80);
     if (!caps.length) throw { message: "Não encontrei capítulos. Tente uma foto mais nítida, só do sumário." };
     dlg._caps = caps;
