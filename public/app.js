@@ -714,22 +714,46 @@ function vTurmas() {
       <div class="toolbar card-acoes"><a class="btn sm primary" href="${linkTurma(t.id)}">Abrir turma</a>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></article>`;
   }).join("")}</div>`;
   // dentro de cada escola, separa por turno (Matutino, Vespertino, Noturno, Integral)
+  // dentro do turno: separado por etapa (Fundamental, Médio...) e em ordem de série, letra e disciplina
+  const ETAPA_NOME = { ei: "Educação Infantil", ef1: "Ensino Fundamental · Anos iniciais", ef2: "Ensino Fundamental · Anos finais", em: "Ensino Médio", eja: "EJA", "": "Outras turmas" }, ETAPA_ORD = ["ei", "ef1", "ef2", "em", "eja", ""];
+  const etapaT = t => { const e = etapaDaSerie(t.serie || t.nome); return ETAPA_NOME[e] ? e : ""; };
+  const numSerie = t => { const m = String(t.nome || t.serie || "").match(/(\d+)/); return m ? Number(m[1]) : 99; };
+  const ordenar = l => l.slice().sort((a, b) => numSerie(a) - numSerie(b) || String(a.nome).localeCompare(String(b.nome), "pt-BR") || String(a.disciplina).localeCompare(String(b.disciplina), "pt-BR"));
+  const variasEtapas = new Set(S.turmas.map(etapaT)).size > 1;
+  const porEtapa = lista => {
+    if (!variasEtapas) return cartoes(ordenar(lista));
+    return ETAPA_ORD.filter(e => lista.some(t => etapaT(t) === e)).map(e => { const l = ordenar(lista.filter(t => etapaT(t) === e)); return `<h4 class="grupo-etapa etapa-${e || "outra"}">${ETAPA_NOME[e]} <small class="muted">${l.length} turma${l.length === 1 ? "" : "s"}</small></h4>` + cartoes(l); }).join("");
+  };
+  // botões dos turnos em que o professor tem aula: mostram só as turmas daquele turno
+  const ordT = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; };
+  const tnsTodos = [...new Set(S.turmas.map(turnoGrupo))].sort((a, b) => ordT(a) - ordT(b));
+  if (tnsTodos.length > 1) {
+    if (!S.turmasTurno || (S.turmasTurno !== "todos" && !tnsTodos.includes(S.turmasTurno))) {
+      const h = new Date().getHours(), agora = h < 12 ? "Matutino" : h < 18 ? "Vespertino" : "Noturno";
+      S.turmasTurno = tnsTodos.includes(agora) ? agora : tnsTodos[0];
+    }
+  } else S.turmasTurno = "todos";
+  const filtroT = S.turmasTurno, noFiltro = t => filtroT === "todos" || turnoGrupo(t) === filtroT;
+  const botoesT = tnsTodos.length > 1 ? `<div class="seg turnos-turmas" role="tablist" aria-label="Turno">${[...tnsTodos, "todos"].map(x => { const n = x === "todos" ? S.turmas.length : S.turmas.filter(t => turnoGrupo(t) === x).length; return `<button type="button" role="tab" class="${x === filtroT ? "on" : ""}" aria-selected="${x === filtroT}" data-act="turmas-turno" data-v="${esc(x)}">${x === "todos" ? "Todas" : esc(x || "Sem turno")} <small class="num">${n}</small></button>`; }).join("")}</div>` : "";
   const porTurno = lista => {
+    lista = lista.filter(noFiltro);
+    if (filtroT !== "todos") return porEtapa(lista);
     const ordem = x => { const i = ORDEM_TURNO.indexOf(x); return i < 0 ? 9 : i; };
     const tns = [...new Set(lista.map(turnoGrupo))].sort((a, b) => ordem(a) - ordem(b));
-    if (tns.length < 2 && tns[0]) return `<h3 class="grupo-turno">${esc(tns[0])} <small class="muted">${lista.length} turma${lista.length === 1 ? "" : "s"}</small></h3>` + cartoes(lista);
-    if (tns.length < 2) return cartoes(lista);
-    return tns.map(tn => { const l = lista.filter(t => turnoGrupo(t) === tn); return `<h3 class="grupo-turno">${esc(tn || "Sem turno")} <small class="muted">${l.length} turma${l.length === 1 ? "" : "s"}</small></h3>` + cartoes(l); }).join("");
+    if (tns.length < 2 && tns[0]) return `<h3 class="grupo-turno">${esc(tns[0])} <small class="muted">${lista.length} turma${lista.length === 1 ? "" : "s"}</small></h3>` + porEtapa(lista);
+    if (tns.length < 2) return porEtapa(lista);
+    return tns.map(tn => { const l = lista.filter(t => turnoGrupo(t) === tn); return `<h3 class="grupo-turno">${esc(tn || "Sem turno")} <small class="muted">${l.length} turma${l.length === 1 ? "" : "s"}</small></h3>` + porEtapa(l); }).join("");
   };
-  if (!variasEscolas()) return head + porTurno(S.turmas);
-  const semEsc = S.turmas.filter(t => !escolaDe(t));
-  return head + escolas().map(e => `<section class="grupo-escola"><h2>${ico("inicio")}${esc(e)} <small class="muted">${(n => `${n} turma${n === 1 ? "" : "s"}`)(S.turmas.filter(t => escolaDe(t) === e).length)}</small></h2>${porTurno(S.turmas.filter(t => escolaDe(t) === e))}</section>`).join("")
+  if (!variasEscolas()) return head + botoesT + porTurno(S.turmas);
+  const semEsc = S.turmas.filter(t => !escolaDe(t) && noFiltro(t));
+  return head + botoesT + escolas().filter(e => S.turmas.some(t => escolaDe(t) === e && noFiltro(t))).map(e => `<section class="grupo-escola"><h2>${ico("inicio")}${esc(e)} <small class="muted">${(n => `${n} turma${n === 1 ? "" : "s"}`)(S.turmas.filter(t => escolaDe(t) === e && noFiltro(t)).length)}</small></h2>${porTurno(S.turmas.filter(t => escolaDe(t) === e))}</section>`).join("")
     + (semEsc.length ? `<section class="grupo-escola"><h2>Sem escola definida</h2>${porTurno(semEsc)}</section>` : "");
 }
 
 // botão de bimestre no cartão: abre a turma já naquele período
 document.addEventListener("click", e => { const b = e.target.closest(".card-bim[data-bim]"); if (!b) return; S.bimSel[b.dataset.turma] = String(b.dataset.bim); });
 // o cartão inteiro abre a turma (menos os botões dentro dele)
+document.addEventListener("click", e => { const b = e.target.closest("[data-act='turmas-turno']"); if (b) { S.turmasTurno = b.dataset.v; render(); } });
 document.addEventListener("click", e => { const c = e.target.closest(".card-turma[data-abrir]"); if (!c || e.target.closest("a,button")) return; irTurma(c.dataset.abrir); });
 
 /* ----- Chamada ----- */
