@@ -54,7 +54,7 @@ Não há testes automatizados. Antes de entregar, rode `npm run verificar`; ele 
 ## Regras importantes
 
 ### Banco e deploy
-- O banco muda por **migrações** (`prisma/migrations`). Ao subir, o contêiner roda `prisma/migrar.sh`, que aplica as migrações pendentes (`prisma migrate deploy`); se falharem, o servidor não sobe. Nunca use `prisma db push` contra o banco de produção.
+- O banco muda por **migrações** (`prisma/migrations`). Ao subir, o contêiner roda `prisma/migrar.sh`, que aplica as migrações pendentes (`prisma migrate deploy`); se falharem, o servidor não sobe. Nunca use `prisma db push` contra o banco de produção. Bancos antigos, criados pelo `db push`, só recebem a migração inicial como "já aplicada" se forem iguais a `prisma/base/schema-0_inicial.prisma` (cópia congelada: não edite).
 - Para mudar o banco: edite `prisma/schema.prisma` e crie a migração com `npm run db:nova-migracao -- descricao_curta` (precisa de um Postgres local). Faça commit do schema **e** da pasta nova em `prisma/migrations` no mesmo PR. O CI falha se o schema e as migrações não baterem.
 - **Prefira mudanças aditivas** (coluna nova com `@default` ou opcional). Renomear ou apagar coluna/tabela só com plano combinado com o dono do projeto, e com backup feito antes do merge. Nunca edite uma migração que já foi para a `main`: crie outra.
 - O sistema roda em **uma instância só**. Limites de login, pedidos de IA em andamento e o agendamento do backup ficam em memória (`src/lib/limite.ts`, `src/lib/backup.ts`).
