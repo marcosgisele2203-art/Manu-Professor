@@ -2399,6 +2399,13 @@ function dlgColarSGDE(num) {
     <textarea class="input" id="sgdeTxt" rows="9" placeholder="Cole aqui (Ctrl+V)"></textarea><p class="small muted" id="sgdeInfo">Nada colado ainda.</p>`,
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-hab-colar-ok" disabled id="sgdeOk">Adicionar habilidades</button>`);
 }
+function listaImport(hs) {
+  const t = turmaAtual(), da = hs.filter(h => habDaTurma(h, t)).length, temUn = hs.some(h => h.unidade);
+  dlg._sgdeHabs = hs;
+  document.getElementById("sgdeInfo").innerHTML = `<b>${hs.length}</b> habilidades encontradas${temUn ? `. Marcadas só as de <b>${esc(t.disciplina)}</b> (${da}); marque outra se quiser` : ""}:
+    <div class="sgde-lidas">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="sgdeSel" value="${i}" ${habDaTurma(h, t) ? "checked" : ""}><span><span class="bncc">${esc(h.codigo || "—")}</span> ${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}${h.objeto ? `<small class="hab-obj">Objeto: ${esc(h.objeto)}</small>` : ""}</span></label>`).join("")}</div>`;
+  document.getElementById("sgdeOk").disabled = !hs.length;
+}
 async function iaLerHabs() {
   const fs = [...(document.getElementById("sgdeArq")?.files || [])].slice(0, 4), st0 = document.getElementById("iaStatus");
   if (!fs.length) { st0.textContent = "Escolha o print (ou os prints) da tabela."; return; }
@@ -2406,19 +2413,18 @@ async function iaLerHabs() {
   const arquivos = [];
   for (const f of fs) { const mime = f.type === "application/pdf" ? f.type : ["image/jpeg", "image/png", "image/webp"].includes(f.type) ? f.type : ""; if (!mime) { st0.textContent = "Use imagens (PNG ou JPG) ou PDF."; return; } arquivos.push({ dados: await lerBase64(f), mime }); }
   await comIA(async (signal, st) => {
-    const r = await iaJSON({ tipo: "lerhabs", arquivos }, signal);
+    const r = await iaJSON({ tipo: "lerhabs", componente: turmaAtual()?.disciplina, arquivos }, signal);
     const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").trim().slice(0, 40), descricao: String(h.descricao || "").trim().slice(0, 500), unidade: String(h.unidade || "").trim().slice(0, 60), objeto: String(h.objeto || "").replace(/^[•\s]+/, "").trim().slice(0, 200) }))
       .filter(h => h.codigo || h.descricao).map(h => { for (const k of ["unidade", "objeto"]) if (!h[k]) delete h[k]; return h; });
     if (!hs.length) throw { message: "Não encontrei habilidades no print. Tente um print mais nítido, só da tabela." };
-    dlg._sgdeHabs = hs;
-    document.getElementById("sgdeInfo").innerHTML = `<b>${hs.length}</b> habilidades lidas do print:<ul class="sgde-lidas">${hs.map(h => `<li><span class="bncc">${esc(h.codigo)}</span> ${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}</li>`).join("")}</ul>`;
-    document.getElementById("sgdeOk").disabled = false; st.textContent = "Confira e toque em Adicionar.";
+    listaImport(hs); st.textContent = "Confira as marcadas e toque em Adicionar.";
   });
 }
 document.addEventListener("input", e => {
   if (e.target.id !== "sgdeTxt") return;
-  dlg._sgdeHabs = null;
   const hs = lerTabelaSGDE(e.target.value), ok = document.getElementById("sgdeOk");
+  if (hs.length) { listaImport(hs); return; }
+  dlg._sgdeHabs = null;
   document.getElementById("sgdeInfo").innerHTML = hs.length ? `<b>${hs.length}</b> habilidades encontradas: ${hs.slice(0, 6).map(h => `<span class="bncc">${esc(h.codigo)}</span>`).join(" ")}${hs.length > 6 ? " …" : ""}${hs.some(h => h.objeto) ? " · com objeto de conhecimento" : ""}` : "Não encontrei códigos de habilidade. Confira se copiou a tabela inteira.";
   ok.disabled = !hs.length;
 });
@@ -2434,6 +2440,8 @@ function unidadesDoBim(t, b, formato) {
 }
 // modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano diário
 const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
+// a habilidade é do componente da turma? (Matemática x Matemática - RA)
+const habDaTurma = (h, t) => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
 const ehRA = x => /(^|[^a-z])ra([^a-z]|$)/i.test(String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 const INSTRUMENTOS = ["Prova bimestral", "Trabalho", "Participação nas atividades", "Lista de exercícios", "Atividade em grupo", "Seminário", "Avaliação diagnóstica", "Registro no caderno"];
 function dlgPlanoEscola(num) {
@@ -2577,8 +2585,9 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act, num = Number(b.dataset.num || dlg._bim), t = turmaAtual(); if (!t) return;
   if (act === "bim-hab-ia") return dlgHabIA(num);
   if (act === "bim-hab-colar") return dlgColarSGDE(num);
+  if (act === "bim-hab-filtrar") return mudarBim(num, nb => { const n0 = habsDe(nb).length; nb.habs = habsDe(nb).filter(h => habDaTurma(h, t)); toast(`${n0 - nb.habs.length} habilidades de outra unidade retiradas`); });
   if (act === "ia-lerhabs") return iaLerHabs();
-  if (act === "bim-hab-colar-ok") { const hs = dlg._sgdeHabs || lerTabelaSGDE(val("sgdeTxt")); fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades adicionadas`); }
+  if (act === "bim-hab-colar-ok") { const todas = dlg._sgdeHabs || lerTabelaSGDE(val("sgdeTxt")), sel = dlg.querySelectorAll('input[name="sgdeSel"]'), hs = sel.length ? [...sel].filter(x => x.checked).map(x => todas[Number(x.value)]) : todas; if (!hs.length) { toast("Marque pelo menos uma habilidade."); return; } fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades adicionadas`); }
   if (act === "bim-pe") return dlgPlanoEscola(num);
   if (act === "ia-planoescola") return iaPlanoEscola();
   if (act === "pe-copiar-aula" || act === "pe-copiar-tudo") {
@@ -2658,7 +2667,9 @@ function formPreparo(b, etapa) {
     <div class="prep-recs">${RECURSOS.map(([g, xs]) => { const n = xs.filter(x => rec.includes(x)).length; return `<details ${g === "Tecnologia" || n ? "open" : ""}><summary>${g}${n ? ` <small>${n} marcado${n > 1 ? "s" : ""}</small>` : ""}</summary><div>${xs.map(x => `<label><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" ${rec.includes(x) ? "checked" : ""}> ${esc(x)}</label>`).join("")}</div></details>`; }).join("")}</div>
     ${outros.length ? `<p class="small">Outros: ${outros.map(x => `<label class="prep-outro"><input type="checkbox" data-prep-rec="${esc(x)}" data-num="${b.num}" checked> ${esc(x)}</label>`).join(" ")}</p>` : ""}
     <form class="prep-linha curta" data-form="bim-rec" data-num="${b.num}"><input class="input" name="rec" placeholder="Outro recurso (opcional)" maxlength="80" aria-label="Outro recurso"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form></div>`;
+  const t = turmaAtual(), fora = hs.filter(h => !habDaTurma(h, t)).length;
   return passos + `<div class="prep-sec"><h3>Habilidades que vou trabalhar</h3>
+    ${fora ? `<div class="aviso-pop prep-fora"><span>${fora} ${fora === 1 ? "habilidade é" : "habilidades são"} de outra unidade curricular (não de ${esc(t.disciplina)}).</span><button type="button" class="btn sm" data-act="bim-hab-filtrar" data-num="${b.num}">Deixar só as de ${esc(t.disciplina)}</button></div>` : ""}
     ${hs.length ? `<table class="prep-habs"><thead><tr><th>Código</th><th>Descrição da habilidade</th><th>Objeto de conhecimento</th><th></th></tr></thead><tbody>${hs.map((h, i) => `<tr><td class="num"><b>${esc(h.codigo || "—")}</b></td><td>${esc(h.descricao)}</td><td>${esc(h.objeto || "")}</td><td><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar">×</button></td></tr>`).join("")}</tbody></table>` : ""}
     <form class="prep-linha" data-form="bim-hab" data-num="${b.num}"><input class="input" name="habCod" placeholder="Código" maxlength="40" aria-label="Código da habilidade"><input class="input" name="hab" placeholder="Descrição da habilidade" maxlength="500" aria-label="Descrição da habilidade"><input class="input" name="habObj" placeholder="Objeto de conhecimento" maxlength="200" aria-label="Objeto de conhecimento"><button class="btn" type="submit">${ico("plus")}Adicionar</button></form>
     <p class="small muted">Tem as habilidades em outro lugar? <button type="button" class="link-btn" data-act="bim-hab-colar" data-num="${b.num}">Importar de print, foto ou PDF</button> · <button type="button" class="link-btn" data-act="bim-hab-ia" data-num="${b.num}">Sugerir com IA</button></p></div>`;

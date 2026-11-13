@@ -575,3 +575,5 @@ a.per{text-decoration:none;color:inherit}
   .prep-habs td:last-child{position:absolute;top:4px;right:0;width:auto}.prep-habs td:nth-child(3):not(:empty)::before{content:"Objeto: ";color:var(--muted)}
 }
 @media (max-width:760px){.nav a.nav-sub{display:none}}
+.sgde-lidas{list-style:none;padding:0}.sgde-lidas .check{align-items:flex-start;border:0;padding:4px 0}
+.prep-fora{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0}
