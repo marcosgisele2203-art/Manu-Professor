@@ -51,7 +51,7 @@ export async function POST(req: Request) {
   } else if (acao === "senha-provisoria") {
     // senha fácil de ditar: manu-1234-5678; no próximo acesso o professor cria a dele
     const prov = `manu-${randomInt(1000, 9999)}-${randomInt(1000, 9999)}`;
-    await prisma.professor.update({ where: { id }, data: { senhaHash: await bcrypt.hash(prov, 10), trocarSenha: true } });
+    await prisma.professor.update({ where: { id }, data: { senhaHash: await bcrypt.hash(prov, 10), trocarSenha: true, sessaoVersao: { increment: 1 } } }); // encerra os logins abertos
     return voltar(`Senha provisória de ${p.email}: ${prov} — entregue ao professor. Ao entrar, ele vai criar uma senha nova.`, id);
   } else if (acao === "bloquear" || acao === "liberar") {
     await prisma.professor.update({ where: { id }, data: { bloqueado: acao === "bloquear" } });

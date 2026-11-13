@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     // primeira vez com o Google numa conta criada com senha: o Google confirmou o dono do e-mail, então
     // a senha antiga (que pode ter sido criada por outra pessoa) deixa de valer; o professor cria outra no perfil
     const primeiraVez = !p.googleSub && Boolean(p.senhaHash);
-    p = await prisma.professor.update({ where: { id: p.id }, data: { googleSub: perfil.sub, ...(primeiraVez ? { senhaHash: null, trocarSenha: false } : {}), ...(refresh ? { googleRefresh: refresh } : {}), ...(!p.foto && fotoGoogle ? { foto: fotoGoogle } : {}) } });
+    p = await prisma.professor.update({ where: { id: p.id }, data: { googleSub: perfil.sub, ...(primeiraVez ? { senhaHash: null, trocarSenha: false, sessaoVersao: { increment: 1 } } : {}), ...(refresh ? { googleRefresh: refresh } : {}), ...(!p.foto && fotoGoogle ? { foto: fotoGoogle } : {}) } });
   }
   await criarSessao(p.id, { google: true });
   return NextResponse.json({ ok: true });

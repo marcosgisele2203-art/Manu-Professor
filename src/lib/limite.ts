@@ -1,11 +1,11 @@
 // Limites simples em memória (um só servidor): tentativas de login e pedidos de IA em andamento
 const tentativas = new Map<string, { n: number; ate: number }>();
-const JANELA = 15 * 60 * 1000, MAX_ERROS = 8;
+const JANELA = 15 * 60 * 1000;
 
-export function loginBloqueado(chave: string) {
+export function loginBloqueado(chave: string, maxErros: number) {
   const t = tentativas.get(chave);
   if (!t || t.ate < Date.now()) { tentativas.delete(chave); return 0; }
-  return t.n >= MAX_ERROS ? Math.ceil((t.ate - Date.now()) / 60000) : 0;
+  return t.n >= maxErros ? Math.ceil((t.ate - Date.now()) / 60000) : 0;
 }
 export function loginErrou(chave: string) {
   const t = tentativas.get(chave);

@@ -25,6 +25,7 @@ model Professor {
   aceitouTermosEm DateTime?
   limiteIA  Int?     // usos de IA por mês; vazio = usa o padrão (LIMITE_IA_MENSAL)
   bloqueado Boolean  @default(false)
+  sessaoVersao Int   @default(0) // aumenta ao trocar a senha: encerra os logins abertos em outros aparelhos
   registros Registro[]
   usosIA    UsoIA[]
 
