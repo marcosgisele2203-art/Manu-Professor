@@ -76,7 +76,7 @@ Para criar uma função de IA nova:
 5. No navegador, use `comIA(async (signal, st) => { const r = await iaJSON({ tipo: ... }, signal); ... })`. Ela já mostra o status, o botão Parar e atualiza o contador de uso. Os botões de IA do diálogo têm `data-act="ia-..."`, e o status fica em `#iaStatus`.
 6. O resultado da IA é sempre uma sugestão: mostre para o professor conferir antes de salvar.
 
-Conteúdo de aula (plano, slides, questões) segue o "jeito Manu de ensinar" (`ESTILO` em `api/ia/route.ts`): gancho, conexão com a vida do aluno, explicação em camadas, curiosidade verdadeira e missão final. Não aplique esse estilo à leitura de arquivos nem ao planejamento oficial (SGDE/Tagnos). As seções do plano ficam em `SECOES_PLANO` no `app.js`.
+Plano de aula e slides seguem o "jeito Manu de ensinar" completo (`ESTILO` em `api/ia/route.ts`): gancho, conexão com a vida do aluno, explicação em camadas, curiosidade verdadeira e missão final. Questões usam só a parte do estilo que cabe numa questão: enunciado com situação real e próxima dos alunos, fatos corretos, e os campos "explicacao" (por quê) e "erroComum"; gancho, curiosidade e missão não entram em questão de prova. Não aplique esse estilo à leitura de arquivos nem ao planejamento oficial (SGDE/Tagnos). As seções do plano ficam em `SECOES_PLANO` no `app.js`.
 
 O modelo e o cálculo de custo estão em `MODELO` (`api/ia/route.ts`) e `PRECO` (`src/lib/uso.ts`).
 

@@ -615,7 +615,10 @@ a.per{text-decoration:none;color:inherit}
 /* "jeito Manu de ensinar": seções de encantamento no plano, slides novos e explicação das questões */
 .sec-manu{border-radius:12px;padding:10px 14px;margin:10px 0}
 .sec-manu h3{margin-top:0}
-.sec-gancho{background:#e3f5f6}.sec-curiosidade{background:#fdf0dc}.sec-missao{background:#fde8f0}
+/* tokens do tema, para o texto (--ink) continuar legível no modo escuro */
+.sec-gancho{background:var(--accent-soft)}.sec-gancho h3{color:var(--accent-soft-ink)}
+.sec-curiosidade{background:var(--warn-soft)}.sec-curiosidade h3{color:var(--warn)}
+.sec-missao{background:var(--mark)}.sec-missao h3{color:var(--mark-ink)}
 .sl-ic{font-size:7cqw;line-height:1}
 .sl-ic-t{margin-right:1.2cqw}
 .sl.imagine{background:#eee8fb}.sl.imagine .sl-in,.sl.curiosidade .sl-in{justify-content:center}
