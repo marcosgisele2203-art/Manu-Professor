@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Professor {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String?  // vazio em contas criadas com "Continuar com Google"
+  googleSub String?
+  googleRefresh String? // permissão do Google Drive guardada (criptografada)
+  escola    String?
+  escolas   String[] @default([]) // escolas onde leciona (a primeira é a principal)
+  disciplinas String[] @default([])
+  etapas    String[] @default([]) // ei, ef1, ef2, em, eja, outro
+  trocarSenha Boolean @default(false) // entrou com senha provisória: precisa criar uma nova
+  foto      String?  // foto do professor: endereço da foto do Google ou imagem pequena enviada por ele
+  criadoEm  DateTime @default(now())
+  aceitouTermosEm DateTime?
+  limiteIA  Int?     // usos de IA por mês; vazio = usa o padrão (LIMITE_IA_MENSAL)
+  bloqueado Boolean  @default(false)
+  sessaoVersao Int   @default(0) // aumenta ao trocar a senha: encerra os logins abertos em outros aparelhos
+  registros Registro[]
+  usosIA    UsoIA[]
+
+  @@index([googleSub])
+}
+
+// Cada chamada à IA, para controlar o limite mensal e o custo
+model UsoIA {
+  id            String    @id @default(cuid())
+  professorId   String
+  professor     Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  tipo          String
+  tokensEntrada Int       @default(0)
+  tokensSaida   Int       @default(0)
+  criadoEm      DateTime  @default(now())
+
+  @@index([professorId, criadoEm])
+  @@index([criadoEm])
+}
+
+// Cada turma, plano, chamada, avaliação, atividade, questão e prova do professor
+// é um registro JSON numa coleção. Simples de evoluir sem migrações a cada campo novo.
+model Registro {
+  id          String    @id
+  colecao     String
+  dados       Json
+  professorId String
+  professor   Professor @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  criadoEm    DateTime  @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([professorId, colecao, id])
+  @@index([professorId, colecao])
+}
+
+// Cópia local das questões do Enem de cada ano (fonte: API pública enem.dev, dados do INEP)
+model EnemProva {
+  ano          Int      @id
+  questoes     Json
+  atualizadoEm DateTime @updatedAt
+}
