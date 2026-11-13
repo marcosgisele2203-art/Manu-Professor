@@ -549,3 +549,5 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .sgde-lidas{margin:6px 0 0;padding-left:18px;display:grid;gap:3px;max-height:30vh;overflow:auto}
 .hab-form{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding-top:8px;border-top:1px dashed var(--line)}
 .hab-form .field{margin:0}.hab-form label{font-size:.78rem}.hab-form .btn{justify-self:start}
+.passo-n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.8rem;font-weight:800;margin-right:8px;vertical-align:middle;flex:none}
+.bim-det>summary b{display:inline-flex;align-items:center}
