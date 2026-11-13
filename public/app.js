@@ -1076,7 +1076,7 @@ document.addEventListener("click", e => {
     dlg._tn.nome = b.dataset.nome; if (!(dlg._tn.letras || []).length) dlg._tn.letras = ["A"];
     const se = dlg.querySelector("#tSerie"); se.value = b.dataset.serie;
     dlg.querySelector("#tDiscLista").innerHTML = [...new Set([...(S.disciplinas || []), ...componentesPara(b.dataset.etapa)])].map(c => `<option value="${esc(c)}">`).join("");
-    const disc = dlg.querySelector("#tDisc"); if (b.dataset.etapa === "ei" && disc.tagName === "INPUT" && !disc.value) disc.value = "Polivalente (todos os campos)";
+    const disc = dlg.querySelector("#tDisc"); if (b.dataset.etapa === "ei" && disc?.tagName === "INPUT" && !disc.value) disc.value = "Polivalente (todos os campos)";
     compoeNomeTurma();
   } else if (b.dataset.act === "tn-letra") {
     const v = b.dataset.v, editando = S.turmas.some(x => x.id === dlg._obj?.id);
@@ -1085,7 +1085,7 @@ document.addEventListener("click", e => {
     else ls = ls.includes(v) ? ls.filter(l => l !== v) : [...ls, v].sort((a, c) => LETRAS.indexOf(a) - LETRAS.indexOf(c));
     dlg._tn.letras = ls; if (!dlg._tn.nome) { toast("Escolha primeiro a série."); return; } compoeNomeTurma();
   }
-  else { abrirPopTurma(false); dlg.querySelector("#tDisc").focus(); }
+  else { abrirPopTurma(false); (dlg.querySelector("#tDisc") || dlg.querySelector('input[name="tDiscs"]'))?.focus(); }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && dlg.open && !dlg.querySelector("#tnPop")?.hidden) { e.preventDefault(); abrirPopTurma(false); } });
 // fecha a lista ao tocar fora dela (no início do toque, para não brigar com o foco no campo)
@@ -1134,13 +1134,19 @@ function dlgExcluirTurma(tid) {
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn danger" data-act="excluir-turma-ok" disabled id="exOk">Excluir turma</button>`);
 }
 document.addEventListener("change", e => { if (e.target.id === "exConf") document.getElementById("exOk").disabled = !e.target.checked; });
+// disciplinas marcadas no cadastro (várias) ou a escolhida/digitada (uma)
+function discsEscolhidas() { const cs = [...dlg.querySelectorAll('input[name="tDiscs"]:checked')].map(x => x.value); return cs.length || dlg.querySelector('input[name="tDiscs"]') ? cs : [val("tDisc")].filter(Boolean); }
+// a mesma turma em outras disciplinas (mesmo nome, escola e ano): compartilham a lista de alunos
+const irmasDe = t => S.turmas.filter(o => o.id !== t.id && o.nome === t.nome && escolaDe(o) === escolaDe(t) && String(o.ano || "") === String(t.ano || ""));
 function dlgTurma(t) {
   t = t || { id: uid(), nome: "", disciplina: (S.disciplinas || []).length === 1 ? S.disciplinas[0] : "", serie: "", ano: String(new Date().getFullYear()), turno: "", cor: CORES[S.turmas.length % CORES.length], alunos: [] };
   dlg._obj = t; dlg._tn = {};
   abrirDlg(t.nome ? "Editar turma" : "Nova turma", `
     <div class="grid2"><div class="field tn-campo"><label for="tNome">Nome da turma</label><input class="input" id="tNome" required value="${esc(t.nome)}" placeholder="Escolha a série e a turma" autocomplete="off" aria-haspopup="listbox" aria-expanded="false" aria-controls="tnPop">
 </div>
-    <div class="field"><label for="tDisc">Disciplina</label>${(S.disciplinas || []).length
+    <div class="field"><label for="tDisc">Disciplina</label>${!S.turmas.some(x => x.id === t.id) && (S.disciplinas || []).length > 1
+      ? `<div class="disc-ops" role="group" aria-label="Disciplinas desta turma">${S.disciplinas.map((d, i) => `<label class="check"><input type="checkbox" name="tDiscs" value="${esc(d)}" ${i === 0 ? "checked" : ""}><span>${esc(d)}</span></label>`).join("")}</div><small class="muted">Dá aula de mais de uma nesta turma? Marque todas: cada uma ganha seu diário e suas notas, com a mesma lista de alunos.</small><datalist id="tDiscLista" hidden>`
+      : (S.disciplinas || []).length
       ? `<select class="input" id="tDisc" required>${(t.disciplina && !S.disciplinas.includes(t.disciplina) ? [t.disciplina, ...S.disciplinas] : S.disciplinas).map(d => `<option ${t.disciplina === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select><small class="muted">Só as disciplinas do <a href="#perfil" data-act="fechar">Meu perfil</a>. Para outra, acrescente lá.</small><datalist id="tDiscLista" hidden>`
       : `<input class="input" id="tDisc" required value="${esc(t.disciplina)}" placeholder="Língua Portuguesa" list="tDiscLista" autocomplete="off"><datalist id="tDiscLista">`}${[...new Set([...(S.disciplinas || []), ...componentesPara(etapaDaSerie(t.serie))])].map(c => `<option value="${esc(c)}">`).join("")}</datalist></div></div>
 <div class="tn-pop" id="tnPop" hidden role="dialog" aria-label="Escolher série e turma"><div id="tnSeries">${gruposSeries(false)}</div>
@@ -2489,7 +2495,7 @@ S.alEdit = null;
 const limparNome = s => String(s).replace(/^\s*\d+[\s.\-–)]+/, "").replace(/\s+/g, " ").trim();
 function vAlunos() {
   const t = turmaAtual(), al = t.alunos || [], bim = bimSelecionado(t);
-  return `<div class="page-head"><div><h1>Alunos</h1><p class="muted">${al.length ? `${al.length} ${al.length === 1 ? "aluno" : "alunos"} nesta turma.` : "Cadastre os alunos para fazer chamada e lançar notas."}</p></div>${al.length > 1 ? `<div class="toolbar"><button class="btn sm" data-act="al-ordenar">Ordenar A a Z</button></div>` : ""}</div>
+  return `<div class="page-head"><div><h1>Alunos</h1><p class="muted">${al.length ? `${al.length} ${al.length === 1 ? "aluno" : "alunos"} nesta turma.` : "Cadastre os alunos para fazer chamada e lançar notas."}${irmasDe(t).length ? ` A mesma lista vale para ${irmasDe(t).map(o => esc(o.nome + " · " + o.disciplina)).join(", ")}.` : ""}</p></div>${al.length > 1 ? `<div class="toolbar"><button class="btn sm" data-act="al-ordenar">Ordenar A a Z</button></div>` : ""}</div>
   <section class="panel">
     <form class="toolbar" id="alForm" style="align-items:flex-end"><div class="field" style="flex:1;min-width:220px"><label for="alNome">Nome do aluno</label><input class="input" id="alNome" type="text" autocomplete="off" placeholder="Ex.: Ana Beatriz Souza"></div><button class="btn primary" type="submit">${ico("plus")}Adicionar</button></form>
     <details class="al-colar"><summary>Colar a lista da secretaria (vários nomes de uma vez)</summary>
@@ -2505,8 +2511,11 @@ function vAlunos() {
     : `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima ou cole a lista da secretaria.</p></div>`}`;
 }
 async function salvarAlunos(alunos, msg) {
-  const nt = JSON.parse(JSON.stringify(turmaAtual())); nt.alunos = alunos; S.alEdit = null;
-  await salvar("turmas", nt); if (msg) toast(msg);
+  const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)); nt.alunos = alunos; S.alEdit = null;
+  await salvar("turmas", nt);
+  // mesma turma em outras disciplinas: a lista de alunos é a mesma
+  for (const o of irmasDe(t)) { const c = JSON.parse(JSON.stringify(o)); c.alunos = JSON.parse(JSON.stringify(alunos)); await salvar("turmas", c); }
+  if (msg) toast(msg);
 }
 function adicionarNomes(nomes) {
   const t = turmaAtual(), atuais = (t.alunos || []).slice(), vistos = new Set(atuais.map(a => a.nome.toLowerCase()));
@@ -2685,18 +2694,21 @@ document.addEventListener("click", async e => {
     case "nova-turma": S.horPop = null; dlgTurma(); if (b.dataset.turno) { const sel = document.getElementById("tTurno"); if (sel) sel.value = b.dataset.turno; } if (b.dataset.escola) escolherEscolaDlg(b.dataset.escola); setTimeout(() => abrirPopTurma(true), 30); break;
     case "editar-turma": dlgTurma(JSON.parse(JSON.stringify(turma(id)))); break;
     case "salvar-turma": {
-      const ls = (dlg._tn?.letras || []).filter(l => l !== "Única");
-      if (!S.turmas.some(x => x.id === dlg._obj.id) && ls.length > 1 && val("tNome") === nomeComposto()) {
-        if (!val("tDisc")) { toast("Preencha a disciplina."); return; }
-        const base = S.turmas.length, criadas = ls.map((l, i) => ({ id: uid(), nome: `${dlg._tn.nome} ${l}`, disciplina: val("tDisc"), serie: val("tSerie"), ano: val("tAno"), turno: dlg._tn.turnos?.[l] || val("tTurno") || "", escola: val("tEscola"), cor: CORES[(base + i) % CORES.length], alunos: [], bimestres: bimestresPadrao(val("tAno")) }));
-        lembrarNoPerfil(val("tEscola"), val("tDisc"));
+      const ls = (dlg._tn?.letras || []).filter(l => l !== "Única"), discs = discsEscolhidas(), novaT = !S.turmas.some(x => x.id === dlg._obj.id);
+      if (novaT && !discs.length) { toast("Marque a disciplina."); return; }
+      if (novaT && (ls.length > 1 && val("tNome") === nomeComposto() || discs.length > 1)) {
+        if (!val("tNome")) { toast("Preencha o nome da turma."); return; }
+        const nomes = ls.length > 1 && val("tNome") === nomeComposto() ? ls.map(l => ({ nome: `${dlg._tn.nome} ${l}`, l })) : [{ nome: val("tNome"), l: null }];
+        const combos = nomes.flatMap(n => discs.map(d => ({ ...n, d })));
+        const base = S.turmas.length, criadas = combos.map(({ nome, l, d }, i) => ({ id: uid(), nome, disciplina: d, serie: val("tSerie"), ano: val("tAno"), turno: (l && dlg._tn.turnos?.[l]) || val("tTurno") || "", escola: val("tEscola"), cor: CORES[(base + i) % CORES.length], alunos: [], bimestres: bimestresPadrao(val("tAno")) }));
+        lembrarNoPerfil(val("tEscola"), discs[0]);
         fechar();
-        for (const o of criadas) await salvar("turmas", o);
-        toast(`${criadas.length} turmas criadas: ${criadas.map(o => o.nome.split(" ").pop()).join(", ")}`);
+        for (const o of criadas) { const irma = [...irmasDe(o), ...criadas.filter(x => x !== o && x.nome === o.nome)].find(x => (x.alunos || []).length); if (irma) o.alunos = JSON.parse(JSON.stringify(irma.alunos)); await salvar("turmas", o); }
+        toast(`${criadas.length} turmas criadas: ${criadas.map(o => (ls.length > 1 ? o.nome.split(" ").pop() : o.nome) + (discs.length > 1 ? " · " + o.disciplina : "")).join(", ")}`);
         for (const o of criadas) await pastaAutomatica(o.id);
         location.hash = "turmas"; break;
       }
-      const o = dlg._obj; o.nome = val("tNome"); o.disciplina = val("tDisc");
+      const o = dlg._obj; o.nome = val("tNome"); o.disciplina = novaT ? discs[0] : val("tDisc");
       if (!o.nome || !o.disciplina) { toast("Preencha o nome da turma e a disciplina."); return; }
       o.serie = val("tSerie"); o.ano = val("tAno"); o.turno = val("tTurno"); o.escola = val("tEscola");
       o.cor = (dlg.querySelector('input[name="tCor"]:checked') || {}).value || o.cor;
@@ -2704,6 +2716,7 @@ document.addEventListener("click", async e => {
       if (!bimestresDe(o).length) o.bimestres = bimestresPadrao(o.ano);
       delete o.exemplo;
       const nova = !S.turmas.some(x => x.id === o.id);
+      if (nova && !(o.alunos || []).length) { const irma = irmasDe(o).find(x => (x.alunos || []).length); if (irma) { o.alunos = JSON.parse(JSON.stringify(irma.alunos)); toast(`Alunos copiados de ${irma.nome} · ${irma.disciplina}`); } }
       lembrarNoPerfil(o.escola, o.disciplina);
       fechar(); S.turmaSel = o.id; await salvar("turmas", o); toast("Turma salva"); pastaAutomatica(o.id); if (nova) irTurma(o.id, "alunos"); break; }
     case "apagar-turma": dlgExcluirTurma(dlg._obj.id); break;

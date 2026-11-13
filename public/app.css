@@ -525,3 +525,4 @@ body.sem-rede #syncState{color:#9a6700;font-weight:700}
 .sit-g{display:grid;gap:6px}.sit-g>b{font-size:.92rem}.sit-g>b .num{font-weight:800}
 .sit-g>div{display:flex;flex-wrap:wrap;gap:6px}
 .sit-g.bad>b{color:#b42318}.sit-g.warn>b{color:#9a6700}.sit-g.ok>b{color:#1d7a46}
+.disc-ops{display:flex;flex-wrap:wrap;gap:6px}.disc-ops .check{border:1px solid var(--line);border-radius:10px;padding:8px 12px}
