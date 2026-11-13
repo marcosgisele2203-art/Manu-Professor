@@ -2313,13 +2313,35 @@ function chipsPeriodo(t) {
 
 /* Habilidades, recursos e tecnologia de cada bimestre */
 const RECURSOS = [["Na sala", ["Livro didático", "Quadro", "Material impresso", "Material concreto", "Jogos de tabuleiro ou cartas", "Cartazes", "Biblioteca"]],
-  ["Tecnologia", ["Projetor ou TV", "Computador do professor", "Caixa de som", "Laboratório de informática", "Chromebooks ou tablets", "Celular dos alunos", "Internet na sala", "Lousa digital", "Kit de robótica"]]];
-const TEC = new Set(RECURSOS[1][1]);
+  ["Tecnologia", ["Projetor ou TV", "Computador do professor", "Caixa de som", "Laboratório de informática", "Chromebooks ou tablets", "Celular dos alunos", "Internet na sala", "Lousa digital", "Kit de robótica"]],
+  ["IA e apoio digital", ["IA como apoio pedagógico (Manu/Claude)", "NotebookLM", "GeoGebra", "Google Formulários", "Wordwall", "Vídeos educativos"]]];
+const TEC = new Set([...RECURSOS[1][1], ...RECURSOS[2][1]]);
 S.bimAberto = {};
 document.addEventListener("toggle", e => { const d = e.target; if (d.classList && d.classList.contains("bim-det")) S.bimAberto[d.dataset.chave] = d.open; }, true);
 const habsDe = b => Array.isArray(b.habs) ? b.habs : [];
 const textoHab = h => (h.codigo ? h.codigo + " – " : "") + h.descricao;
-function lerHab(txt) { const m = String(txt).trim().match(/^((?:EI|EF|EM)\d{2}[A-Z]{2,4}\d{2,3})\s*[-–:.)]?\s*(.*)$/i); return m ? { codigo: m[1].toUpperCase(), descricao: m[2].trim() } : { codigo: "", descricao: String(txt).trim() }; }
+const RE_HAB = /(?:MS\.)?(?:EI|EF|EM)\d{2}[A-Z]{2,4}\d{2,3}(?:\.[a-z]\.\d+)?/i;
+function lerHab(txt) { const m = String(txt).trim().match(new RegExp("^(" + RE_HAB.source + ")\\s*[-–:.)]?\\s*(.*)$", "i")); return m ? { codigo: m[1], descricao: m[2].trim() } : { codigo: "", descricao: String(txt).trim() }; }
+// cola das tabelas do SGDE: "código | descrição | unidade" e "unidade | código | objeto de conhecimento"
+function lerTabelaSGDE(txt) {
+  const out = new Map(); let ult = null;
+  for (const linha of String(txt).split(/\r?\n/)) {
+    const cols = linha.split("\t").map(x => x.replace(/^[•\s]+/, "").trim()).filter(Boolean);
+    if (!cols.length) continue;
+    const i = cols.findIndex(c => new RegExp("^" + RE_HAB.source + "$", "i").test(c));
+    if (i < 0) { // continuação da descrição na linha de baixo
+      const m = linha.match(RE_HAB);
+      if (m) { const h = out.get(m[0]) || { codigo: m[0], descricao: "" }; h.descricao = h.descricao || linha.replace(m[0], "").replace(/^[\s\t•–-]+/, "").trim(); out.set(m[0], h); ult = h; }
+      else if (ult) ult.descricao = (ult.descricao + " " + cols.join(" ")).trim();
+      continue;
+    }
+    const cod = cols[i], h = out.get(cod) || { codigo: cod, descricao: "" };
+    if (i === 0) { h.descricao = cols[1] || h.descricao; if (cols[2]) h.unidade = cols[2]; }
+    else { if (cols[i - 1]) h.unidade = h.unidade || cols[i - 1]; if (cols[i + 1]) h.objeto = cols[i + 1]; }
+    out.set(cod, h); ult = h;
+  }
+  return [...out.values()];
+}
 async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)), nb = bimPorNum(nt, num); fn(nb, nt); await salvar("turmas", nt); if (msg) toast(msg); }
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
 function bimIA(b) {
@@ -2330,7 +2352,7 @@ function bimIA(b) {
     const attrs = f.acao ? `data-act="${f.acao}" data-num="${b.num}" data-bim-ir="${b.num}"` : `href="${href}" data-bim-ir="${b.num}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
     return `<${f.acao ? "button type=\"button\"" : "a"} class="ia-card${f.sub ? " sub" : ""}" ${attrs}><b>${f.nome}</b>${f.desc ? `<small>${f.desc}</small>` : ""}</${f.acao ? "button" : "a"}>`;
   };
-  const grupos = [], ferr = [{ grupo: "Planejamento do bimestre" }, { acao: "bim-ia", nome: "Planejar o bimestre", desc: "Semana a semana, BNCC" }, { acao: "bim-hab-ia", nome: "Habilidades da BNCC", desc: "Sugestões para o período" }, { acao: "bim-tec-ia", nome: "Ideias de tecnologia", desc: "Com e sem internet" },
+  const grupos = [], ferr = [{ grupo: "Planejamento do bimestre" }, { acao: "bim-pe", nome: "Planejamento para a escola", desc: "Por aula, semanal ou quinzenal (SGDE)" }, { acao: "bim-ia", nome: "Planejar o bimestre", desc: "Semana a semana, BNCC" }, { acao: "bim-hab-ia", nome: "Habilidades da BNCC", desc: "Sugestões para o período" }, { acao: "bim-tec-ia", nome: "Ideias de tecnologia", desc: "Com e sem internet" },
     { grupo: "Aulas" }, ...FERRAMENTAS_IA.slice(0, 2), ...FERRAMENTAS_IA.slice(2)];
   let atual = null;
   for (const f of ferr) { if (f.grupo) { atual = { nome: f.grupo, itens: [] }; grupos.push(atual); } else atual.itens.push(f); }
@@ -2346,8 +2368,8 @@ function bimExtras(b) {
   const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
   const aberto = S.bimAberto[chave] ?? (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim));
   return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b>Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia</span></summary><div class="bim-extras">
-    <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div>
-      ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
+    <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><div class="toolbar"><button class="btn sm" data-act="bim-hab-colar" data-num="${b.num}">Colar do SGDE</button><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div></div>
+      ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}${h.objeto ? `<small class="hab-obj">Objeto: ${esc(h.objeto)}</small>` : ""}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
       <form class="perfil-add" data-form="bim-hab" data-num="${b.num}"><input class="input" name="hab" placeholder="Ex.: EF07MA01 – Resolver problemas com números naturais" maxlength="400" aria-label="Nova habilidade"><button class="btn sm" type="submit">${ico("plus")}Adicionar</button></form></div>
     <div class="bim-box"><div class="bim-box-h"><h3>O que vou usar nas aulas</h3></div>
       ${RECURSOS.map(([g, xs]) => `<div class="rec-grupo"><span class="small muted">${g}</span><div class="chips-esc">${xs.map(x => `<button type="button" class="tn-op" data-act="bim-rec" data-num="${b.num}" data-v="${esc(x)}" aria-pressed="${rec.includes(x)}">${rec.includes(x) ? "✓ " : ""}${esc(x)}</button>`).join("")}</div></div>`).join("")}
@@ -2361,6 +2383,104 @@ function bimExtras(b) {
         <div class="toolbar"><button class="btn sm primary" data-act="bim-tec-plano" data-num="${b.num}" data-i="${i}">Virar plano de aula</button><button class="btn sm ghost" data-act="bim-tec-rem" data-num="${b.num}" data-i="${i}">Tirar</button></div></article>`).join("")}</div>` : ""}</div>
   </div></details>`;
 }
+function dlgColarSGDE(num) {
+  const b = bimPorNum(turmaAtual(), num); dlg._bim = num;
+  abrirDlg(`Colar habilidades do SGDE · ${esc(b.nome)}`, `<ol class="small"><li>No SGDE, abra o planejamento do bimestre.</li><li>Selecione a tabela <b>Organização Curricular Bimestral</b> (código, descrição e unidade), copie (Ctrl+C) e cole abaixo.</li><li>Se quiser, copie também a tabela <b>Disciplina/Unidade Curricular</b> (objeto de conhecimento) e cole embaixo.</li></ol>
+    <textarea class="input" id="sgdeTxt" rows="9" placeholder="Cole aqui (Ctrl+V)"></textarea><p class="small muted" id="sgdeInfo">Nada colado ainda.</p>`,
+    `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-hab-colar-ok" disabled id="sgdeOk">Adicionar habilidades</button>`);
+}
+document.addEventListener("input", e => {
+  if (e.target.id !== "sgdeTxt") return;
+  const hs = lerTabelaSGDE(e.target.value), ok = document.getElementById("sgdeOk");
+  document.getElementById("sgdeInfo").innerHTML = hs.length ? `<b>${hs.length}</b> habilidades encontradas: ${hs.slice(0, 6).map(h => `<span class="bncc">${esc(h.codigo)}</span>`).join(" ")}${hs.length > 6 ? " …" : ""}${hs.some(h => h.objeto) ? " · com objeto de conhecimento" : ""}` : "Não encontrei códigos de habilidade. Confira se copiou a tabela inteira.";
+  ok.disabled = !hs.length;
+});
+// aulas do bimestre pelo horário e pelo calendário, agrupadas por aula, semana ou quinzena
+function unidadesDoBim(t, b, formato) {
+  const n = d => { const w = diaSemana(d), k = horarioDe(t).filter(a => a.dia === w).length; return Math.max(1, k); };
+  const dias = diasDeAula(t, b.inicio, b.fim);
+  if (formato === "diario") return dias.map(d => ({ rotulo: `${DIAS[diaSemana(d)] || "Sábado"}, ${fmtData(d)}`, aulas: n(d), data: d }));
+  const sem = semanasDo(b).map(w => ({ ...w, aulas: dias.filter(d => d >= w.inicio && d <= addDias(w.fim, 1)).reduce((a, d) => a + n(d), 0) })).filter(w => w.aulas);
+  if (formato === "semanal") return sem.map((w, i) => ({ rotulo: `Semana ${i + 1} (${w.rotulo})`, aulas: w.aulas }));
+  const out = []; for (let i = 0; i < sem.length; i += 2) { const a = sem[i], z = sem[i + 1] || a; out.push({ rotulo: `${out.length + 1}ª quinzena (${fmtData(a.inicio)} a ${fmtData(z.fim)})`, aulas: a.aulas + (z !== a ? z.aulas : 0) }); }
+  return out;
+}
+// modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano diário
+const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
+const ehRA = x => /(^|[^a-z])ra([^a-z]|$)/i.test(String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+const INSTRUMENTOS = ["Prova bimestral", "Trabalho", "Participação nas atividades", "Lista de exercícios", "Atividade em grupo", "Seminário", "Avaliação diagnóstica", "Registro no caderno"];
+function dlgPlanoEscola(num) {
+  const t = turmaAtual(), b = bimPorNum(t, num), hs = habsDe(b); dlg._bim = num;
+  const pe = b.planoEscola || {}, m0 = pe.modelo || modeloDaEscola(escolaDe(t)), f0 = m0 === "municipal" ? "diario" : pe.formato || "quinzenal", ins0 = pe.instrumentos || ["Prova bimestral", "Trabalho"];
+  const marca = h => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
+  const tot = unidadesDoBim(t, b, "semanal").reduce((a, u) => a + u.aulas, 0);
+  abrirDlg(`Planejamento para a escola · ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)} · ${fmtData(b.inicio)} a ${fmtData(b.fim)} · <b>${tot} aulas</b> pelo seu horário e pelo calendário${horarioDe(t).length ? "" : ` <span class="chip warn">cadastre o horário desta turma em Meu horário para contar as aulas certo</span>`}</p>
+    <div class="field"><span class="small muted">Rede da escola</span><div class="chips-esc">${[["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (plano diário)"]].map(([v, n]) => `<label class="check"><input type="radio" name="peMod" value="${v}" ${m0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
+    <div class="field" id="peFmtBox" ${m0 === "municipal" ? "hidden" : ""}><span class="small muted">Como a escola pede o planejamento?</span><div class="chips-esc">${[["diario", "Por aula (diário)"], ["semanal", "Semanal"], ["quinzenal", "Quinzenal"]].map(([v, n]) => `<label class="check"><input type="radio" name="peFmt" value="${v}" ${f0 === v ? "checked" : ""}><span>${n}</span></label>`).join("")}</div></div>
+    <div class="field"><span class="small muted">Habilidades deste planejamento ${hs.length ? "" : "(nenhuma no bimestre: a Manu escolhe as da série)"}</span>${hs.length ? `<div class="pe-habs">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="peHab" value="${i}" ${marca(h) ? "checked" : ""}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}</span></label>`).join("")}</div>` : ""}</div>
+    <div class="field"><span class="small muted">Instrumentos avaliativos</span><div class="chips-esc">${INSTRUMENTOS.map(x => `<label class="check"><input type="checkbox" name="peIns" value="${esc(x)}" ${ins0.includes(x) ? "checked" : ""}><span>${esc(x)}</span></label>`).join("")}</div></div>
+    <p class="small muted">Recursos: ${(b.recursos || []).length ? b.recursos.map(esc).join(", ") : "nenhum marcado (marque em “O que vou usar nas aulas”)"}.</p>
+    <div class="field"><label for="peObs">Algo a considerar (opcional)</label><input class="input" id="peObs" value="${esc(pe.obsProf || "")}" placeholder="Ex.: turma com dificuldade em frações; usar a lousa digital nas aulas de geometria"></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-planoescola">${ico("spark")}Gerar planejamento</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Pode levar até um minuto. Fica guardado no bimestre para você copiar.</span></div></div>`,
+    `<button type="button" class="btn" data-act="fechar">Fechar</button>`);
+}
+document.addEventListener("change", e => { if (e.target.name === "peMod") { const mun = e.target.value === "municipal"; document.getElementById("peFmtBox").hidden = mun; if (mun) { const d = dlg.querySelector('input[name="peFmt"][value="diario"]'); if (d) d.checked = true; } } });
+async function iaPlanoEscola() {
+  const t = turmaAtual(), b = bimPorNum(t, dlg._bim), hs = habsDe(b);
+  const modelo = dlg.querySelector('input[name="peMod"]:checked')?.value || "estadual";
+  const formato = modelo === "municipal" ? "diario" : dlg.querySelector('input[name="peFmt"]:checked')?.value || "quinzenal";
+  const sel = hs.length ? [...dlg.querySelectorAll('input[name="peHab"]:checked')].map(x => hs[Number(x.value)]) : [];
+  const instrumentos = [...dlg.querySelectorAll('input[name="peIns"]:checked')].map(x => x.value), obs = val("peObs");
+  const unidades = unidadesDoBim(t, b, formato);
+  if (!unidades.length) { document.getElementById("iaStatus").textContent = "Não há dias de aula neste bimestre. Confira as datas do bimestre e o horário."; return; }
+  const eventos = [];
+  for (const e of [...eventosDoAno(Number(b.inicio.slice(0, 4)))]) { const fim = e.fim || e.data; if (fim < b.inicio || e.data > b.fim || (e.escola && e.escola !== escolaDe(t)) || e.tipo === "com-aula") continue; eventos.push(`${fmtData(e.data)}${e.fim ? " a " + fmtData(e.fim) : ""}: ${e.nome} (${TIPOS_CAL[e.tipo] || e.tipo})`); }
+  await comIA(async (signal, st) => {
+    const r = await iaJSON({ tipo: "planoescola", periodo: b.nome, formato, modelo, unidades: unidades.map(u => ({ rotulo: u.rotulo, aulas: u.aulas })), habilidades: sel.map(h => [h.codigo, h.descricao, h.unidade, h.objeto && "objeto: " + h.objeto].filter(Boolean).join(" – ").slice(0, 700)).slice(0, 60),
+      recursos: (b.recursos || []).slice(0, 50), eventos: eventos.slice(0, 40), instrumentos, observacoes: obs || undefined, turma: turmaIA(t.id) }, signal);
+    if (!r || !Array.isArray(r.unidades) || !r.unidades.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
+    const txt = (x, n) => String(x || "").slice(0, n);
+    await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs,
+      acoesIntro: txt(r.acoesIntro, 3000), unidades: r.unidades.slice(0, 70).map((u, i) => ({ rotulo: txt(u.rotulo || unidades[i]?.rotulo, 120), data: unidades[i]?.data || "", aulas: unidades[i]?.aulas || 1, habilidades: (Array.isArray(u.habilidades) ? u.habilidades : []).map(String).slice(0, 12), objetos: txt(u.objetos, 600),
+        objetivos: txt(u.objetivos, 1200), desenvolvimento: txt(u.desenvolvimento, 4000), recursos: txt(u.recursos, 600), avaliacao: txt(u.avaliacao, 800) })),
+      recuperar: txt(r.recuperar, 4000), criterios: txt(r.criterios, 3000), observacoes: txt(r.observacoes, 1500) }; });
+    st.textContent = "Pronto."; fechar(); toast(`Planejamento ${formato === "diario" ? "por aula" : formato} do ${b.nome} pronto`);
+    setTimeout(() => document.querySelector(`#bim-${b.num} .pe-painel`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  });
+}
+// texto de cada campo do SGDE, para copiar
+function textosPlanoEscola(pe) {
+  const nomeU = { diario: "Aula", semanal: "Semana", quinzenal: "Quinzena" }[pe.formato] || "Período";
+  return {
+    acoes: [pe.acoesIntro, ...(pe.unidades || []).map(u => `${u.rotulo}${(u.habilidades || []).length ? ` — Habilidades: ${u.habilidades.map(h => `(${h})`).join(" e ")}` : ""}${u.objetos ? `. Objetos de conhecimento: ${u.objetos}` : ""}\n${u.desenvolvimento}`)].filter(Boolean).join("\n\n"),
+    recuperar: pe.recuperar || "", criterios: [(pe.instrumentos || []).join("\n"), pe.criterios].filter(Boolean).join("\n"), observacoes: pe.observacoes || "", nomeU,
+  };
+}
+function textoAula(u) {
+  return [u.rotulo, (u.habilidades || []).length ? "Habilidades: " + u.habilidades.join(", ") : "", u.objetos ? "Objeto de conhecimento: " + u.objetos : "", u.objetivos ? "Objetivos: " + u.objetivos : "",
+    u.desenvolvimento ? "Desenvolvimento: " + u.desenvolvimento : "", u.recursos ? "Recursos: " + u.recursos : "", u.avaliacao ? "Avaliação: " + u.avaliacao : ""].filter(Boolean).join("\n");
+}
+function painelPlanoEscola(b) {
+  const pe = b.planoEscola; if (!pe) return "";
+  if (pe.modelo === "municipal") {
+    const t = turmaAtual(), criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === b.num).map(p => p.data));
+    return `<details class="bim-det pe-painel" open><summary><b>Planejamento diário (rede municipal)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+      <div class="pe-corpo"><div class="toolbar"><button class="btn sm" data-act="pe-copiar-tudo" data-num="${b.num}">Copiar tudo</button><button class="btn sm primary" data-act="pe-planos" data-num="${b.num}" ${(pe.unidades || []).every(u => !u.data || criados.has(u.data)) ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula no Planejamento"}</button><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div>
+      <div class="pe-aulas">${(pe.unidades || []).map((u, i) => `<article class="pe-aula"><div class="pe-campo-h"><b>${esc(u.rotulo)}${u.aulas > 1 ? ` · ${u.aulas} aulas` : ""}</b><button type="button" class="btn sm" data-act="pe-copiar-aula" data-num="${b.num}" data-i="${i}">Copiar</button></div>
+        ${(u.habilidades || []).length ? `<div class="tec-tags">${u.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
+        ${[["Objeto de conhecimento", u.objetos], ["Objetivos", u.objetivos], ["Desenvolvimento", u.desenvolvimento], ["Recursos", u.recursos], ["Avaliação", u.avaliacao]].filter(x => x[1]).map(([k, v]) => `<p class="small"><b>${k}:</b> ${esc(v)}</p>`).join("")}</article>`).join("")}</div></div></details>`;
+  }
+  const tx = textosPlanoEscola(pe), F = { diario: "por aula", semanal: "semanal", quinzenal: "quinzenal" }[pe.formato];
+  const campo = (k, tit) => `<div class="pe-campo"><div class="pe-campo-h"><b>${tit}</b><button type="button" class="btn sm" data-act="pe-copiar" data-campo="${k}" data-num="${b.num}">Copiar</button></div><textarea class="input pe-txt" data-campo="${k}" data-num="${b.num}" rows="${k === "acoes" ? 12 : 5}">${esc(pe.editado?.[k] ?? tx[k])}</textarea></div>`;
+  return `<details class="bim-det pe-painel" open><summary><b>Planejamento para a escola (SGDE)</b><span class="small muted">${F} · ${(pe.unidades || []).length} ${tx.nomeU.toLowerCase()}s · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+    <div class="pe-corpo"><p class="small muted">Confira, ajuste se quiser (fica salvo) e use <b>Copiar</b> para colar em cada campo do planejamento da escola.</p>
+    ${campo("acoes", "Ações didáticas e estratégias para aprendizagem")}${campo("recuperar", "Recuperar para Avançar")}${campo("criterios", "Critérios e instrumentos avaliativos")}${campo("observacoes", "Observações do docente")}
+    <div class="toolbar"><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div></div></details>`;
+}
+document.addEventListener("change", async e => {
+  const ta = e.target.closest(".pe-txt"); if (!ta) return;
+  await mudarBim(Number(ta.dataset.num), nb => { nb.planoEscola.editado = { ...(nb.planoEscola.editado || {}), [ta.dataset.campo]: ta.value }; }, "Texto salvo");
+});
 function dlgHabIA(num) {
   const t = turmaAtual(), b = bimPorNum(t, num); dlg._bim = num; dlg._habs = [];
   abrirDlg(`Habilidades do ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}</p>
@@ -2411,9 +2531,26 @@ document.addEventListener("submit", async e => {
   document.querySelector(`[data-form='${f.dataset.form}'][data-num='${num}'] input`)?.focus();
 });
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act^='bim-hab'],[data-act='bim-rec'],[data-act^='bim-tec'],[data-act='ia-habs'],[data-act='ia-tec']"); if (!b) return;
+  const b = e.target.closest("[data-act^='bim-hab'],[data-act='bim-rec'],[data-act^='bim-tec'],[data-act='ia-habs'],[data-act='ia-tec'],[data-act='bim-pe'],[data-act='ia-planoescola'],[data-act^='pe-copiar'],[data-act='pe-planos']"); if (!b) return;
   const act = b.dataset.act, num = Number(b.dataset.num || dlg._bim), t = turmaAtual(); if (!t) return;
   if (act === "bim-hab-ia") return dlgHabIA(num);
+  if (act === "bim-hab-colar") return dlgColarSGDE(num);
+  if (act === "bim-hab-colar-ok") { const hs = lerTabelaSGDE(val("sgdeTxt")); fechar(); return mudarBim(num, nb => { const ja = new Map(habsDe(nb).map(h => [h.codigo, h])); for (const h of hs) ja.set(h.codigo, { ...(ja.get(h.codigo) || {}), ...h }); nb.habs = [...ja.values()]; }, `${hs.length} habilidades do SGDE adicionadas`); }
+  if (act === "bim-pe") return dlgPlanoEscola(num);
+  if (act === "ia-planoescola") return iaPlanoEscola();
+  if (act === "pe-copiar-aula" || act === "pe-copiar-tudo") {
+    const pe = bimPorNum(t, num)?.planoEscola, us = pe?.unidades || [], txt = act === "pe-copiar-tudo" ? us.map(textoAula).join("\n\n") : textoAula(us[Number(b.dataset.i)] || {});
+    try { await navigator.clipboard.writeText(txt); toast("Copiado. Agora cole no planejamento da escola (Ctrl+V)."); } catch (_) { toast("Não consegui copiar automaticamente neste aparelho."); }
+    return;
+  }
+  if (act === "pe-planos") {
+    const bi = bimPorNum(t, num), pe = bi?.planoEscola; if (!pe) return;
+    const ja = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === num).map(p => p.data)); let n = 0; b.disabled = true;
+    for (const u of pe.unidades || []) { if (!u.data || ja.has(u.data)) continue;
+      await salvar("planos", { id: uid(), turmaId: t.id, data: u.data, titulo: u.objetos ? u.objetos.slice(0, 120) : u.rotulo, duracao: `${u.aulas || 1} aula${(u.aulas || 1) > 1 ? "s" : ""} de 50 min`, bncc: (u.habilidades || []).join(", "), objetivos: u.objetivos || "", conteudo: u.objetos || "", metodologia: u.desenvolvimento || "", recursos: u.recursos || "", avaliacao: u.avaliacao || "", status: "planejado", origem: { pe: num } }); n++; }
+    toast(`${n} planos de aula criados no Planejamento, um por dia de aula.`); return;
+  }
+  if (act === "pe-copiar") { const ta = document.querySelector(`.pe-txt[data-campo="${b.dataset.campo}"][data-num="${num}"]`); if (!ta) return; try { await navigator.clipboard.writeText(ta.value); } catch (_) { ta.select(); document.execCommand("copy"); } toast("Copiado. Agora cole no campo do SGDE (Ctrl+V)."); return; }
   if (act === "ia-habs") return iaHabs();
   if (act === "bim-tec-ia") return dlgTecIA(num);
   if (act === "ia-tec") return iaTec();
@@ -2456,6 +2593,7 @@ function vBimestres() {
       <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
       ${bimIA(b)}
       ${bimExtras(b)}
+      ${painelPlanoEscola(b)}
       ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
         ${(pl.semanas || []).map((s, i) => `<tr><td class="num"><b>${i + 1}</b><div class="small muted">${esc(sem[i]?.rotulo || "")}</div></td><td><b>${esc(s.tema)}</b></td><td class="small">${esc(s.habilidades || "")}</td><td class="small">${esc(s.objetivos || "")}</td><td class="small">${esc(s.atividades || "")}</td><td class="small">${esc(s.avaliacao || "")}</td><td>${criados.has(i + 1) ? '<span class="chip ok">plano criado</span>' : ""}</td></tr>`).join("")}
