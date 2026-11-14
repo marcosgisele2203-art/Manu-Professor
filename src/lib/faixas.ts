@@ -24,8 +24,10 @@ export function faixaDaSerie(...textos: (string | undefined)[]): Faixa | null {
     // "série" sem "fundamental" é o nome atual do Ensino Médio (1ª a 3ª série)
     const serieAntiga = s.match(/([1-8])\s*[ªa°]?\s*s[ée]rie/i);
     if (serieAntiga) {
-      if (!/fundamental|\bEF\b/i.test(s)) return Number(serieAntiga[1]) <= 3 ? "em" : null;
-      return Number(serieAntiga[1]) + 1 <= 5 ? "ef1" : "ef2"; // nomenclatura antiga do fundamental: 4ª série = 5º ano
+      const n = Number(serieAntiga[1]);
+      // 1ª a 3ª série sem "fundamental" é Ensino Médio; 4ª a 8ª só existe no fundamental antigo (4ª série = 5º ano)
+      if (n <= 3 && !/fundamental|\bEF\b/i.test(s)) return "em";
+      return n + 1 <= 5 ? "ef1" : "ef2";
     }
     if (/anos? iniciais/i.test(s)) return "ef1";
     if (/anos? finais/i.test(s)) return "ef2";
