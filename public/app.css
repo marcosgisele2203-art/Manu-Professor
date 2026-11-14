@@ -629,3 +629,12 @@ a.per{text-decoration:none;color:inherit}
 .sl.desafio .sl-rot{color:#a8205a}.sl.desafio::before{content:"";position:absolute;inset:0 0 auto;height:30%;background:#fde8f0}
 .sl.desafio ul{margin-top:3cqw}
 .q-exp{margin:4px 0 0;padding:6px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent-soft-ink)}
+
+/* Bimestres: visão geral em cartões curtos */
+.bim-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.bim-linha{display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);text-decoration:none;box-shadow:var(--shadow)}
+.bim-linha:hover,.bim-linha:focus-visible{border-color:var(--accent)}
+.bim-linha.agora{border-color:var(--accent);border-width:2px}
+.bim-linha-tit{display:flex;justify-content:space-between;align-items:center;gap:8px}.bim-linha-tit b{font-size:1.1rem}
+.bim-linha .bim-falta{color:var(--warn);font-weight:600}
+.bim-linha .btn{align-self:flex-start;margin-top:4px;pointer-events:none}
