@@ -80,7 +80,7 @@ Plano de aula e slides seguem o "jeito Manu de ensinar" completo (`ESTILO` em `a
 
 O estilo e as questões também se adaptam à idade da turma: `src/lib/faixas.ts` descobre a faixa pela série/etapa digitada (Educação Infantil, anos iniciais, anos finais, Ensino Médio, EJA) e devolve as regras daquela idade (`regrasFaixa("aula" | "questoes", serie)`). Sem série reconhecível, o prompt leva as cinco faixas e pede para a IA escolher a mais provável pelo tema.
 
-O modelo e o cálculo de custo estão em `MODELO` (`api/ia/route.ts`) e `PRECO` (`src/lib/uso.ts`).
+O modelo de cada função e o cálculo de custo ficam em `src/lib/uso.ts` (`modeloDe()` e `PRECOS`): Opus em todo conteúdo criativo; só as instruções de atividade usam um modelo mais barato. Ao trocar ou incluir um modelo, atualize os dois.
 
 ### Padrões do `public/app.js`
 - O estado global fica em `S`. As telas são funções `vNome()` que devolvem HTML em string, e `render()` redesenha.

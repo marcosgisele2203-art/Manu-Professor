@@ -2,14 +2,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { lerSessao } from "@/lib/auth";
 import { iaEmAndamento, iaComecou, iaTerminou } from "@/lib/limite";
-import { situacaoIA, registrarUso } from "@/lib/uso";
+import { situacaoIA, registrarUso, modeloDe } from "@/lib/uso";
 import { promptMaterial, SUBTIPOS, ADAPTACOES } from "@/lib/materiais";
 import { regrasFaixa } from "@/lib/faixas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const MODELO = "claude-opus-5-5";
 const client = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
 
 const SISTEMA = `Você é a Manu, assistente pedagógica que apoia professores da educação básica no Brasil. Escreva em português do Brasil, de forma prática e direta, alinhado à BNCC quando fizer sentido. Não invente dados sobre alunos. Na Educação Infantil, trabalhe com os campos de experiência e os objetivos de aprendizagem e desenvolvimento da BNCC (códigos como EI03EF01), com propostas lúdicas e sem provas; no Ensino Médio, use as competências e habilidades por área (códigos como EM13LGG101).`;
@@ -268,10 +267,10 @@ export async function POST(req: Request) {
     registrarUso(pid, tipo, m.usage?.input_tokens ?? 0, m.usage?.output_tokens ?? 0);
 
   const stream = client.beta.messages.stream({
-    model: MODELO,
+    model: modeloDe(tipo),
     max_tokens: 16000,
     system: SISTEMA,
-    output_config: { effort: "medium" },
+    output_config: { effort: tipo === "atividade" ? "low" : "medium" },
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     messages: mensagens,
