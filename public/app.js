@@ -45,7 +45,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["calendario", "Calendário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Painel"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+const ABAS = [["resumo", "Painel"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"], ["construir", "Construir com a Manu IA"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["bimestre", "planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
@@ -322,7 +322,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>${S.erroRede ? "Sem internet" : "Não foi possível carregar seus dados"}</h3><p>${S.erroRede ? "Este aparelho ainda não tem uma cópia dos seus dados. Abra o sistema uma vez com internet; depois ele funciona mesmo sem conexão." : "Verifique a internet e recarregue a página."}</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente, construir: vConstruir }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -726,6 +726,13 @@ function vInicio() {
 }
 
 /* ----- Resumo da turma ----- */
+/* ----- Construir com a Manu IA ----- */
+// Página que vai reunir as ferramentas de IA da turma; cada ferramenta entra aqui aos poucos
+function vConstruir() {
+  const t = turmaAtual();
+  return `<div class="page-head"><div><h1>Construir conteúdo com a Manu IA</h1><p class="muted">Tudo o que a Manu cria para ${esc(t.nome)} vai ficar reunido aqui.</p></div></div>
+    <div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Em construção</h3><p>As ferramentas vão aparecer aqui, uma de cada vez.</p><a class="btn" href="${linkTurma(t.id, "resumo")}">Voltar ao Painel</a></div>`;
+}
 function vResumoTurma() {
   const t = turmaAtual(), d0 = hoje(), al = t.alunos || [];
   const bimR = bimSelecionado(t), Br = bimR ? bimPorNum(t, bimR) : null;
@@ -741,9 +748,8 @@ function vResumoTurma() {
   const px = proximaAula(t);
   const linhaHor = px ? `<a class="faixa-hor" href="#horario">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
     : `<a class="faixa-hor vazio" href="#horario"><b>Cadastre o horário de aula</b><span>Dias e horários desta turma</span></a>`;
-  // botão principal: leva ao bimestre (atual ou escolhido), onde ficam as ferramentas de IA; sem bimestres, à página Bimestres
-  const bIA = Br || bimDaData(t, d0) || bimestresDe(t)[0];
-  const btnIA = cap.ia ? `<a class="atalho ai atalho-ia" href="${linkTurma(t.id, bIA ? "bimestre" : "bimestres")}" ${bIA ? `data-bim-nav="${bIA.num}"` : ""}><b>${ico("spark")}Construir conteúdo com a Manu IA</b><span>Plano de aula, slides, questões e materiais${bIA ? " · " + esc(bIA.nome) : ""}</span></a>` : "";
+  // botão principal: abre a página "Construir com a Manu IA", onde as ferramentas de IA vão ficar reunidas
+  const btnIA = cap.ia ? `<a class="atalho ai atalho-ia" href="${linkTurma(t.id, "construir")}"><b>${ico("spark")}Construir conteúdo com a Manu IA</b><span>Crie com a IA o que precisar para as aulas desta turma</span></a>` : "";
   return faixa + linhaHor + `<div class="atalhos">
     ${btnIA}
     <a class="atalho" href="${linkTurma(t.id, "chamada")}"><b>${hojeFeita ? "Diário de hoje feito" : "Registrar a aula de hoje"}</b><span>${hojeFeita ? "Toque para revisar" : "P, F ou J para cada aluno"}</span></a>
