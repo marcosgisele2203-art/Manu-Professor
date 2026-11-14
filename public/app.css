@@ -612,3 +612,19 @@ a.per{text-decoration:none;color:inherit}
 .lv-cap{display:grid;grid-template-columns:1fr 64px auto 64px auto;gap:6px;align-items:center;margin:6px 0}
 .lv-cap span{color:var(--muted);font-size:.85rem}
 .livro-caps .tn-op small{font-weight:500;opacity:.8}
+/* "jeito Manu de ensinar": seções de encantamento no plano, slides novos e explicação das questões */
+.sec-manu{border-radius:12px;padding:10px 14px;margin:10px 0}
+.sec-manu h3{margin-top:0}
+/* tokens do tema, para o texto (--ink) continuar legível no modo escuro */
+.sec-gancho{background:var(--accent-soft)}.sec-gancho h3{color:var(--accent-soft-ink)}
+.sec-curiosidade{background:var(--warn-soft)}.sec-curiosidade h3{color:var(--warn)}
+.sec-missao{background:var(--mark)}.sec-missao h3{color:var(--mark-ink)}
+.sl-ic{font-size:7cqw;line-height:1}
+.sl-ic-t{margin-right:1.2cqw}
+.sl.imagine{background:#eee8fb}.sl.imagine .sl-in,.sl.curiosidade .sl-in{justify-content:center}
+.sl.imagine .sl-rot{color:#5b3fa8;position:absolute;top:5cqw;left:5.5cqw}.sl.curiosidade .sl-rot{color:#8a5208;position:absolute;top:5cqw;left:5.5cqw}
+.sl.imagine .sl-t,.sl.curiosidade .sl-t{font-size:5cqw;text-align:center}
+.sl.curiosidade{background:#fdf0dc}
+.sl.desafio .sl-rot{color:#a8205a}.sl.desafio::before{content:"";position:absolute;inset:0 0 auto;height:30%;background:#fde8f0}
+.sl.desafio ul{margin-top:3cqw}
+.q-exp{margin:4px 0 0;padding:6px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent-soft-ink)}
