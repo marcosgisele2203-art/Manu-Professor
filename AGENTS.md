@@ -76,6 +76,10 @@ Para criar uma função de IA nova:
 5. No navegador, use `comIA(async (signal, st) => { const r = await iaJSON({ tipo: ... }, signal); ... })`. Ela já mostra o status, o botão Parar e atualiza o contador de uso. Os botões de IA do diálogo têm `data-act="ia-..."`, e o status fica em `#iaStatus`.
 6. O resultado da IA é sempre uma sugestão: mostre para o professor conferir antes de salvar.
 
+Plano de aula e slides seguem o "jeito Manu de ensinar" completo (`ESTILO` em `api/ia/route.ts`): gancho, conexão com a vida do aluno, explicação em camadas, curiosidade verdadeira e missão final. Questões usam só a parte do estilo que cabe numa questão: enunciado com situação real e próxima dos alunos, fatos corretos, e os campos "explicacao" (por quê) e "erroComum"; gancho, curiosidade e missão não entram em questão de prova. Não aplique esse estilo à leitura de arquivos nem ao planejamento oficial (SGDE/Tagnos). As seções do plano ficam em `SECOES_PLANO` no `app.js`.
+
+O estilo e as questões também se adaptam à idade da turma: `src/lib/faixas.ts` descobre a faixa pela série/etapa digitada (Educação Infantil, anos iniciais, anos finais, Ensino Médio, EJA) e devolve as regras daquela idade (`regrasFaixa("aula" | "questoes", serie)`). Sem série reconhecível, o prompt leva as cinco faixas e pede para a IA escolher a mais provável pelo tema.
+
 O modelo de cada função e o cálculo de custo ficam em `src/lib/uso.ts` (`modeloDe()` e `PRECOS`): Opus em todo conteúdo criativo; só as instruções de atividade usam um modelo mais barato. Ao trocar ou incluir um modelo, atualize os dois.
 
 ### Padrões do `public/app.js`
@@ -101,3 +105,12 @@ O modelo de cada função e o cálculo de custo ficam em `src/lib/uso.ts` (`mode
 - Quem não fez a tarefa revisa o PR (`@codex review` no GitHub, ou pedir ao Claude Code). O dono faz o merge.
 - **Segredos:** nunca colocar senhas do banco, chaves ou tokens no código, em exemplos ou em PRs.
   Tudo vem de variáveis de ambiente (veja `.env.example`).
+
+### Troca de agente (quando o crédito de um acaba)
+O trabalho tem que poder continuar com outro agente a qualquer momento:
+- Faça commits pequenos e envie (push) com frequência. O que não foi enviado se perde se o crédito acabar no meio.
+- Mantenha a descrição do PR atualizada: o que já foi feito, o que falta e o que não foi testado.
+- **Um agente por vez em cada branch.** Quem assume continua no mesmo branch; quem saiu não volta a ele sem o dono combinar.
+- Ao assumir: leia este arquivo, a descrição do PR e os últimos commits, e diga ao dono o que falta **antes** de mudar qualquer coisa.
+- Pedido sugerido para o dono: "Continue o PR #N (branch X). Leia o AGENTS.md, a descrição do PR e os últimos commits. Diga o que falta antes de mexer em qualquer coisa."
+- O crédito dos agentes que programam é separado do crédito da chave da API usada pela IA do site (`ANTHROPIC_API_KEY`).

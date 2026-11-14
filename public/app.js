@@ -332,9 +332,7 @@ function renderNav() {
   if (tt) { // dentro da turma: só Início e as seções da turma
     const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]));
     $("#nav").innerHTML = `<a href="#inicio">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`
-        + (k === "bimestres" ? bimestresDe(tt).map(b => { const at = DO_BIMESTRE.includes(S.view) && String(bimSelecionado(tt)) === String(b.num), agora = hoje() >= b.inicio && hoje() <= b.fim;
-          return `<a href="${linkTurma(tt.id, "bimestre")}" class="nav-sub so-pc${agora ? " agora" : ""}" data-bim-nav="${b.num}" ${at ? 'aria-current="true"' : ""}><span>${esc(b.nome)}</span>${agora ? '<small>atual</small>' : ""}</a>`; }).join("") : "")).join("");
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join(""); // cada bimestre se abre pelos cartões da página Bimestres
     document.body.classList.add("na-turma");
   } else {
     document.body.classList.remove("na-turma");
@@ -1070,7 +1068,8 @@ function questaoHTML(q, idx, gabarito = true) {
     ${q.tipo !== "aberta" && q.alternativas?.length ? `<ol type="A">${q.alternativas.map((alt, i) => `<li class="${gabarito && i === q.correta ? "correct" : ""}">${esc(alt)}${q.altImgs?.[i] && /^https:\/\//.test(q.altImgs[i]) ? `<img class="q-img" src="${esc(q.altImgs[i])}" alt="Alternativa">` : ""}</li>`).join("")}</ol>` : ""}
     ${q.fonte ? `<p class="small muted fonte">Fonte: ${esc(q.fonte)}</p>` : ""}
     ${gabarito && q.tipo === "aberta" && q.resposta ? `<p class="small" style="color:var(--ok)"><b>Resposta esperada:</b> ${esc(q.resposta)}</p>` : ""}
-    ${gabarito && q.tipo !== "aberta" && q.correta != null ? `<p class="small" style="color:var(--ok)"><b>Gabarito:</b> ${letras[q.correta] || ""}</p>` : ""}</div>`;
+    ${gabarito && q.tipo !== "aberta" && q.correta != null ? `<p class="small" style="color:var(--ok)"><b>Gabarito:</b> ${letras[q.correta] || ""}</p>` : ""}
+    ${gabarito && q.explicacao ? `<p class="small q-exp"><b>💬 Por quê:</b> ${esc(q.explicacao)}</p>` : ""}${gabarito && q.erroComum ? `<p class="small q-exp"><b>⚠️ Erro comum:</b> ${esc(q.erroComum)}</p>` : ""}</div>`;
 }
 function vQuestoes() {
   const f = S.filtroQ;
@@ -1265,9 +1264,13 @@ function dlgTurma(t) {
     `${S.turmas.some(x => x.id === t.id) ? `<button type="button" class="btn danger" data-act="apagar-turma" style="margin-right:auto">Apagar turma</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-turma">Salvar turma</button>`);
 }
 
+// Seções do plano de aula, na ordem em que aparecem (as com ícone são o "jeito Manu de ensinar")
+const SECOES_PLANO = [["gancho", "🎯 Gancho"], ["objetivos", "Objetivos"], ["conteudo", "Conteúdos"], ["explicacao", "💬 Explicação para a turma"], ["curiosidade", "💡 Você sabia?"],
+  ["metodologia", "Metodologia"], ["missao", "🚀 Missão final"], ["diferenciacao", "🧭 Caminhos diferentes"], ["recursos", "Recursos"], ["avaliacao", "Avaliação"]];
+const secoesPlano = (p, sec) => SECOES_PLANO.map(([k, n]) => sec(n, p[k], k)).join("");
 function dlgPlano(p, comIA) {
   const t = turmaAtual();
-  p = p || { id: uid(), turmaId: t?.id || "", data: hoje(), titulo: "", duracao: "1 aula de 50 min", bncc: "", objetivos: "", conteudo: "", metodologia: "", recursos: "", avaliacao: "", status: "planejado" };
+  p = p || { id: uid(), turmaId: t?.id || "", data: hoje(), titulo: "", duracao: "1 aula de 50 min", bncc: "", gancho: "", objetivos: "", conteudo: "", explicacao: "", curiosidade: "", metodologia: "", missao: "", diferenciacao: "", recursos: "", avaliacao: "", status: "planejado" };
   dlg._obj = p;
   abrirDlg(S.planos.some(x => x.id === p.id) ? "Editar plano de aula" : "Novo plano de aula", `
     ${comIA ? `<div class="ai-box"><div class="grid2"><div class="field"><label for="iaTema">Tema da aula</label><input class="input" id="iaTema" placeholder="Ex.: Frações equivalentes"></div><div class="field"><label for="iaExtra">Detalhes (opcional)</label><input class="input" id="iaExtra" placeholder="Turma agitada, sem projetor, 2 aulas…"></div></div>
@@ -1277,9 +1280,14 @@ function dlgPlano(p, comIA) {
     <div class="field"><label for="pDur">Duração</label><input class="input" id="pDur" value="${esc(p.duracao)}"></div></div>
     <div class="grid2"><div class="field"><label for="pTitulo">Título</label><input class="input" id="pTitulo" value="${esc(p.titulo)}"></div>
     <div class="field"><label for="pBncc">Habilidades BNCC</label><input class="input" id="pBncc" value="${esc(p.bncc)}" placeholder="EF06MA07, EF06MA08"></div></div>
+    <div class="field"><label for="pGanc">🎯 Gancho (abertura que desperta a curiosidade)</label><textarea class="input" id="pGanc" rows="2">${esc(p.gancho || "")}</textarea></div>
     <div class="field"><label for="pObj">Objetivos de aprendizagem</label><textarea class="input" id="pObj" rows="3">${esc(p.objetivos)}</textarea></div>
     <div class="field"><label for="pCont">Conteúdos</label><textarea class="input" id="pCont" rows="2">${esc(p.conteudo)}</textarea></div>
+    <div class="field"><label for="pExp">💬 Explicação para a turma</label><textarea class="input" id="pExp" rows="6">${esc(p.explicacao || "")}</textarea></div>
+    <div class="field"><label for="pCur">💡 Você sabia? (curiosidade)</label><textarea class="input" id="pCur" rows="2">${esc(p.curiosidade || "")}</textarea></div>
     <div class="field"><label for="pMet">Metodologia / sequência didática</label><textarea class="input" id="pMet" rows="6">${esc(p.metodologia)}</textarea></div>
+    <div class="grid2"><div class="field"><label for="pMis">🚀 Missão final</label><textarea class="input" id="pMis" rows="3">${esc(p.missao || "")}</textarea></div>
+    <div class="field"><label for="pDif">🧭 Caminhos diferentes (dificuldade e desafio extra)</label><textarea class="input" id="pDif" rows="3">${esc(p.diferenciacao || "")}</textarea></div></div>
     <div class="grid2"><div class="field"><label for="pRec">Recursos</label><textarea class="input" id="pRec" rows="3">${esc(p.recursos)}</textarea></div>
     <div class="field"><label for="pAval">Avaliação</label><textarea class="input" id="pAval" rows="3">${esc(p.avaliacao)}</textarea></div></div>
     <label class="check" style="border:0"><input type="checkbox" id="pDada" ${p.status === "dada" ? "checked" : ""}><span>Aula já foi dada</span></label>`,
@@ -1288,10 +1296,10 @@ function dlgPlano(p, comIA) {
 
 function dlgVerPlano(p) {
   const t = turma(p.turmaId);
-  const sec = (h, v) => v ? `<div class="sec"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
+  const sec = (h, v, k) => v ? `<div class="sec${["gancho", "curiosidade", "missao"].includes(k) ? " sec-manu sec-" + k : ""}"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
   abrirDlg(esc(p.titulo), `<div class="doc" style="border:0;padding:0">
     <div class="toolbar"><span class="chip">${esc(t?.nome || "")}</span><span class="chip">${esc(fmtDataLonga(p.data))}</span><span class="chip">${esc(p.duracao || "")}</span>${(p.bncc || "").split(/[,;\s]+/).filter(Boolean).map(c => `<span class="bncc">${esc(c)}</span>`).join("")}</div>
-    ${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}</div>`,
+    ${secoesPlano(p, sec)}</div>`,
     `<button type="button" class="btn ai" data-act="sl-do-plano" data-id="${esc(p.id)}">${ico("spark")}Gerar slides</button>${botoesExport(`data-plano="${esc(p.id)}"`)}<button type="button" class="btn" data-act="editar-plano" data-id="${esc(p.id)}">Editar</button><button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
@@ -1347,7 +1355,9 @@ function dlgQuestao(q) {
     <div class="field"><label for="qEnun">Enunciado</label><textarea class="input" id="qEnun" rows="4">${esc(q.enunciado)}</textarea></div>
     <div class="field"><label for="qAlts">Alternativas, uma por linha (para dissertativa, deixe vazio)</label><textarea class="input" id="qAlts" rows="5">${esc((q.alternativas || []).join("\n"))}</textarea></div>
     <div class="grid2"><div class="field"><label for="qCorreta">Alternativa correta</label><select class="input" id="qCorreta">${"ABCDE".split("").map((l, i) => `<option value="${i}" ${q.correta === i ? "selected" : ""}>${l}</option>`).join("")}</select></div>
-    <div class="field"><label for="qResp">Resposta esperada (dissertativa)</label><input class="input" id="qResp" value="${esc(q.resposta)}"></div></div>`,
+    <div class="field"><label for="qResp">Resposta esperada (dissertativa)</label><input class="input" id="qResp" value="${esc(q.resposta)}"></div></div>
+    <div class="grid2"><div class="field"><label for="qExp">💬 Por quê (explicação da resposta)</label><textarea class="input" id="qExp" rows="2">${esc(q.explicacao || "")}</textarea></div>
+    <div class="field"><label for="qErro">⚠️ Erro comum</label><textarea class="input" id="qErro" rows="2">${esc(q.erroComum || "")}</textarea></div></div>`,
     `${S.questoes.some(x => x.id === q.id) ? `<button type="button" class="btn danger" data-act="apagar-questao" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-questao">Salvar questão</button>`);
 }
 
@@ -1432,7 +1442,8 @@ async function iaPlano() {
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "plano", tema, duracao: val("pDur"), detalhes: val("iaExtra"), turma: turmaIA(val("pTurma")), perfil: textoEstilo(meuEstilo()) || undefined, livro: livroDoDia(val("pTurma"), val("pData")) }, signal);
     const set = (id, v) => { const el = dlg.querySelector("#" + id); if (el && v) el.value = String(v); };
-    set("pTitulo", r.titulo); set("pBncc", r.bncc); set("pObj", r.objetivos); set("pCont", r.conteudo); set("pMet", r.metodologia); set("pRec", r.recursos); set("pAval", r.avaliacao);
+    set("pTitulo", r.titulo); set("pBncc", r.bncc); set("pGanc", r.gancho); set("pObj", r.objetivos); set("pCont", r.conteudo); set("pExp", r.explicacao); set("pCur", r.curiosidade);
+    set("pMet", r.metodologia); set("pMis", r.missao); set("pDif", r.diferenciacao); set("pRec", r.recursos); set("pAval", r.avaliacao);
     st.textContent = "Pronto. Revise e ajuste antes de salvar.";
   });
 }
@@ -1452,7 +1463,7 @@ async function iaQuestoes() {
       tipoQuestao: val("gTipo") === "misto" ? "misture múltipla escolha, verdadeiro ou falso e dissertativa" : TIPO[val("gTipo")],
       dificuldade: val("gDif") === "variada" ? "variada" : DIF[val("gDif")] }, signal);
     if (!Array.isArray(arr) || !arr.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
-    dlg._gerada = arr.filter(q => q && q.enunciado).map(q => ({ id: uid(), disciplina: val("gDisc"), tema, serie: val("gSerie"), tipo: TIPO[q.tipo] ? q.tipo : "multipla", dificuldade: DIF[q.dificuldade] ? q.dificuldade : "media", enunciado: String(q.enunciado), alternativas: Array.isArray(q.alternativas) ? q.alternativas.map(String) : [], correta: Number.isInteger(q.correta) ? q.correta : null, resposta: String(q.resposta || ""), bncc: String(q.bncc || "") }));
+    dlg._gerada = arr.filter(q => q && q.enunciado).map(q => ({ id: uid(), disciplina: val("gDisc"), tema, serie: val("gSerie"), tipo: TIPO[q.tipo] ? q.tipo : "multipla", dificuldade: DIF[q.dificuldade] ? q.dificuldade : "media", enunciado: String(q.enunciado), alternativas: Array.isArray(q.alternativas) ? q.alternativas.map(String) : [], correta: Number.isInteger(q.correta) ? q.correta : null, resposta: String(q.resposta || ""), explicacao: String(q.explicacao || "").slice(0, 600), erroComum: String(q.erroComum || "").slice(0, 300), bncc: String(q.bncc || "") }));
     dlg.querySelector("#gLista").innerHTML = dlg._gerada.map((q, i) => `<label class="check"><input type="checkbox" name="gSel" value="${i}" checked><div style="min-width:0;flex:1">${questaoHTML(q, i + 1)}<div class="toolbar" style="margin-top:4px"><span class="chip">${esc(TIPO[q.tipo])}</span><span class="chip">${esc(DIF[q.dificuldade])}</span>${q.bncc ? `<span class="bncc">${esc(q.bncc)}</span>` : ""}</div></div></label>`).join("");
     dlg.querySelector("#gSalvar").disabled = false;
     st.textContent = `${dlg._gerada.length} questões geradas. Desmarque as que não quiser.`;
@@ -1762,15 +1773,18 @@ document.addEventListener("click", async e => {
 });
 
 /* ---------- Slides com IA ---------- */
-const SL_ROTULO = { capa: "", objetivo: "Objetivo da aula", conteudo: "", pergunta: "Pergunta para a turma", atividade: "Atividade", resumo: "Para lembrar" };
+const SL_ROTULO = { capa: "", imagine: "Imagine…", objetivo: "Objetivo da aula", conteudo: "", pergunta: "Pergunta para a turma", curiosidade: "Você sabia?", atividade: "Atividade", desafio: "Desafio", resumo: "Para lembrar" };
+// só um emoji (ou nada): o texto da IA não pode virar outra coisa no slide
+const iconeSl = x => { const m = String(x || "").match(/\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/u); return m ? m[0] : ""; };
 S.slForm = { planoId: "", tema: "", serie: "", disciplina: "", quantidade: 10, observacoes: "" };
 S.slAtual = null; S.slStatus = ""; S.slBusy = false; S.slShow = -1;
 let slCtl = null;
 
 function slideHTML(s, d, i) {
   const t = s.tipo || "conteudo", rot = SL_ROTULO[t] || "";
-  if (t === "capa") return `<div class="sl capa"><div class="sl-in"><div class="sl-t">${esc(s.titulo || d.titulo)}</div>${(s.topicos || []).length ? `<div class="sl-sub">${esc(s.topicos.join(" · "))}</div>` : `<div class="sl-sub">${esc([d.serie, d.disciplina].filter(Boolean).join(" · "))}</div>`}</div></div>`;
-  return `<div class="sl ${t}"><div class="sl-in">${rot ? `<div class="sl-rot">${rot}</div>` : ""}<div class="sl-t">${esc(s.titulo)}</div>
+  const ic = iconeSl(s.icone);
+  if (t === "capa") return `<div class="sl capa"><div class="sl-in">${ic ? `<div class="sl-ic">${ic}</div>` : ""}<div class="sl-t">${esc(s.titulo || d.titulo)}</div>${(s.topicos || []).length ? `<div class="sl-sub">${esc(s.topicos.join(" · "))}</div>` : `<div class="sl-sub">${esc([d.serie, d.disciplina].filter(Boolean).join(" · "))}</div>`}</div></div>`;
+  return `<div class="sl ${t}"><div class="sl-in">${rot ? `<div class="sl-rot">${rot}</div>` : ""}<div class="sl-t">${ic ? `<span class="sl-ic-t">${ic}</span>` : ""}${esc(s.titulo)}</div>
     ${(s.topicos || []).length ? `<ul>${s.topicos.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${s.destaque ? `<div class="sl-dest">${esc(s.destaque)}</div>` : ""}<div class="sl-n">${i + 1}</div></div></div>`;
 }
 
@@ -1802,7 +1816,7 @@ function vSlides() {
 }
 
 function textoPlano(p) {
-  return [`Título: ${p.titulo}`, p.duracao && `Duração: ${p.duracao}`, p.bncc && `BNCC: ${p.bncc}`, p.objetivos && `Objetivos: ${p.objetivos}`, p.conteudo && `Conteúdos: ${p.conteudo}`, p.metodologia && `Metodologia: ${p.metodologia}`, p.recursos && `Recursos: ${p.recursos}`, p.avaliacao && `Avaliação: ${p.avaliacao}`].filter(Boolean).join("\n").slice(0, 7500);
+  return [`Título: ${p.titulo}`, p.duracao && `Duração: ${p.duracao}`, p.bncc && `BNCC: ${p.bncc}`, ...SECOES_PLANO.map(([k, n]) => p[k] && `${n.replace(/^\W+\s/u, "")}: ${p[k]}`)].filter(Boolean).join("\n").slice(0, 7500);
 }
 async function gerarSlides() {
   const f = S.slForm;
@@ -1813,7 +1827,7 @@ async function gerarSlides() {
     const p = S.planos.find(x => x.id === f.planoId);
     const d = await iaJSON({ tipo: "slides", tema: f.tema, serie: f.serie, disciplina: f.disciplina, quantidade: Math.max(5, Math.min(20, Number(f.quantidade) || 10)), observacoes: f.observacoes, plano: p ? textoPlano(p) : undefined }, slCtl.signal);
     if (!d || !Array.isArray(d.slides) || !d.slides.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
-    d.slides = d.slides.filter(s => s && (s.titulo || (s.topicos || []).length)).map(s => ({ tipo: SL_ROTULO[s.tipo] !== undefined ? s.tipo : "conteudo", titulo: String(s.titulo || ""), topicos: Array.isArray(s.topicos) ? s.topicos.map(String).slice(0, 6) : [], destaque: String(s.destaque || ""), notas: String(s.notas || "") }));
+    d.slides = d.slides.filter(s => s && (s.titulo || (s.topicos || []).length)).map(s => ({ tipo: SL_ROTULO[s.tipo] !== undefined ? s.tipo : "conteudo", titulo: String(s.titulo || ""), topicos: Array.isArray(s.topicos) ? s.topicos.map(String).slice(0, 6) : [], destaque: String(s.destaque || ""), notas: String(s.notas || ""), icone: iconeSl(s.icone) }));
     S.slAtual = { titulo: String(d.titulo || f.tema), slides: d.slides, bncc: String(d.bncc || ""), id: uid(), tema: f.tema, serie: f.serie, disciplina: f.disciplina, planoId: f.planoId, turmaId: S.planos.find(x => x.id === f.planoId)?.turmaId || (S.dentroTurma ? S.turmaSel : ""), criadoEm: new Date().toISOString() };
     S.slStatus = "Pronto. Confira os slides e baixe o PowerPoint.";
   } catch (e) { S.slStatus = iaErro(e); }
@@ -1830,29 +1844,32 @@ async function baixarPptx(d) {
   await montarPptx(d).writeFile({ fileName: slug(d.titulo) + ".pptx" });
 }
 function montarPptx(d) {
-  const C = { teal: "0B7C8A", tealEsc: "075E69", ink: "1F3140", muted: "556676", soft: "E3F5F6", rosa: "FDE8F0", rosaInk: "A8205A", ouro: "FDF0DC", ouroInk: "8A5208", branco: "FFFFFF" };
+  const C = { teal: "0B7C8A", tealEsc: "075E69", ink: "1F3140", muted: "556676", soft: "E3F5F6", rosa: "FDE8F0", rosaInk: "A8205A", ouro: "FDF0DC", ouroInk: "8A5208", lilas: "EEE8FB", lilasInk: "5B3FA8", branco: "FFFFFF" };
   const F = "Arial";
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE"; pptx.title = d.titulo; pptx.author = S.nome || "Manu Professor";
   d.slides.forEach((s, i) => {
-    const sl = pptx.addSlide(), t = s.tipo;
+    const sl = pptx.addSlide(), t = s.tipo, ic = iconeSl(s.icone);
     if (t === "capa") {
       sl.background = { color: C.teal };
+      if (ic) sl.addText(ic, { x: 0.8, y: 1.0, w: 2, h: 1.2, fontSize: 60 });
       sl.addText(s.titulo || d.titulo, { x: 0.8, y: 2.3, w: 11.7, h: 1.8, fontFace: F, fontSize: 44, bold: true, color: C.branco, valign: "bottom" });
       const sub = (s.topicos || []).length ? s.topicos.join(" · ") : [d.serie, d.disciplina].filter(Boolean).join(" · ");
       if (sub) sl.addText(sub, { x: 0.8, y: 4.2, w: 11.7, h: 0.8, fontFace: F, fontSize: 22, color: C.soft });
-    } else if (t === "pergunta") {
-      sl.background = { color: C.soft };
-      sl.addText(SL_ROTULO.pergunta.toUpperCase(), { x: 0.8, y: 0.6, w: 11.7, h: 0.5, fontFace: F, fontSize: 16, bold: true, color: C.tealEsc, charSpacing: 2 });
-      sl.addText(s.titulo, { x: 0.8, y: 1.6, w: 11.7, h: 2.6, fontFace: F, fontSize: 40, bold: true, color: C.ink, align: "center", valign: "middle" });
+    } else if (t === "pergunta" || t === "imagine" || t === "curiosidade") {
+      // slides de "parar e pensar": texto grande e centralizado, cada tipo com sua cor
+      const fundoC = t === "imagine" ? C.lilas : t === "curiosidade" ? C.ouro : C.soft, rotC = t === "imagine" ? C.lilasInk : t === "curiosidade" ? C.ouroInk : C.tealEsc;
+      sl.background = { color: fundoC };
+      sl.addText(SL_ROTULO[t].toUpperCase(), { x: 0.8, y: 0.6, w: 11.7, h: 0.5, fontFace: F, fontSize: 16, bold: true, color: rotC, charSpacing: 2 });
+      sl.addText((ic ? ic + "  " : "") + s.titulo, { x: 0.8, y: 1.6, w: 11.7, h: 2.6, fontFace: F, fontSize: 40, bold: true, color: C.ink, align: "center", valign: "middle" });
       if ((s.topicos || []).length) sl.addText(s.topicos.map(x => ({ text: x, options: { bullet: true } })), { x: 1.5, y: 4.4, w: 10.3, h: 2.4, fontFace: F, fontSize: 22, color: C.ink, paraSpaceAfter: 8 });
     } else {
       sl.background = { color: C.branco };
-      const fundo = t === "atividade" ? C.rosa : t === "resumo" ? C.ouro : null, rotCor = t === "atividade" ? C.rosaInk : t === "resumo" ? C.ouroInk : C.teal;
+      const fundo = t === "atividade" || t === "desafio" ? C.rosa : t === "resumo" ? C.ouro : null, rotCor = t === "atividade" || t === "desafio" ? C.rosaInk : t === "resumo" ? C.ouroInk : C.teal;
       if (fundo) sl.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 2.0, fill: { color: fundo }, line: { color: fundo } });
       let y = 0.45;
       if (SL_ROTULO[t]) { sl.addText(SL_ROTULO[t].toUpperCase(), { x: 0.7, y, w: 11.9, h: 0.4, fontFace: F, fontSize: 14, bold: true, color: rotCor, charSpacing: 2 }); y += 0.4; }
-      sl.addText(s.titulo, { x: 0.7, y, w: 11.9, h: 0.9, fontFace: F, fontSize: 32, bold: true, color: C.ink, valign: "middle" });
+      sl.addText((ic ? ic + "  " : "") + s.titulo, { x: 0.7, y, w: 11.9, h: 0.9, fontFace: F, fontSize: 32, bold: true, color: C.ink, valign: "middle" });
       const temDest = !!s.destaque;
       if ((s.topicos || []).length) sl.addText(s.topicos.map(x => ({ text: x, options: { bullet: { indent: 24 } } })), { x: 0.8, y: 2.25, w: 11.7, h: temDest ? 3.4 : 4.6, fontFace: F, fontSize: 24, color: C.ink, valign: "top", paraSpaceAfter: 12 });
       if (temDest) sl.addText(s.destaque, { x: 0.8, y: 5.8, w: 11.7, h: 1.0, fontFace: F, fontSize: 22, bold: true, color: C.tealEsc, fill: { color: C.soft }, rectRadius: 0.15, shape: pptx.ShapeType.roundRect, margin: 14 });
@@ -2006,7 +2023,7 @@ async function htmlParaDocx(html, estilo) {
 }
 
 const corpoPlano = p => { const t = turma(p.turmaId); const sec = (h, v) => v ? `<div class="sec"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
-  return `<div class="instr">${esc(t?.disciplina || "")} · ${esc(t?.nome || "")} · ${esc(fmtDataLonga(p.data))} · ${esc(p.duracao || "")}</div><h1>${esc(p.titulo)}</h1>${p.bncc ? `<p>BNCC: ${esc(p.bncc)}</p>` : ""}${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}`; };
+  return `<div class="instr">${esc(t?.disciplina || "")} · ${esc(t?.nome || "")} · ${esc(fmtDataLonga(p.data))} · ${esc(p.duracao || "")}</div><h1>${esc(p.titulo)}</h1>${p.bncc ? `<p>BNCC: ${esc(p.bncc)}</p>` : ""}${secoesPlano(p, sec)}`; };
 
 async function boletimXlsx(t) {
   await carregarScript("/vendor/exceljs-4.4.0.min.js");
@@ -2391,7 +2408,7 @@ async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
 function bimIA(b) {
   const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
-  if (!ativo) return `<div class="toolbar"><span class="passo-n">2</span><button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
+  if (!ativo) return `<div class="toolbar">${b.preparado ? "" : '<span class="passo-n">2</span>'}<button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
   const item = f => {
     const href = f.acao ? "" : f.href ? linkTurma(t.id, f.href.replace("#", "")) : linkTurma(t.id, f.aba);
     const attrs = f.acao ? `data-act="${f.acao}" data-num="${b.num}" data-bim-ir="${b.num}"` : `href="${href}" data-bim-ir="${b.num}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
@@ -2403,7 +2420,7 @@ function bimIA(b) {
   for (const f of ferr) { if (f.grupo) { atual = { nome: f.grupo, itens: [] }; grupos.push(atual); } else atual.itens.push(f); }
   grupos.push({ nome: "Banco e Enem", itens: [{ href: "#questoes", nome: "Banco de questões", desc: "Suas questões guardadas" }, { href: "#enem", nome: "Questões do Enem", desc: "Provas oficiais do INEP" }] });
   const prontos = habsDe(b).length || (b.recursos || []).length;
-  return `<div class="bim-ia"><div class="bim-ia-tit"><span class="passo-n">2</span>${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${prontos ? "" : `<p class="small aviso-pop" style="margin:0">Preencha antes o passo 1 (habilidades e recursos): a Manu usa essas informações para criar tudo.</p>`}${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
+  return `<div class="bim-ia"><div class="bim-ia-tit">${b.preparado ? "" : '<span class="passo-n">2</span>'}${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${prontos ? "" : `<p class="small aviso-pop" style="margin:0">Preencha antes o passo 1 (habilidades e recursos): a Manu usa essas informações para criar tudo.</p>`}${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-bim-ir]"); if (a) { const t = turmaAtual(); if (t) S.bimSel[t.id] = String(a.dataset.bimIr); }
@@ -2502,8 +2519,9 @@ document.addEventListener("click", async e => {
 function bimExtras(b) {
   const hs = habsDe(b), rec = b.recursos || [], ids = b.ideiasTec || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
   const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
-  const aberto = S.bimAberto[chave] ?? (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim));
-  return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b><span class="passo-n">1</span>Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia</span></summary><div class="bim-extras">
+  // bimestre preparado: a configuração fica recolhida e só abre quando o professor quer ver ou editar
+  const aberto = S.bimAberto[chave] ?? (!b.preparado && (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim)));
+  return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b>${b.preparado ? "" : '<span class="passo-n">1</span>'}Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia${b.preparado ? " · toque para ver ou editar" : ""}</span></summary><div class="bim-extras">
     <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><div class="toolbar"><button class="btn sm" data-act="bim-hab-colar" data-num="${b.num}">Importar habilidades</button><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div></div>
       ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}${h.objeto ? `<small class="hab-obj"><b>Objeto de conhecimento:</b> ${esc(h.objeto)}</small>` : ""}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
       <form class="hab-form" data-form="bim-hab" data-num="${b.num}">
@@ -2711,6 +2729,7 @@ async function iaPlanoEscola() {
     if (!r || !Array.isArray(r.unidades) || !r.unidades.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const txt = (x, n) => String(x || "").slice(0, n);
     const tecnologias = (sugerirTec && Array.isArray(r.tecnologias) ? r.tecnologias : []).slice(0, 6).map(x => ({ nome: txt(x?.nome, 80), onde: txt(x?.onde, 200), porque: txt(x?.porque, 300) })).filter(x => x.nome);
+    S.bimAberto[t.id + ":" + b.num + ":pe"] = true; // recém-gerado: mostra aberto
     await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs, sugerirTec, tecnologias,
       acoesIntro: txt(r.acoesIntro, 3000), unidades: r.unidades.slice(0, 70).map((u, i) => ({ rotulo: txt(u.rotulo || unidades[i]?.rotulo, 120), data: unidades[i]?.data || "", aulas: unidades[i]?.aulas || 1, habilidades: (Array.isArray(u.habilidades) ? u.habilidades : []).map(String).slice(0, 12), objetos: txt(u.objetos, 600), unidadeTematica: txt(u.unidadeTematica, 120),
         objetivos: txt(u.objetivos, 1200), desenvolvimento: txt(u.desenvolvimento, 4000), recursos: txt(u.recursos, 600), avaliacao: txt(u.avaliacao, 800) })),
@@ -2746,7 +2765,7 @@ function painelPlanoEscola(b) {
   const pe = b.planoEscola; if (!pe) return "";
   if (pe.modelo === "municipal") {
     const t = turmaAtual(), criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === b.num).map(p => p.data));
-    return `<details class="bim-det pe-painel" open><summary><b>Plano de aulas (Tagnos)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+    return `<details class="bim-det pe-painel" data-chave="${esc(turmaAtual().id + ":" + b.num + ":pe")}" ${(S.bimAberto[turmaAtual().id + ":" + b.num + ":pe"] ?? !b.preparado) ? "open" : ""}><summary><b>Plano de aulas (Tagnos)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
       <div class="pe-corpo"><div class="toolbar"><button class="btn sm" data-act="pe-copiar-tudo" data-num="${b.num}">Copiar tudo</button><button class="btn sm primary" data-act="pe-planos" data-num="${b.num}" ${(pe.unidades || []).every(u => !u.data || criados.has(u.data)) ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula no Planejamento"}</button><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div>${blocoTecPE(pe)}
       <p class="small muted">No Tagnos, <b>Unidade Temática</b>, <b>Conteúdo</b> e <b>Habilidades</b> são escolhidos na lista; os outros campos você copia e cola. Quando o dia tem mais de uma aula, use o mesmo texto em cada uma.</p>
       <div class="pe-aulas">${(pe.unidades || []).map((u, i) => `<article class="pe-aula"><div class="pe-campo-h"><b>${esc(u.rotulo)}${u.aulas > 1 ? ` · ${u.aulas} aulas` : ""}</b><button type="button" class="btn sm ghost" data-act="pe-copiar-aula" data-num="${b.num}" data-i="${i}">Copiar tudo da aula</button></div>
@@ -2756,7 +2775,7 @@ function painelPlanoEscola(b) {
   }
   const tx = textosPlanoEscola(pe), F = { diario: "por aula", semanal: "semanal", quinzenal: "quinzenal" }[pe.formato];
   const campo = (k, tit) => `<div class="pe-campo"><div class="pe-campo-h"><b>${tit}</b><button type="button" class="btn sm" data-act="pe-copiar" data-campo="${k}" data-num="${b.num}">Copiar</button></div><textarea class="input pe-txt" data-campo="${k}" data-num="${b.num}" rows="${k === "acoes" ? 12 : 5}">${esc(pe.editado?.[k] ?? tx[k])}</textarea></div>`;
-  return `<details class="bim-det pe-painel" open><summary><b>Planejamento para a escola (SGDE)</b><span class="small muted">${F} · ${(pe.unidades || []).length} ${tx.nomeU.toLowerCase()}s · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+  return `<details class="bim-det pe-painel" data-chave="${esc(turmaAtual().id + ":" + b.num + ":pe")}" ${(S.bimAberto[turmaAtual().id + ":" + b.num + ":pe"] ?? !b.preparado) ? "open" : ""}><summary><b>Planejamento para a escola (SGDE)</b><span class="small muted">${F} · ${(pe.unidades || []).length} ${tx.nomeU.toLowerCase()}s · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
     <div class="pe-corpo"><p class="small muted">Confira, ajuste se quiser (fica salvo) e use <b>Copiar</b> para colar em cada campo do planejamento da escola.</p>${blocoTecPE(pe)}
     ${campo("acoes", "Ações didáticas e estratégias para aprendizagem")}${campo("recuperar", "Recuperar para Avançar")}${campo("criterios", "Critérios e instrumentos avaliativos")}${campo("observacoes", "Observações do docente")}
     <div class="toolbar"><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div></div></details>`;
@@ -2883,7 +2902,24 @@ function vBimestres() {
       <p class="small muted">Essas são datas sugeridas. Depois de criar, ajuste pelo calendário da sua escola em Editar períodos.</p>
       <div><button class="btn primary" data-act="bim-criar">Criar ${n.tipo === "bimestre" ? "bimestres" : "trimestres"}</button></div></section>`;
   }
-  return head + bs.map(b => cardBimestre(t, b)).join("");
+  return head + `<div class="bim-lista">${bs.map(b => linhaBimestre(t, b)).join("")}</div>`;
+}
+// Visão geral enxuta: um cartão curto por bimestre; o preparo e as ferramentas ficam dentro do bimestre
+function linhaBimestre(t, b) {
+  const [st, cls] = statusBim(b), sem = semanasDo(b), agora = hoje() >= b.inicio && hoje() <= b.fim;
+  const aulas = S.chamadas.filter(c => c.turmaId === t.id && c.data >= b.inicio && c.data <= b.fim).length, prev = aulasPrevistas(t, b);
+  const planos = S.planos.filter(p => p.turmaId === t.id && p.data >= b.inicio && p.data <= b.fim).length;
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id && String(a.bimestre) === String(b.num)).length;
+  const m = mediaTurma(t, b.num), f = freqTurma(t, b.num), nh = habsDe(b).length;
+  const pl = (x, um, varios) => `${x} ${x === 1 ? um : varios}`;
+  const resumo = [prev !== null ? `${aulas} de ${prev} dias com chamada` : pl(aulas, "aula registrada", "aulas registradas"), pl(planos, "plano de aula", "planos de aula"), pl(avs, "avaliação", "avaliações"), m !== null ? `média ${fmtNota(m)}` : "", f !== null ? `frequência ${f}%` : ""].filter(Boolean).join(" · ");
+  const prep = b.preparado ? `${pl(nh, "habilidade", "habilidades")}${b.plano ? " · planejamento feito" : ""}` : "Ainda não preparado";
+  return `<a class="bim-linha${agora ? " agora" : ""}" href="${linkTurma(t.id, "bimestre")}" data-bim-nav="${b.num}">
+    <div class="bim-linha-tit"><b>${esc(b.nome)}</b><span class="chip ${cls}">${st}</span></div>
+    <span class="small muted">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span>
+    <span class="small">${resumo}</span>
+    <span class="small ${b.preparado ? "muted" : "bim-falta"}">${prep}</span>
+    <span class="btn sm ${b.preparado ? "" : "ai"}">${b.preparado ? "Abrir" : "Preparar"}</span></a>`;
 }
 function cardBimestre(t, b) {
   {
@@ -2896,14 +2932,13 @@ function cardBimestre(t, b) {
     return `<section class="panel bim-card" id="bim-${b.num}">
       <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
       <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
-      ${bimExtras(b)}
-      ${bimIA(b)}
+      ${b.preparado ? bimIA(b) + bimExtras(b) : bimExtras(b) + bimIA(b)}
       ${painelPlanoEscola(b)}
-      ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
+      ${pl ? `<details class="bim-det bim-plano" data-chave="${esc(t.id + ":" + b.num + ":plano")}" ${(S.bimAberto[t.id + ":" + b.num + ":plano"] ?? !b.preparado) ? "open" : ""}><summary><b>Planejamento semana a semana</b><span class="small muted">${(pl.semanas || []).length} semanas · ${criados.size} plano${criados.size === 1 ? "" : "s"} de aula criado${criados.size === 1 ? "" : "s"} · toque para ver</span></summary><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
         ${(pl.semanas || []).map((s, i) => `<tr><td class="num"><b>${i + 1}</b><div class="small muted">${esc(sem[i]?.rotulo || "")}</div></td><td><b>${esc(s.tema)}</b></td><td class="small">${esc(s.habilidades || "")}</td><td class="small">${esc(s.objetivos || "")}</td><td class="small">${esc(s.atividades || "")}</td><td class="small">${esc(s.avaliacao || "")}</td><td>${criados.has(i + 1) ? '<span class="chip ok">plano criado</span>' : ""}</td></tr>`).join("")}
         </tbody></table></div>
-        <div class="toolbar"><button class="btn primary" data-act="bim-planos" data-num="${b.num}" ${criados.size >= (pl.semanas || []).length ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula das semanas"}</button><button class="btn ai sm" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Refazer com IA</button></div></div>`
+        <div class="toolbar"><button class="btn primary" data-act="bim-planos" data-num="${b.num}" ${criados.size >= (pl.semanas || []).length ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula das semanas"}</button><button class="btn ai sm" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Refazer com IA</button></div></details>`
       : `<div class="toolbar"><button class="btn ai" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Planejar o ${esc(b.nome)} com IA</button><span class="small muted">A Manu distribui as habilidades da BNCC pelas ${sem.length} semanas.</span></div>`}
     </section>`;
   }
@@ -2952,7 +2987,7 @@ document.addEventListener("click", async e => {
   if (b.dataset.act === "bim-prep-prox") { S.prepEtapa[ch] = 2; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.act === "bim-prep-voltar") { S.prepEtapa[ch] = 1; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.act === "bim-prep-editar") { S.bimEditar = num; S.prepEtapa[ch] = 1; render(); window.scrollTo(0, 0); return; }
-  if (b.dataset.act === "bim-prep-cancelar") { S.bimEditar = null; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.act === "bim-prep-cancelar") { S.bimEditar = null; S.bimAberto[ch] = false; render(); window.scrollTo(0, 0); return; }
   if (!habsDe(bi).length && !(bi.recursos || []).length) { toast("Coloque pelo menos uma habilidade ou um recurso antes de continuar."); return; }
   S.bimEditar = null; S.bimAberto[t.id + ":" + num] = false; S.prepEtapa[ch] = 1;
   await mudarBim(num, nb => { nb.preparado = true; }, `${bi.nome} preparado. Agora é só criar com a IA.`); window.scrollTo(0, 0);
@@ -2981,6 +3016,7 @@ async function iaBimestre() {
     const nb = bimPorNum(nt, b.num); nb.conteudos = cont;
     nb.plano = { visaoGeral: String(r.visaoGeral || ""), habilidades: Array.isArray(r.habilidades) ? r.habilidades.map(String).slice(0, 20) : [], aulasPorSemana: aulas,
       semanas: r.semanas.slice(0, sem.length).map(s => ({ tema: String(s.tema || ""), habilidades: String(s.habilidades || ""), objetivos: String(s.objetivos || ""), atividades: String(s.atividades || ""), avaliacao: String(s.avaliacao || "") })) };
+    S.bimAberto[t.id + ":" + b.num + ":plano"] = true; // recém-gerado: mostra aberto
     await salvar("turmas", nt);
     st.textContent = "Pronto.";
     fechar(); toast(`Planejamento do ${b.nome} pronto`);
@@ -3381,11 +3417,11 @@ document.addEventListener("click", async e => {
     case "ia-plano": iaPlano(); break;
     case "parar-ia": sampleCtl?.abort(); break;
     case "salvar-plano": { const o = dlg._obj; o.titulo = val("pTitulo"); if (!o.titulo) { toast("Dê um título ao plano."); return; }
-      Object.assign(o, { turmaId: val("pTurma"), data: val("pData"), duracao: val("pDur"), bncc: val("pBncc"), objetivos: val("pObj"), conteudo: val("pCont"), metodologia: val("pMet"), recursos: val("pRec"), avaliacao: val("pAval"), status: dlg.querySelector("#pDada").checked ? "dada" : "planejado" }); delete o.exemplo;
+      Object.assign(o, { turmaId: val("pTurma"), data: val("pData"), duracao: val("pDur"), bncc: val("pBncc"), gancho: val("pGanc"), objetivos: val("pObj"), conteudo: val("pCont"), explicacao: val("pExp"), curiosidade: val("pCur"), metodologia: val("pMet"), missao: val("pMis"), diferenciacao: val("pDif"), recursos: val("pRec"), avaliacao: val("pAval"), status: dlg.querySelector("#pDada").checked ? "dada" : "planejado" }); delete o.exemplo;
       fechar(); await salvar("planos", o); toast("Plano salvo"); break; }
     case "apagar-plano": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const pid = dlg._obj.id; fechar(); await apagar("planos", pid); toast("Plano apagado"); } break;
     case "baixar-plano": { const p = S.planos.find(x => x.id === id); const tt = turma(p.turmaId); const sec = (h, v) => v ? `<div class="sec"><h3>${h}</h3><div>${esc(v)}</div></div>` : "";
-      await baixar(`plano-${slug(p.titulo)}.html`, htmlArquivo(p.titulo, `<div class="eyebrow">${esc(tt?.disciplina || "")} · ${esc(tt?.nome || "")} · ${esc(fmtDataLonga(p.data))} · ${esc(p.duracao || "")}</div><h1>${esc(p.titulo)}</h1>${p.bncc ? `<p>BNCC: ${esc(p.bncc)}</p>` : ""}${sec("Objetivos", p.objetivos)}${sec("Conteúdos", p.conteudo)}${sec("Metodologia", p.metodologia)}${sec("Recursos", p.recursos)}${sec("Avaliação", p.avaliacao)}`)); break; }
+      await baixar(`plano-${slug(p.titulo)}.html`, htmlArquivo(p.titulo, `<div class="eyebrow">${esc(tt?.disciplina || "")} · ${esc(tt?.nome || "")} · ${esc(fmtDataLonga(p.data))} · ${esc(p.duracao || "")}</div><h1>${esc(p.titulo)}</h1>${p.bncc ? `<p>BNCC: ${esc(p.bncc)}</p>` : ""}${secoesPlano(p, sec)}`)); break; }
 
     case "nova-atividade": dlgAtividade(); break;
     case "editar-atividade": dlgAtividade(JSON.parse(JSON.stringify(S.atividades.find(a => a.id === id)))); break;
@@ -3396,7 +3432,7 @@ document.addEventListener("click", async e => {
     case "nova-questao": dlgQuestao(); break;
     case "editar-questao": dlgQuestao(JSON.parse(JSON.stringify(S.questoes.find(q => q.id === id)))); break;
     case "salvar-questao": { const o = dlg._obj; o.enunciado = val("qEnun"); if (!o.enunciado) { toast("Escreva o enunciado."); return; }
-      Object.assign(o, { disciplina: val("qDisc"), tema: val("qTema"), bncc: val("qBncc"), tipo: val("qTipo"), dificuldade: val("qDif"), serie: val("qSerie"), alternativas: val("qAlts").split("\n").map(s => s.trim()).filter(Boolean), resposta: val("qResp") });
+      Object.assign(o, { disciplina: val("qDisc"), tema: val("qTema"), bncc: val("qBncc"), tipo: val("qTipo"), dificuldade: val("qDif"), serie: val("qSerie"), alternativas: val("qAlts").split("\n").map(s => s.trim()).filter(Boolean), resposta: val("qResp"), explicacao: val("qExp"), erroComum: val("qErro") });
       o.correta = o.tipo === "aberta" ? null : Number(val("qCorreta")); delete o.exemplo; fechar(); await salvar("questoes", o); toast("Questão salva"); break; }
     case "apagar-questao": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const qid = dlg._obj.id; fechar(); await apagar("questoes", qid); toast("Questão apagada"); } break;
     case "gerar-questoes": dlgGerarQuestoes(); setTimeout(() => dlg.querySelector("#gTema")?.focus(), 50); break;
