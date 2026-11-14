@@ -11,10 +11,13 @@ export function faixaDaSerie(...textos: (string | undefined)[]): Faixa | null {
     const s = String(bruto || "").trim();
     if (!s) continue;
     if (solto("eja|supletivo").test(s) || /jovens e adultos/i.test(s)) return "eja";
+    // Cursinho pré-vestibular/pré-Enem é público de Ensino Médio, não pré-escola
+    if (/vestibular|pr[ée][\s-]*enem/i.test(s)) return "em";
     // "1º período", "2º período" são nomes comuns de turmas da pré-escola
     if (/\(EI\)|infantil|creche|ber[çc][áa]rio|maternal|jardim|\d\s*[ºª°o]?\s*per[íi]odo/i.test(s) || solto("pr[ée](-?escola)?").test(s)) return "ei";
-    // A sigla EM só em maiúsculas, para não confundir com a preposição ("4º ano em tempo integral")
-    if (/m[ée]dio/i.test(s) || /(^|[^A-Za-zÀ-ú])EM([^A-Za-zÀ-ú]|$)/.test(s)) return "em";
+    // A sigla EM só em maiúsculas e sem outra palavra logo depois, para não confundir com a preposição
+    // ("4º ano em tempo integral", "4º ANO EM TEMPO INTEGRAL"); vale em "2ª série EM", "EM - 1º ano", "1º ano (EM)"
+    if (/m[ée]dio/i.test(s) || /(^|[^A-Za-zÀ-ú])EM(?=\s*$|\s*[-–—()[\],/·|:;]|\s+\d)/.test(s)) return "em";
     // "Fundamental I/II", "EF I/II", "Fund. 1/2"
     const romano = s.match(/(?:fundamental|fund\.?|(?:^|[^a-zà-ú])EF)\s*(II|I|2|1)(?![a-zà-ú\dº°ª])/i);
     if (romano) return /^(II|2)$/i.test(romano[1]) ? "ef2" : "ef1";
