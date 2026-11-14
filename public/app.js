@@ -2904,7 +2904,24 @@ function vBimestres() {
       <p class="small muted">Essas são datas sugeridas. Depois de criar, ajuste pelo calendário da sua escola em Editar períodos.</p>
       <div><button class="btn primary" data-act="bim-criar">Criar ${n.tipo === "bimestre" ? "bimestres" : "trimestres"}</button></div></section>`;
   }
-  return head + bs.map(b => cardBimestre(t, b)).join("");
+  return head + `<div class="bim-lista">${bs.map(b => linhaBimestre(t, b)).join("")}</div>`;
+}
+// Visão geral enxuta: um cartão curto por bimestre; o preparo e as ferramentas ficam dentro do bimestre
+function linhaBimestre(t, b) {
+  const [st, cls] = statusBim(b), sem = semanasDo(b), agora = hoje() >= b.inicio && hoje() <= b.fim;
+  const aulas = S.chamadas.filter(c => c.turmaId === t.id && c.data >= b.inicio && c.data <= b.fim).length, prev = aulasPrevistas(t, b);
+  const planos = S.planos.filter(p => p.turmaId === t.id && p.data >= b.inicio && p.data <= b.fim).length;
+  const avs = S.avaliacoes.filter(a => a.turmaId === t.id && String(a.bimestre) === String(b.num)).length;
+  const m = mediaTurma(t, b.num), f = freqTurma(t, b.num), nh = habsDe(b).length;
+  const pl = (x, um, varios) => `${x} ${x === 1 ? um : varios}`;
+  const resumo = [prev !== null ? `${aulas} de ${prev} dias com chamada` : pl(aulas, "aula registrada", "aulas registradas"), pl(planos, "plano de aula", "planos de aula"), pl(avs, "avaliação", "avaliações"), m !== null ? `média ${fmtNota(m)}` : "", f !== null ? `frequência ${f}%` : ""].filter(Boolean).join(" · ");
+  const prep = b.preparado ? `${pl(nh, "habilidade", "habilidades")}${b.plano ? " · planejamento feito" : ""}` : "Ainda não preparado";
+  return `<a class="bim-linha${agora ? " agora" : ""}" href="${linkTurma(t.id, "bimestre")}" data-bim-nav="${b.num}">
+    <div class="bim-linha-tit"><b>${esc(b.nome)}</b><span class="chip ${cls}">${st}</span></div>
+    <span class="small muted">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span>
+    <span class="small">${resumo}</span>
+    <span class="small ${b.preparado ? "muted" : "bim-falta"}">${prep}</span>
+    <span class="btn sm ${b.preparado ? "" : "ai"}">${b.preparado ? "Abrir" : "Preparar"}</span></a>`;
 }
 function cardBimestre(t, b) {
   {
