@@ -2410,7 +2410,7 @@ async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
 function bimIA(b) {
   const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
-  if (!ativo) return `<div class="toolbar"><span class="passo-n">2</span><button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
+  if (!ativo) return `<div class="toolbar">${b.preparado ? "" : '<span class="passo-n">2</span>'}<button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
   const item = f => {
     const href = f.acao ? "" : f.href ? linkTurma(t.id, f.href.replace("#", "")) : linkTurma(t.id, f.aba);
     const attrs = f.acao ? `data-act="${f.acao}" data-num="${b.num}" data-bim-ir="${b.num}"` : `href="${href}" data-bim-ir="${b.num}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
@@ -2422,7 +2422,7 @@ function bimIA(b) {
   for (const f of ferr) { if (f.grupo) { atual = { nome: f.grupo, itens: [] }; grupos.push(atual); } else atual.itens.push(f); }
   grupos.push({ nome: "Banco e Enem", itens: [{ href: "#questoes", nome: "Banco de questões", desc: "Suas questões guardadas" }, { href: "#enem", nome: "Questões do Enem", desc: "Provas oficiais do INEP" }] });
   const prontos = habsDe(b).length || (b.recursos || []).length;
-  return `<div class="bim-ia"><div class="bim-ia-tit"><span class="passo-n">2</span>${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${prontos ? "" : `<p class="small aviso-pop" style="margin:0">Preencha antes o passo 1 (habilidades e recursos): a Manu usa essas informações para criar tudo.</p>`}${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
+  return `<div class="bim-ia"><div class="bim-ia-tit">${b.preparado ? "" : '<span class="passo-n">2</span>'}${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${prontos ? "" : `<p class="small aviso-pop" style="margin:0">Preencha antes o passo 1 (habilidades e recursos): a Manu usa essas informações para criar tudo.</p>`}${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-bim-ir]"); if (a) { const t = turmaAtual(); if (t) S.bimSel[t.id] = String(a.dataset.bimIr); }
@@ -2521,8 +2521,9 @@ document.addEventListener("click", async e => {
 function bimExtras(b) {
   const hs = habsDe(b), rec = b.recursos || [], ids = b.ideiasTec || [], outros = rec.filter(x => !RECURSOS.some(g => g[1].includes(x)));
   const t = turmaAtual(), chave = t.id + ":" + b.num, sel = bimSelecionado(t);
-  const aberto = S.bimAberto[chave] ?? (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim));
-  return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b><span class="passo-n">1</span>Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia</span></summary><div class="bim-extras">
+  // bimestre preparado: a configuração fica recolhida e só abre quando o professor quer ver ou editar
+  const aberto = S.bimAberto[chave] ?? (!b.preparado && (String(sel) === String(b.num) || (!sel && hoje() >= b.inicio && hoje() <= b.fim)));
+  return `<details class="bim-det" data-chave="${esc(chave)}" ${aberto ? "open" : ""}><summary><b>${b.preparado ? "" : '<span class="passo-n">1</span>'}Habilidades, recursos e tecnologia</b><span class="small muted">${hs.length} habilidade${hs.length === 1 ? "" : "s"} · ${rec.length} recurso${rec.length === 1 ? "" : "s"} · ${ids.length} ideia${ids.length === 1 ? "" : "s"} de tecnologia${b.preparado ? " · toque para ver ou editar" : ""}</span></summary><div class="bim-extras">
     <div class="bim-box"><div class="bim-box-h"><h3>Habilidades (BNCC)</h3><div class="toolbar"><button class="btn sm" data-act="bim-hab-colar" data-num="${b.num}">Importar habilidades</button><button class="btn ai sm" data-act="bim-hab-ia" data-num="${b.num}">${ico("spark")}Sugerir com IA</button></div></div>
       ${hs.length ? `<ul class="bim-habs">${hs.map((h, i) => `<li>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span>` : ""}<span>${esc(h.descricao)}${h.unidade ? ` <small class="muted">· ${esc(h.unidade)}</small>` : ""}${h.objeto ? `<small class="hab-obj"><b>Objeto de conhecimento:</b> ${esc(h.objeto)}</small>` : ""}</span><button type="button" class="btn ghost sm" data-act="bim-hab-rem" data-num="${b.num}" data-i="${i}" aria-label="Tirar habilidade">×</button></li>`).join("")}</ul>` : `<p class="small muted">Nenhuma habilidade ainda. Digite abaixo ou peça sugestões à Manu.</p>`}
       <form class="hab-form" data-form="bim-hab" data-num="${b.num}">
@@ -2730,6 +2731,7 @@ async function iaPlanoEscola() {
     if (!r || !Array.isArray(r.unidades) || !r.unidades.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const txt = (x, n) => String(x || "").slice(0, n);
     const tecnologias = (sugerirTec && Array.isArray(r.tecnologias) ? r.tecnologias : []).slice(0, 6).map(x => ({ nome: txt(x?.nome, 80), onde: txt(x?.onde, 200), porque: txt(x?.porque, 300) })).filter(x => x.nome);
+    S.bimAberto[t.id + ":" + b.num + ":pe"] = true; // recém-gerado: mostra aberto
     await mudarBim(b.num, nb => { nb.planoEscola = { modelo, formato, geradoEm: new Date().toISOString(), instrumentos, obsProf: obs, sugerirTec, tecnologias,
       acoesIntro: txt(r.acoesIntro, 3000), unidades: r.unidades.slice(0, 70).map((u, i) => ({ rotulo: txt(u.rotulo || unidades[i]?.rotulo, 120), data: unidades[i]?.data || "", aulas: unidades[i]?.aulas || 1, habilidades: (Array.isArray(u.habilidades) ? u.habilidades : []).map(String).slice(0, 12), objetos: txt(u.objetos, 600), unidadeTematica: txt(u.unidadeTematica, 120),
         objetivos: txt(u.objetivos, 1200), desenvolvimento: txt(u.desenvolvimento, 4000), recursos: txt(u.recursos, 600), avaliacao: txt(u.avaliacao, 800) })),
@@ -2765,7 +2767,7 @@ function painelPlanoEscola(b) {
   const pe = b.planoEscola; if (!pe) return "";
   if (pe.modelo === "municipal") {
     const t = turmaAtual(), criados = new Set(S.planos.filter(p => p.turmaId === t.id && p.origem?.pe === b.num).map(p => p.data));
-    return `<details class="bim-det pe-painel" open><summary><b>Plano de aulas (Tagnos)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+    return `<details class="bim-det pe-painel" data-chave="${esc(turmaAtual().id + ":" + b.num + ":pe")}" ${(S.bimAberto[turmaAtual().id + ":" + b.num + ":pe"] ?? !b.preparado) ? "open" : ""}><summary><b>Plano de aulas (Tagnos)</b><span class="small muted">${(pe.unidades || []).length} aulas · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
       <div class="pe-corpo"><div class="toolbar"><button class="btn sm" data-act="pe-copiar-tudo" data-num="${b.num}">Copiar tudo</button><button class="btn sm primary" data-act="pe-planos" data-num="${b.num}" ${(pe.unidades || []).every(u => !u.data || criados.has(u.data)) ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula no Planejamento"}</button><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div>${blocoTecPE(pe)}
       <p class="small muted">No Tagnos, <b>Unidade Temática</b>, <b>Conteúdo</b> e <b>Habilidades</b> são escolhidos na lista; os outros campos você copia e cola. Quando o dia tem mais de uma aula, use o mesmo texto em cada uma.</p>
       <div class="pe-aulas">${(pe.unidades || []).map((u, i) => `<article class="pe-aula"><div class="pe-campo-h"><b>${esc(u.rotulo)}${u.aulas > 1 ? ` · ${u.aulas} aulas` : ""}</b><button type="button" class="btn sm ghost" data-act="pe-copiar-aula" data-num="${b.num}" data-i="${i}">Copiar tudo da aula</button></div>
@@ -2775,7 +2777,7 @@ function painelPlanoEscola(b) {
   }
   const tx = textosPlanoEscola(pe), F = { diario: "por aula", semanal: "semanal", quinzenal: "quinzenal" }[pe.formato];
   const campo = (k, tit) => `<div class="pe-campo"><div class="pe-campo-h"><b>${tit}</b><button type="button" class="btn sm" data-act="pe-copiar" data-campo="${k}" data-num="${b.num}">Copiar</button></div><textarea class="input pe-txt" data-campo="${k}" data-num="${b.num}" rows="${k === "acoes" ? 12 : 5}">${esc(pe.editado?.[k] ?? tx[k])}</textarea></div>`;
-  return `<details class="bim-det pe-painel" open><summary><b>Planejamento para a escola (SGDE)</b><span class="small muted">${F} · ${(pe.unidades || []).length} ${tx.nomeU.toLowerCase()}s · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
+  return `<details class="bim-det pe-painel" data-chave="${esc(turmaAtual().id + ":" + b.num + ":pe")}" ${(S.bimAberto[turmaAtual().id + ":" + b.num + ":pe"] ?? !b.preparado) ? "open" : ""}><summary><b>Planejamento para a escola (SGDE)</b><span class="small muted">${F} · ${(pe.unidades || []).length} ${tx.nomeU.toLowerCase()}s · gerado em ${fmtData(pe.geradoEm.slice(0, 10))}</span></summary>
     <div class="pe-corpo"><p class="small muted">Confira, ajuste se quiser (fica salvo) e use <b>Copiar</b> para colar em cada campo do planejamento da escola.</p>${blocoTecPE(pe)}
     ${campo("acoes", "Ações didáticas e estratégias para aprendizagem")}${campo("recuperar", "Recuperar para Avançar")}${campo("criterios", "Critérios e instrumentos avaliativos")}${campo("observacoes", "Observações do docente")}
     <div class="toolbar"><button class="btn ai sm" data-act="bim-pe" data-num="${b.num}">${ico("spark")}Gerar de novo</button></div></div></details>`;
@@ -2915,14 +2917,13 @@ function cardBimestre(t, b) {
     return `<section class="panel bim-card" id="bim-${b.num}">
       <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
       <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
-      ${bimExtras(b)}
-      ${bimIA(b)}
+      ${b.preparado ? bimIA(b) + bimExtras(b) : bimExtras(b) + bimIA(b)}
       ${painelPlanoEscola(b)}
-      ${pl ? `<div class="bim-plano"><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
+      ${pl ? `<details class="bim-det bim-plano" data-chave="${esc(t.id + ":" + b.num + ":plano")}" ${(S.bimAberto[t.id + ":" + b.num + ":plano"] ?? !b.preparado) ? "open" : ""}><summary><b>Planejamento semana a semana</b><span class="small muted">${(pl.semanas || []).length} semanas · ${criados.size} plano${criados.size === 1 ? "" : "s"} de aula criado${criados.size === 1 ? "" : "s"} · toque para ver</span></summary><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
         ${(pl.semanas || []).map((s, i) => `<tr><td class="num"><b>${i + 1}</b><div class="small muted">${esc(sem[i]?.rotulo || "")}</div></td><td><b>${esc(s.tema)}</b></td><td class="small">${esc(s.habilidades || "")}</td><td class="small">${esc(s.objetivos || "")}</td><td class="small">${esc(s.atividades || "")}</td><td class="small">${esc(s.avaliacao || "")}</td><td>${criados.has(i + 1) ? '<span class="chip ok">plano criado</span>' : ""}</td></tr>`).join("")}
         </tbody></table></div>
-        <div class="toolbar"><button class="btn primary" data-act="bim-planos" data-num="${b.num}" ${criados.size >= (pl.semanas || []).length ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula das semanas"}</button><button class="btn ai sm" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Refazer com IA</button></div></div>`
+        <div class="toolbar"><button class="btn primary" data-act="bim-planos" data-num="${b.num}" ${criados.size >= (pl.semanas || []).length ? "disabled" : ""}>${criados.size ? "Criar os planos que faltam" : "Criar os planos de aula das semanas"}</button><button class="btn ai sm" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Refazer com IA</button></div></details>`
       : `<div class="toolbar"><button class="btn ai" data-act="bim-ia" data-num="${b.num}">${ico("spark")}Planejar o ${esc(b.nome)} com IA</button><span class="small muted">A Manu distribui as habilidades da BNCC pelas ${sem.length} semanas.</span></div>`}
     </section>`;
   }
@@ -2971,7 +2972,7 @@ document.addEventListener("click", async e => {
   if (b.dataset.act === "bim-prep-prox") { S.prepEtapa[ch] = 2; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.act === "bim-prep-voltar") { S.prepEtapa[ch] = 1; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.act === "bim-prep-editar") { S.bimEditar = num; S.prepEtapa[ch] = 1; render(); window.scrollTo(0, 0); return; }
-  if (b.dataset.act === "bim-prep-cancelar") { S.bimEditar = null; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.act === "bim-prep-cancelar") { S.bimEditar = null; S.bimAberto[ch] = false; render(); window.scrollTo(0, 0); return; }
   if (!habsDe(bi).length && !(bi.recursos || []).length) { toast("Coloque pelo menos uma habilidade ou um recurso antes de continuar."); return; }
   S.bimEditar = null; S.bimAberto[t.id + ":" + num] = false; S.prepEtapa[ch] = 1;
   await mudarBim(num, nb => { nb.preparado = true; }, `${bi.nome} preparado. Agora é só criar com a IA.`); window.scrollTo(0, 0);
@@ -3000,6 +3001,7 @@ async function iaBimestre() {
     const nb = bimPorNum(nt, b.num); nb.conteudos = cont;
     nb.plano = { visaoGeral: String(r.visaoGeral || ""), habilidades: Array.isArray(r.habilidades) ? r.habilidades.map(String).slice(0, 20) : [], aulasPorSemana: aulas,
       semanas: r.semanas.slice(0, sem.length).map(s => ({ tema: String(s.tema || ""), habilidades: String(s.habilidades || ""), objetivos: String(s.objetivos || ""), atividades: String(s.atividades || ""), avaliacao: String(s.avaliacao || "") })) };
+    S.bimAberto[t.id + ":" + b.num + ":plano"] = true; // recém-gerado: mostra aberto
     await salvar("turmas", nt);
     st.textContent = "Pronto.";
     fechar(); toast(`Planejamento do ${b.nome} pronto`);
