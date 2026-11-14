@@ -332,9 +332,7 @@ function renderNav() {
   if (tt) { // dentro da turma: só Início e as seções da turma
     const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]));
     $("#nav").innerHTML = `<a href="#inicio">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`
-        + (k === "bimestres" ? bimestresDe(tt).map(b => { const at = DO_BIMESTRE.includes(S.view) && String(bimSelecionado(tt)) === String(b.num), agora = hoje() >= b.inicio && hoje() <= b.fim;
-          return `<a href="${linkTurma(tt.id, "bimestre")}" class="nav-sub so-pc${agora ? " agora" : ""}" data-bim-nav="${b.num}" ${at ? 'aria-current="true"' : ""}><span>${esc(b.nome)}</span>${agora ? '<small>atual</small>' : ""}</a>`; }).join("") : "")).join("");
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join(""); // cada bimestre se abre pelos cartões da página Bimestres
     document.body.classList.add("na-turma");
   } else {
     document.body.classList.remove("na-turma");
