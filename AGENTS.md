@@ -1,7 +1,7 @@
-# Instruções para agentes (Codex, Claude Code e outros)
+# Instruções para agentes (Claude Code, Codex, Gemini e outros)
 
 Este arquivo vale para **qualquer agente de IA** que trabalhe neste repositório.
-O `CLAUDE.md` só importa este arquivo, então mantenha as regras **aqui**.
+O `CLAUDE.md` e o `GEMINI.md` só importam este arquivo, então mantenha as regras **aqui**.
 
 ## O que é
 
@@ -92,12 +92,21 @@ O modelo e o cálculo de custo estão em `MODELO` (`api/ia/route.ts`) e `PRECO` 
 - Mensagens de erro para o usuário: frase simples dizendo o que fazer ("Escolha o arquivo do calendário."), nunca códigos ou termos técnicos.
 - Faça mudanças pequenas e focadas, e siga o padrão do arquivo que está editando.
 
-## Fluxo de trabalho (equipe: dono + Claude Code + Codex)
+## Fluxo de trabalho (equipe: dono + Claude Code + Codex + Gemini)
 
 - **Nunca** faça push direto na `main`. A `main` é publicada automaticamente pelo EasyPanel.
 - Uma tarefa = uma branch (`feat/...`, `fix/...`) = um Pull Request pequeno.
 - Descreva no PR, em português simples: **o que mudou, por que, e como o dono pode testar**.
 - Se a mudança exigir ação manual (variável nova no EasyPanel, coluna nova no banco), escreva isso em destaque no PR.
-- Quem não fez a tarefa revisa o PR (`@codex review` no GitHub, ou pedir ao Claude Code). O dono faz o merge.
+- Quem não fez a tarefa revisa o PR (`@codex review` ou `/gemini review` no GitHub, ou pedir ao Claude Code). O dono faz o merge.
 - **Segredos:** nunca colocar senhas do banco, chaves ou tokens no código, em exemplos ou em PRs.
   Tudo vem de variáveis de ambiente (veja `.env.example`).
+
+### Troca de agente (quando o crédito de um acaba)
+O trabalho tem que poder continuar com outro agente a qualquer momento:
+- Faça commits pequenos e envie (push) com frequência. O que não foi enviado se perde se o crédito acabar no meio.
+- Mantenha a descrição do PR atualizada: o que já foi feito, o que falta e o que não foi testado.
+- **Um agente por vez em cada branch.** Quem assume continua no mesmo branch; quem saiu não volta a ele sem o dono combinar.
+- Ao assumir: leia este arquivo, a descrição do PR e os últimos commits, e diga ao dono o que falta **antes** de mudar qualquer coisa.
+- Pedido sugerido para o dono: "Continue o PR #N (branch X). Leia o AGENTS.md, a descrição do PR e os últimos commits. Diga o que falta antes de mexer em qualquer coisa."
+- O crédito dos agentes que programam é separado do crédito da chave da API usada pela IA do site (`ANTHROPIC_API_KEY`).
