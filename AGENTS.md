@@ -1,7 +1,7 @@
-# Instruções para agentes (Claude Code, Codex, Gemini e outros)
+# Instruções para agentes (Codex, Claude Code e outros)
 
 Este arquivo vale para **qualquer agente de IA** que trabalhe neste repositório.
-O `CLAUDE.md` e o `GEMINI.md` só importam este arquivo, então mantenha as regras **aqui**.
+O `CLAUDE.md` só importa este arquivo, então mantenha as regras **aqui**.
 
 ## O que é
 
@@ -92,13 +92,13 @@ O modelo e o cálculo de custo estão em `MODELO` (`api/ia/route.ts`) e `PRECO` 
 - Mensagens de erro para o usuário: frase simples dizendo o que fazer ("Escolha o arquivo do calendário."), nunca códigos ou termos técnicos.
 - Faça mudanças pequenas e focadas, e siga o padrão do arquivo que está editando.
 
-## Fluxo de trabalho (equipe: dono + Claude Code + Codex + Gemini)
+## Fluxo de trabalho (equipe: dono + Claude Code + Codex)
 
 - **Nunca** faça push direto na `main`. A `main` é publicada automaticamente pelo EasyPanel.
 - Uma tarefa = uma branch (`feat/...`, `fix/...`) = um Pull Request pequeno.
 - Descreva no PR, em português simples: **o que mudou, por que, e como o dono pode testar**.
 - Se a mudança exigir ação manual (variável nova no EasyPanel, coluna nova no banco), escreva isso em destaque no PR.
-- Quem não fez a tarefa revisa o PR (`@codex review` ou `/gemini review` no GitHub, ou pedir ao Claude Code). O dono faz o merge.
+- Quem não fez a tarefa revisa o PR (`@codex review` no GitHub, ou pedir ao Claude Code). O dono faz o merge.
 - **Segredos:** nunca colocar senhas do banco, chaves ou tokens no código, em exemplos ou em PRs.
   Tudo vem de variáveis de ambiente (veja `.env.example`).
 
