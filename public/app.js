@@ -2410,7 +2410,7 @@ async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
 function bimIA(b) {
   const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
-  if (!ativo) return `<div class="toolbar"><span class="passo-n">2</span><button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
+  if (!ativo) return `<div class="toolbar">${b.preparado ? "" : '<span class="passo-n">2</span>'}<button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
   const item = f => {
     const href = f.acao ? "" : f.href ? linkTurma(t.id, f.href.replace("#", "")) : linkTurma(t.id, f.aba);
     const attrs = f.acao ? `data-act="${f.acao}" data-num="${b.num}" data-bim-ir="${b.num}"` : `href="${href}" data-bim-ir="${b.num}" ${f.sub ? `data-act="ia-mat" data-v="${f.sub}"` : ""}`;
@@ -2917,8 +2917,7 @@ function cardBimestre(t, b) {
     return `<section class="panel bim-card" id="bim-${b.num}">
       <div class="panel-head"><div><span class="eyebrow">${fmtData(b.inicio)} a ${fmtData(b.fim)} · ${sem.length} semanas</span><h2>${esc(b.nome)}</h2></div><span class="chip ${cls}">${st}</span></div>
       <div class="bim-nums"><div><b class="num">${aulas}${prev !== null ? `<small> de ${prev}</small>` : ""}</b><span>${prev !== null ? "dias de aula com chamada" : "aulas registradas"}</span></div><div><b class="num">${planos}</b><span>planos de aula</span></div><div><b class="num">${avs}</b><span>avaliações</span></div><div><b class="num">${fmtNota(m)}</b><span>média da turma</span></div><div><b class="num">${f === null ? "—" : f + "%"}</b><span>frequência</span></div></div>
-      ${bimIA(b)}
-      ${bimExtras(b)}
+      ${b.preparado ? bimIA(b) + bimExtras(b) : bimExtras(b) + bimIA(b)}
       ${painelPlanoEscola(b)}
       ${pl ? `<details class="bim-det bim-plano" data-chave="${esc(t.id + ":" + b.num + ":plano")}" ${S.bimAberto[t.id + ":" + b.num + ":plano"] ? "open" : ""}><summary><b>Planejamento semana a semana</b><span class="small muted">${(pl.semanas || []).length} semanas · ${criados.size} plano${criados.size === 1 ? "" : "s"} de aula criado${criados.size === 1 ? "" : "s"} · toque para ver</span></summary><p>${esc(pl.visaoGeral || "")}</p>${(pl.habilidades || []).length ? `<div class="toolbar">${pl.habilidades.map(h => `<span class="bncc">${esc(h)}</span>`).join("")}</div>` : ""}
         <div class="table-wrap"><table class="tab-sem"><thead><tr><th>Semana</th><th>Tema</th><th>BNCC</th><th>Objetivos</th><th>Atividades</th><th>Avaliação</th><th></th></tr></thead><tbody>
