@@ -633,3 +633,6 @@ a.per{text-decoration:none;color:inherit}
 .bim-linha-tit{display:flex;justify-content:space-between;align-items:center;gap:8px}.bim-linha-tit b{font-size:1.1rem}
 .bim-linha .bim-falta{color:var(--warn);font-weight:600}
 .bim-linha .btn{align-self:flex-start;margin-top:4px;pointer-events:none}
+
+/* Painel da turma: botão principal da IA ocupa a linha inteira */
+.atalho-ia{grid-column:1/-1;padding:16px 18px}.atalho-ia b{font-size:1.05rem}
