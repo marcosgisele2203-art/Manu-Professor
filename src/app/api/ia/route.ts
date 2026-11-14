@@ -86,7 +86,7 @@ Múltipla escolha tem 4 alternativas plausíveis e só uma correta. Verdadeiro o
 Prefira enunciados com uma situação real e próxima dos alunos (uma história curta, um problema do dia a dia), sem perder a clareza. Use só fatos corretos.
 ${regrasFaixa("questoes", p.serie)}
 Responda SOMENTE com um array JSON; cada item:
-{"tipo":"multipla"|"vf"|"aberta","dificuldade":"facil"|"media"|"dificil","enunciado":"...","alternativas":["..."],"correta":índice a partir de 0 (null para aberta),"resposta":"resposta esperada (só para aberta, senão vazio)","explicacao":"por que a resposta certa está certa, em linguagem que o aluno entende (1 a 3 frases)","erroComum":"o erro mais comum nesta questão e por que está errado (1 frase)","bncc":"código BNCC"}` }] };
+{"tipo":"multipla"|"vf"|"aberta","dificuldade":"facil"|"media"|"dificil","enunciado":"...","alternativas":["..."],"correta":índice a partir de 0 (null para aberta),"resposta":"resposta esperada (só para aberta, senão vazio)","explicacao":"por que a resposta certa está certa, em linguagem que o aluno entende; na Educação Infantil, escrita para o professor, dizendo o que observar na criança (1 a 3 frases)","erroComum":"o erro mais comum nesta questão e por que está errado (1 frase)","bncc":"código BNCC"}` }] };
     case "material":
       return { json: true, mensagens: [{ role: "user", content: promptMaterial(p) }] };
     case "slides":

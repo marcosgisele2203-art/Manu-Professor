@@ -11,8 +11,13 @@ export function faixaDaSerie(...textos: (string | undefined)[]): Faixa | null {
     const s = String(bruto || "").trim();
     if (!s) continue;
     if (solto("eja|supletivo").test(s) || /jovens e adultos/i.test(s)) return "eja";
-    if (/\(EI\)|infantil|creche|ber[çc][áa]rio|maternal|jardim/i.test(s) || solto("pr[ée](-?escola)?").test(s)) return "ei";
-    if (/m[ée]dio/i.test(s) || solto("EM").test(s)) return "em";
+    // "1º período", "2º período" são nomes comuns de turmas da pré-escola
+    if (/\(EI\)|infantil|creche|ber[çc][áa]rio|maternal|jardim|\d\s*[ºª°o]?\s*per[íi]odo/i.test(s) || solto("pr[ée](-?escola)?").test(s)) return "ei";
+    // A sigla EM só em maiúsculas, para não confundir com a preposição ("4º ano em tempo integral")
+    if (/m[ée]dio/i.test(s) || /(^|[^A-Za-zÀ-ú])EM([^A-Za-zÀ-ú]|$)/.test(s)) return "em";
+    // "Fundamental I/II", "EF I/II", "Fund. 1/2"
+    const romano = s.match(/(?:fundamental|fund\.?|(?:^|[^a-zà-ú])EF)\s*(II|I|2|1)(?![a-zà-ú\dº°ª])/i);
+    if (romano) return /^(II|2)$/i.test(romano[1]) ? "ef2" : "ef1";
     // "série" sem "fundamental" é o nome atual do Ensino Médio (1ª a 3ª série)
     const serieAntiga = s.match(/([1-8])\s*[ªa°]?\s*s[ée]rie/i);
     if (serieAntiga) {
@@ -70,7 +75,8 @@ const QUESTOES: Record<Faixa, string> = {
   eja: `Situações da vida adulta: trabalho, contas da casa, compras, saúde, documentos, direitos. Linguagem clara e respeitosa, de adulto para adulto. Nunca infantilize: nada de personagens infantis.`,
 };
 
-const QUAL = (serie: string) => `A série/etapa ${serie ? `informada ("${serie.replace(/"/g, "")}") não deixa clara a idade` : "não foi informada"}. Escolha a faixa etária mais provável pelo tema e pelo componente, diga qual escolheu no começo do campo "conteudo" (plano) ou nas notas da capa (slides), e siga só as regras dessa faixa:`;
+// A série digitada já aparece no prompt; aqui não é repetida, para texto do professor não virar instrução
+const QUAL = (serie: string) => `A série/etapa ${serie ? "informada não deixa clara a idade" : "não foi informada"}. Escolha a faixa etária mais provável pelo tema e pelo componente, diga qual escolheu no começo do campo "conteudo" (plano) ou nas notas da capa (slides), e siga só as regras dessa faixa:`;
 
 export function regrasFaixa(uso: "aula" | "questoes", serie: string | undefined, ...extras: (string | undefined)[]): string {
   const f = faixaDaSerie(serie, ...extras);
