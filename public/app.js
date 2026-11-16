@@ -11,6 +11,9 @@ const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString(
 const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides", "calendario", "perfil"];
 const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
 const MEDIA_MIN = 6, FREQ_MIN = 75;
+// Classes da célula de nota e de frequência: as classes "aviso" e "risco" juntam cor e sublinhado (app.css), para o alerta não depender só da cor
+const clsNota = m => "c num" + (m != null && m < MEDIA_MIN ? " aviso" : "");
+const clsFreq = f => "c num" + (f != null && f < FREQ_MIN ? " risco" : "");
 
 function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.hidden = false;
@@ -998,14 +1001,14 @@ function vNotas() {
     return head + chipsPeriodo(t) + resumo + `<div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média final</th><th class="c">Freq. anual</th><th class="c">Situação</th></tr></thead><tbody>
       ${al.map(s => { const mf = mediaAnual(t, s.id), f = freqAluno(t, s.id);
         const sit = mf === null ? `<span class="chip">sem notas</span>` : (mf >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">aprovado até aqui</span>` : (mf < MEDIA_MIN ? `<span class="chip warn">abaixo da média</span>` : `<span class="chip bad">frequência</span>`);
-        return `<tr><td class="sticky-col">${esc(s.nome)}</td>${bs.map(b => { const m = mediaAluno(t, s.id, b.num); return `<td class="c num" style="color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td>`; }).join("")}<td class="c num" style="font-weight:700;color:${mf !== null && mf < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(mf)}</td><td class="c num" style="color:${f !== null && f < FREQ_MIN ? "var(--bad)" : "inherit"}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td></tr>`; }).join("")}
+        return `<tr><td class="sticky-col">${esc(s.nome)}</td>${bs.map(b => { const m = mediaAluno(t, s.id, b.num); return `<td class="${clsNota(m)}">${fmtNota(m)}</td>`; }).join("")}<td class="${clsNota(mf)}" style="font-weight:700">${fmtNota(mf)}</td><td class="${clsFreq(f)}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td></tr>`; }).join("")}
       </tbody></table></div><p class="small muted">Média final = média das médias dos bimestres que já têm nota. Para lançar notas, toque no bimestre acima ou em "Lançar notas" abaixo.</p>
       ${bs.map(b => {
         const avsB = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(b.num)).sort((x, y) => (x.data || "").localeCompare(y.data || ""));
         const mt = mediaTurma(t, b.num);
         return `<section class="panel notas-bim"><div class="panel-head"><div><h2>${esc(b.nome)}</h2><span class="small muted">${fmtData(b.inicio)} a ${fmtData(b.fim)} · média ${tipoMediaBim(t, b.num) === "somatoria" ? "somatória" : "aritmética"} · ${avsB.length} ${avsB.length === 1 ? "avaliação" : "avaliações"}${mt !== null ? ` · média da turma ${fmtNota(mt)}` : ""}</span></div><button class="btn sm" data-act="bim-sel" data-v="${b.num}">${avsB.length ? "Editar notas" : "Lançar notas"}</button></div>
           ${avsB.length ? `<div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${avsB.map(x => `<th class="c">${x.sigla ? `<b>${esc(x.sigla)}</b> ` : ""}${esc(x.nome)}<div class="num" style="text-transform:none;font-weight:500">${x.tipo === "recuperacao" ? "recuperação" : tipoMediaBim(t, b.num) === "somatoria" ? `vale ${fmtNota(x.valor)}` : `peso ${esc(x.peso)}`}</div></th>`).join("")}<th class="c">Média</th></tr></thead><tbody>
-            ${al.map(s => { const m = mediaAluno(t, s.id, b.num); return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avsB.map(x => { const v = x.notas?.[s.id]; return `<td class="c num" style="color:${v != null && v !== "" && Number(v) < MEDIA_MIN ? "var(--warn)" : "inherit"}">${v == null || v === "" ? "—" : fmtNota(v)}</td>`; }).join("")}<td class="c num" style="font-weight:700;color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted small">Nenhuma nota lançada neste bimestre.</p>`}</section>`;
+            ${al.map(s => { const m = mediaAluno(t, s.id, b.num); return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avsB.map(x => { const v = x.notas?.[s.id]; return `<td class="${clsNota(v == null || v === "" ? null : Number(v))}">${v == null || v === "" ? "—" : fmtNota(v)}</td>`; }).join("")}<td class="${clsNota(m)}" style="font-weight:700">${fmtNota(m)}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted small">Nenhuma nota lançada neste bimestre.</p>`}</section>`;
       }).join("")}`;
   }
   if (!avs.length) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma avaliação ${bim ? "no " + esc(bimPorNum(t, bim)?.nome || "") : "em " + esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.${bim ? " Se o bimestre já passou e você só tem a média final de cada aluno, lance direto a média." : ""}</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>${bim ? `<button class="btn" data-act="nota-media-bim">Já tenho a média do bimestre</button>` : ""}</div></div>`;
@@ -1022,7 +1025,7 @@ function vNotas() {
     <tbody>${al.map(s => { const m = mediaAluno(t, s.id, bim), f = freqAluno(t, s.id, bim);
       const sit = m === null ? `<span class="chip">sem notas</span>` : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">em dia</span>` : (m < MEDIA_MIN ? `<span class="chip warn">recuperação</span>` : `<span class="chip bad">frequência</span>`);
       return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avs.map(a => { const n = a.notas?.[s.id]; return `<td class="c"><input class="grade" type="text" inputmode="decimal" aria-label="Nota de ${esc(s.nome)} em ${esc(a.nome)}" data-av="${esc(a.id)}" data-aluno="${esc(s.id)}" value="${n === undefined || n === null ? "" : esc(String(n).replace(".", ","))}"></td>`; }).join("")}
-      <td class="c num" style="font-weight:600;color:${m !== null && m < MEDIA_MIN ? "var(--warn)" : "inherit"}">${fmtNota(m)}</td><td class="c num" style="color:${f !== null && f < FREQ_MIN ? "var(--bad)" : "inherit"}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td>${temPara ? `<td class="c">${paraTxt(precisaNoBim(t, s.id, bim))}</td>` : ""}</tr>`; }).join("")}</tbody></table></div>
+      <td class="${clsNota(m)}" style="font-weight:600">${fmtNota(m)}</td><td class="${clsFreq(f)}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td>${temPara ? `<td class="c">${paraTxt(precisaNoBim(t, s.id, bim))}</td>` : ""}</tr>`; }).join("")}</tbody></table></div>
     ${temPara ? `<p class="small muted"><b>Para passar</b>: a média que o aluno precisa neste bimestre para fechar o ano com ${MEDIA_MIN}, contando as médias dos outros bimestres.</p>` : ""}
     <p class="small muted">Digite a nota de 0 a 10 e saia do campo para salvar. Use vírgula ou ponto.</p>`;
 }
@@ -3478,6 +3481,16 @@ document.addEventListener("change", async e => {
   if (el.id === "fDisc") { S.filtroQ.disc = el.value; render(); }
   if (el.id === "fDif") { S.filtroQ.dif = el.value; render(); }
 });
+// Régua de lançamento: marca a coluna da nota em foco; a linha do aluno fica por conta do CSS
+function colunaFoco(el) {
+  document.querySelectorAll(".col-foco").forEach(c => c.classList.remove("col-foco"));
+  const td = el && el.matches && el.matches("input.grade") ? el.closest("td") : null;
+  const tab = td && td.closest("table");
+  if (!tab) return;
+  tab.querySelectorAll("tr").forEach(tr => tr.children[td.cellIndex]?.classList.add("col-foco"));
+}
+document.addEventListener("focusin", e => colunaFoco(e.target));
+document.addEventListener("focusout", () => colunaFoco(null));
 document.addEventListener("input", e => {
   if (e.target.id === "fTxt") { S.filtroQ.txt = e.target.value; clearTimeout(document._ft); document._ft = setTimeout(() => { const pos = e.target.selectionStart; e.target.blur(); render(); const f = $("#fTxt"); if (f) { f.focus(); f.setSelectionRange(pos, pos); } }, 300); }
 });
