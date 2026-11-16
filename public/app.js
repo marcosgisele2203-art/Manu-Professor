@@ -1298,7 +1298,9 @@ document.addEventListener("click", async e => {
   a.respostas = a.respostas || {};
   a.respostas[c.alunoId] = (a.itens || []).map((_, i) => c.marcadas[i] || "");
   a.atualizadoEm = new Date().toISOString();
-  await salvar("acas", a);
+  // pela mesma fila da tabela: um envio em andamento não pode passar por cima deste
+  S.acas[S.acas.findIndex(x => x.id === a.id)] = a; render();
+  await acaEnviar(a.id);
   toast(`Respostas de ${nome} salvas`);
   const prox = t.alunos.find(s => !acaAluno(a, s.id).respondeu);
   if (!prox) { fechar(); toast("Todos os alunos têm respostas lançadas."); return; }
