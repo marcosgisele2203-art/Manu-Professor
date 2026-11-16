@@ -1096,7 +1096,7 @@ function vAca() {
 
   const tabela = `<div class="table-wrap"><table>
     <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
-    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c"><input class="grade aca" type="text" maxlength="1" autocapitalize="characters" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
+    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
 
   const painelItens = `<section class="panel"><h2>Resultados por item</h2><p class="small muted">Quantos alunos marcaram cada letra, e quanto isso dá em porcentagem de quem fez a atividade.</p>
     <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Gabarito</th><th>Habilidade</th>${ACA_LETRAS.map(L => `<th class="c">${L}</th>`).join("")}<th class="c">Em branco</th><th class="c">Acertos</th></tr></thead>
@@ -1150,6 +1150,73 @@ function vAcaAno(t) {
 
   return resumo + porAluno + porHab;
 }
+
+function acaGravarLetra(acaId, alunoId, item, letra) {
+  const orig = S.acas.find(x => x.id === acaId); if (!orig) return Promise.resolve();
+  const a = JSON.parse(JSON.stringify(orig));
+  a.respostas = a.respostas || {};
+  const r = (a.respostas[alunoId] || []).slice();
+  while (r.length < a.itens.length) r.push("");
+  if (r[item] === letra) return Promise.resolve();
+  r[item] = letra;
+  a.respostas[alunoId] = r; a.atualizadoEm = new Date().toISOString();
+  return salvar("acas", a);
+}
+/* Escolha flutuante: tocar na célula abre A, B, C, D, E e "Em branco" ao lado dela. Escolher grava e já passa para o
+   item seguinte (no último, para o aluno de baixo), como na folha de respostas. No celular não abre o teclado. */
+let acaPickAlvo = null;
+function acaPickEl() {
+  let p = document.getElementById("acaPick");
+  if (p) return p;
+  p = document.createElement("div"); p.id = "acaPick"; p.className = "aca-pick"; p.setAttribute("role", "toolbar"); p.hidden = true;
+  p.innerHTML = `<span class="aca-pick-tit" id="acaPickTit"></span><div class="aca-pick-bts">${ACA_LETRAS.map(L => `<button type="button" data-letra="${L}">${L}</button>`).join("")}<button type="button" class="branco" data-letra="">Em branco</button></div>`;
+  p.addEventListener("mousedown", e => e.preventDefault()); // a célula continua em foco enquanto escolhe
+  p.addEventListener("click", e => { const b = e.target.closest("button"); if (b) acaEscolher(b.dataset.letra); });
+  document.body.appendChild(p);
+  return p;
+}
+function acaPickMostrar(el) {
+  acaPickAlvo = { aca: el.dataset.aca, aluno: el.dataset.aluno, item: Number(el.dataset.item) };
+  const p = acaPickEl(), atual = el.value.trim().toUpperCase();
+  p.querySelector("#acaPickTit").textContent = (el.closest("tr")?.querySelector(".sticky-col")?.textContent || "") + " · item " + (acaPickAlvo.item + 1);
+  p.querySelectorAll("button").forEach(b => b.classList.toggle("on", !!b.dataset.letra && b.dataset.letra === atual));
+  p.hidden = false;
+  acaPickPosicionar(el);
+}
+function acaPickPosicionar(el) {
+  const p = document.getElementById("acaPick");
+  if (!p || p.hidden || !el) return;
+  const r = el.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  let top = r.bottom + 6;
+  if (top + h > innerHeight - 8) top = r.top - h - 6; // perto do fim da tela, abre por cima
+  p.style.top = Math.max(8, top) + "px";
+  p.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+}
+function acaPickFechar() { const p = document.getElementById("acaPick"); if (p) p.hidden = true; acaPickAlvo = null; }
+const acaCel = (acaId, alunoId, item) => document.querySelector(`input.aca[data-aca="${CSS.escape(acaId)}"][data-aluno="${CSS.escape(alunoId)}"][data-item="${item}"]`);
+function acaEscolher(letra) {
+  const alvo = acaPickAlvo; if (!alvo) return;
+  const cel = acaCel(alvo.aca, alvo.aluno, alvo.item);
+  const prox = acaCel(alvo.aca, alvo.aluno, alvo.item + 1) || cel?.closest("tr")?.nextElementSibling?.querySelector("input.aca");
+  const chave = prox ? [prox.dataset.aluno, prox.dataset.item] : null;
+  // salvar redesenha a tela na hora: a próxima célula é procurada de novo depois disso
+  acaGravarLetra(alvo.aca, alvo.aluno, alvo.item, letra);
+  const nova = chave && acaCel(alvo.aca, chave[0], chave[1]);
+  if (nova) { nova.focus(); nova.scrollIntoView({ block: "nearest", inline: "nearest" }); acaPickPosicionar(nova); }
+  else { acaPickFechar(); document.activeElement?.blur?.(); }
+}
+document.addEventListener("focusin", e => { if (e.target.matches && e.target.matches("input.aca")) acaPickMostrar(e.target); });
+document.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement?.matches?.("input.aca")) acaPickFechar(); }, 0));
+document.addEventListener("keydown", e => {
+  if (!e.target.matches || !e.target.matches("input.aca") || !acaPickAlvo || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toUpperCase();
+  if (ACA_LETRAS.includes(k)) { e.preventDefault(); acaEscolher(k); }
+  else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); acaEscolher(""); }
+  else if (e.key === "Escape") { e.preventDefault(); acaPickFechar(); }
+});
+// a tabela rola de lado e a página de pé: o quadrinho acompanha a célula
+window.addEventListener("scroll", () => { if (acaPickAlvo) acaPickPosicionar(document.activeElement); }, true);
+window.addEventListener("resize", () => { if (acaPickAlvo) acaPickPosicionar(document.activeElement); });
 
 /* Planilha oficial da ACA: o gabarito não aparece escrito em lugar nenhum, está dentro da fórmula que conta os acertos.
    Os descritores ficam numa aba própria, um bloco por ano. Tudo é lido aqui no aparelho: a planilha não sai dele. */
@@ -3752,17 +3819,11 @@ document.addEventListener("change", async e => {
     return;
   }
   if (el.matches("input.aca")) {
-    const a = JSON.parse(JSON.stringify(S.acas.find(x => x.id === el.dataset.aca)));
     const letra = el.value.trim().toUpperCase();
     // letra inválida volta ao que está salvo: um erro de digitação não pode apagar a resposta que já estava lá
-    if (letra && !ACA_LETRAS.includes(letra)) { toast("Use uma letra de A a E, ou deixe em branco se o aluno não respondeu."); el.value = ((a.respostas || {})[el.dataset.aluno] || [])[Number(el.dataset.item)] || ""; return; }
-    a.respostas = a.respostas || {};
-    const r = (a.respostas[el.dataset.aluno] || []).slice();
-    while (r.length < a.itens.length) r.push("");
-    r[Number(el.dataset.item)] = letra;
-    a.respostas[el.dataset.aluno] = r; a.atualizadoEm = new Date().toISOString();
+    if (letra && !ACA_LETRAS.includes(letra)) { toast("Use uma letra de A a E, ou deixe em branco se o aluno não respondeu."); el.value = (((S.acas.find(x => x.id === el.dataset.aca) || {}).respostas || {})[el.dataset.aluno] || [])[Number(el.dataset.item)] || ""; return; }
     el.value = letra;
-    await salvar("acas", a);
+    await acaGravarLetra(el.dataset.aca, el.dataset.aluno, Number(el.dataset.item), letra);
     return;
   }
   if (el.matches("input.grade")) {
