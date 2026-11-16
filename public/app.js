@@ -1158,15 +1158,41 @@ const acaTxt = v => {
   if (typeof v === "object") return String(v.richText ? v.richText.map(r => r.text).join("") : (v.result ?? v.text ?? "")).trim();
   return String(v).trim();
 };
+const acaColNum = s => [...s.toUpperCase()].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
+// a mesma fórmula diz também em que colunas ficam as letras marcadas por cada aluno
 function acaGabaritoDaAba(ws) {
   let achado = null;
   ws.eachRow(row => row.eachCell({ includeEmpty: false }, cell => {
     const f = cell.formula || (cell.value && cell.value.formula);
     if (!f || achado) return;
-    const letras = [...String(f).matchAll(/IF\(\s*\$?[A-Z]+\$?\d+\s*=\s*"([A-E])"/gi)].map(m => m[1].toUpperCase());
-    if (letras.length >= 3) achado = letras;
+    const ms = [...String(f).matchAll(/IF\(\s*\$?([A-Z]+)\$?\d+\s*=\s*"([A-E])"/gi)];
+    if (ms.length >= 3) achado = { letras: ms.map(m => m[2].toUpperCase()), cols: ms.map(m => acaColNum(m[1])) };
   }));
   return achado;
+}
+// linhas de aluno: um nome à esquerda das colunas de resposta e pelo menos uma letra de A a E marcada
+function acaAlunosDaAba(ws, cols) {
+  const primeira = Math.min(...cols), alunos = [];
+  ws.eachRow(row => {
+    const letras = cols.map(c => { const v = acaTxt(row.getCell(c).value).toUpperCase(); return ACA_LETRAS.includes(v) ? v : ""; });
+    if (!letras.some(x => x)) return;
+    let nome = "";
+    row.eachCell({ includeEmpty: false }, (c, n) => { const v = acaTxt(c.value); if (n < primeira && /[a-zà-ú]{2}/i.test(v) && v.length > nome.length) nome = v; });
+    if (nome && !/^(item|gabarito|total|nome|aluno|estudante)/i.test(nome)) alunos.push({ nome, letras });
+  });
+  return alunos;
+}
+const nomeChave = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z ]/g, " ").replace(/\s+/g, " ").trim();
+// junta cada nome da planilha a um aluno da turma: nome igual, ou um nome começando pelo outro (planilha com nome abreviado), desde que só um aluno combine
+function acaCasarAlunos(daPlanilha, turmaAlunos) {
+  const chaves = turmaAlunos.map(s => ({ s, k: nomeChave(s.nome) })), usados = new Set(), casados = {}, sobra = [];
+  daPlanilha.forEach(p => {
+    const k = nomeChave(p.nome);
+    let c = chaves.filter(x => !usados.has(x.s.id) && x.k === k);
+    if (!c.length) c = chaves.filter(x => !usados.has(x.s.id) && x.k && (x.k.startsWith(k + " ") || k.startsWith(x.k + " ")));
+    if (c.length === 1) { usados.add(c[0].s.id); casados[c[0].s.id] = p.letras; } else sobra.push(p.nome);
+  });
+  return { casados, sobra };
 }
 function acaDescritores(wb) {
   const ws = wb.worksheets.find(w => /descritor/i.test(w.name));
@@ -1201,8 +1227,9 @@ async function acaLerPlanilha(arq) {
     if (!g) continue;
     const ano = (ws.name.match(/(\d)\s*º?\s*ano/i) || [])[1] || "?";
     const d = blocos[ano] || {};
-    const itens = g.map((certa, i) => { const x = d[i + 1] || {}; return { certa, desc: x.codigo || "", nivel: x.nivel || ACA_NIVEIS[0], descritor: x.descritor || "", habilidade: x.habilidade || "", objeto: x.objeto || "" }; });
-    if (!achados.some(a => a.ano === ano)) achados.push({ ano, aba: ws.name, itens }); // abas do mesmo ano repetem o gabarito
+    const itens = g.letras.map((certa, i) => { const x = d[i + 1] || {}; return { certa, desc: x.codigo || "", nivel: x.nivel || ACA_NIVEIS[0], descritor: x.descritor || "", habilidade: x.habilidade || "", objeto: x.objeto || "" }; });
+    // abas do mesmo ano repetem o gabarito, mas cada uma pode ser de uma turma: guarda todas, a escolha é pelos nomes
+    achados.push({ ano, aba: ws.name, itens, alunos: acaAlunosDaAba(ws, g.cols) });
   }
   return achados;
 }
@@ -1216,7 +1243,7 @@ function dlgAca(aca) {
   const t = turmaAtual(), bim = String(bimSelecionado(t) || "1"), B = bimPorNum(t, bim);
   // cópia: mexer na quantidade de itens não pode alterar a ACA salva se o professor desistir
   aca = aca ? JSON.parse(JSON.stringify(aca)) : { id: uid(), turmaId: t.id, bimestre: bim, nome: "ACA do " + (B?.nome || bim + "º bimestre"), itens: Array.from({ length: 12 }, () => ({ certa: "", desc: "", nivel: ACA_NIVEIS[0] })), respostas: {} };
-  dlg._obj = aca;
+  dlg._obj = aca; dlg._importadas = null;
   abrirDlg(S.acas.some(x => x.id === aca.id) ? "Editar o gabarito da ACA" : "Montar a ACA do bimestre", `
     <div class="field"><label for="acaArquivo">Planilha da ACA</label><input class="input" id="acaArquivo" type="file" accept=".xlsx"><p class="small muted" id="acaArqSt">Mande a planilha oficial e o gabarito, os níveis e as habilidades são lidos dela. A leitura é feita no seu aparelho: a planilha não é enviada para a internet nem para a IA.</p></div>
     <div class="grid3"><div class="field"><label for="acaNome">Nome</label><input class="input" id="acaNome" value="${esc(aca.nome || "")}" placeholder="4ª ACA 2026"></div>
@@ -3593,6 +3620,8 @@ document.addEventListener("click", async e => {
       // o que veio da planilha (descritor, objeto, habilidade do currículo) não aparece no formulário, então vem do item anterior
       for (let i = 0; i < qtd; i++) novos.push({ ...((a.itens || [])[i] || {}), certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
       if (novos.some(x => !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item."); return; }
+      // respostas lidas da planilha substituem as daquele aluno; quem não estava nela fica como estava
+      a.respostas = { ...(a.respostas || {}), ...(dlg._importadas || {}) };
       const fizeram = Object.values(a.respostas || {}).filter(r => (r || []).some(x => x)).length;
       const matric = Number(dlg.querySelector("#acaMatric")?.value) || (turmaAtual()?.alunos || []).length;
       if (matric < fizeram) { toast(`Já tem ${fizeram} ${fizeram === 1 ? "aluno com resposta lançada" : "alunos com respostas lançadas"}: o número de matriculados não pode ser menor que isso.`); return; }
@@ -3693,12 +3722,20 @@ document.addEventListener("change", async e => {
     try {
       const achados = await acaLerPlanilha(arq);
       if (!achados.length) { st.textContent = "Não encontrei o gabarito nesta planilha. Confira se é o arquivo da ACA, ou preencha os itens à mão."; return; }
-      const serie = String(turmaAtual()?.serie || turmaAtual()?.nome || "");
-      const escolhido = achados.find(x => serie.includes(x.ano)) || achados[0];
+      const tt = turmaAtual(), al = tt?.alunos || [];
+      const serie = String(tt?.serie || tt?.nome || "");
+      // a aba certa é a que tem mais alunos desta turma; sem nenhum nome em comum, vale o ano da série
+      achados.forEach(x => { x.casa = acaCasarAlunos(x.alunos, al); x.n = Object.keys(x.casa.casados).length; });
+      const porNome = achados.slice().sort((x, y) => y.n - x.n)[0];
+      const escolhido = porNome.n ? porNome : (achados.find(x => serie.includes(x.ano)) || achados[0]);
       a.itens = escolhido.itens;
+      dlg._importadas = escolhido.casa.casados; // só entram nas respostas ao salvar
       dlg.querySelector("#acaQtd").value = a.itens.length;
       dlg.querySelector("#acaItens").innerHTML = acaLinhasItens(a.itens);
-      st.textContent = `Li ${a.itens.length} itens da aba "${escolhido.aba}"${achados.length > 1 ? ", que é a que combina com esta turma" : ""}. Confira abaixo antes de salvar.`;
+      const n = escolhido.n, sobra = escolhido.casa.sobra;
+      st.innerHTML = esc(`Li ${a.itens.length} itens da aba "${escolhido.aba}"`) + (escolhido.alunos.length
+        ? esc(` e as respostas de ${n} ${n === 1 ? "aluno" : "alunos"} desta turma`) + (sobra.length ? `<br><b>${sobra.length === 1 ? "Este nome não foi encontrado" : "Estes nomes não foram encontrados"} na turma:</b> ${esc(sobra.join(", "))}. Lance as letras ${sobra.length === 1 ? "dele" : "deles"} à mão ou confira o nome em Alunos.` : "")
+        : esc(". A planilha não tinha respostas de alunos")) + ". Confira e toque em Salvar.";
     } catch (err) { console.error(err); st.textContent = "Não consegui ler esta planilha. Confira se é o arquivo .xlsx da ACA."; }
     return;
   }
