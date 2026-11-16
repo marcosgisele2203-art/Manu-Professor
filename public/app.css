@@ -131,6 +131,11 @@ td.aviso{color:var(--warn);text-decoration:underline 2px;text-underline-offset:3
 td.risco{color:var(--bad);text-decoration:underline 2px;text-underline-offset:3px}
 /* ACA: campo de uma letra por item e barras de desempenho (o tamanho da barra já diz o resultado, a cor só reforça) */
 td .grade.aca{width:44px;text-transform:uppercase;cursor:pointer;caret-color:transparent}
+/* acerto em verde com ✓ e erro em vermelho claro: o ✓ garante que não depende só da cor */
+td.aca-ok,td.aca-err{position:relative}
+td.aca-ok .grade.aca{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);font-weight:700}
+td.aca-err .grade.aca{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 45%,transparent);color:var(--bad)}
+td.aca-ok::after{content:"✓";position:absolute;top:2px;right:4px;font-size:.7rem;font-weight:800;color:var(--ok);pointer-events:none}
 .aca-pick{position:fixed;z-index:60;max-width:calc(100vw - 16px);box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .aca-pick[hidden]{display:none}
 .aca-pick-tit{font-size:.8rem;color:var(--muted);max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}

@@ -1096,7 +1096,7 @@ function vAca() {
 
   const tabela = `<div class="table-wrap"><table>
     <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
-    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
+    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c${r[i] ? (r[i] === it.certa ? " aca-ok" : " aca-err") : ""}"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
 
   const painelItens = `<section class="panel"><h2>Resultados por item</h2><p class="small muted">Quantos alunos marcaram cada letra, e quanto isso dá em porcentagem de quem fez a atividade.</p>
     <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Gabarito</th><th>Habilidade</th>${ACA_LETRAS.map(L => `<th class="c">${L}</th>`).join("")}<th class="c">Em branco</th><th class="c">Acertos</th></tr></thead>
@@ -1113,7 +1113,7 @@ function vAca() {
 
   return head + chipsPeriodo(t) + `<div class="page-head"><div><h2>${esc(aca.nome || "ACA")}</h2><p class="small muted">${esc(B?.nome || bim + "º bimestre")}, ${esc(t.disciplina || "")}</p></div>
     <div class="toolbar"><button class="btn" data-act="aca-config" data-id="${esc(aca.id)}">Editar o gabarito</button><button class="btn ai" data-act="aca-foto" data-id="${esc(aca.id)}">${ico("spark")}Corrigir pela foto do cartão</button><button class="btn primary" data-act="aca-lancar-notas" data-id="${esc(aca.id)}">Lançar as notas no bimestre</button></div></div>`
-    + resumo + tabela + `<p class="small muted">Toque no quadrinho e escolha a letra que o aluno marcou, ou use <b>Corrigir pela foto do cartão</b> para a Manu ler o cartão-resposta. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs + painelCurriculo;
+    + resumo + tabela + `<p class="small muted">Toque no quadrinho e escolha a letra que o aluno marcou, ou use <b>Corrigir pela foto do cartão</b> para a Manu ler o cartão-resposta. Verde com ✓ é acerto; vermelho é erro. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs + painelCurriculo;
 }
 
 // Ano todo: as ACAs dos quatro bimestres lado a lado. A planilha não mostra isso, porque cada bimestre é um arquivo separado
