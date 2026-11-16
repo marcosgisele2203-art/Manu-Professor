@@ -218,6 +218,14 @@ async function iniciar() {
 }
 // app instalável e funcionando sem internet
 if ("serviceWorker" in navigator) { const reg = () => navigator.serviceWorker.register("/sw.js").catch(() => {}); if (document.readyState === "complete") reg(); else addEventListener("load", reg); }
+// versão nova publicada: o service worker avisa e a tela se atualiza sozinha, para ninguém seguir com o app antigo
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
+  if (e.data !== "versao-nova" || window._atualizando) return;
+  window._atualizando = true;
+  document.activeElement?.blur?.(); // tira o foco: o campo em edição salva antes de a página recarregar
+  toast("Atualizando para a versão nova…");
+  setTimeout(() => location.reload(), 1200); // tempo de a nota sair e de a professora ler o aviso
+});
 let pedidoInstalar = null;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); pedidoInstalar = e; if (S.view === "inicio" || S.view === "perfil") render(); });
 addEventListener("appinstalled", () => { pedidoInstalar = null; toast("Manu Professor instalado no aparelho"); render(); });

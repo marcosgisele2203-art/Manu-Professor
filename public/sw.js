@@ -9,7 +9,14 @@ self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CASCA).then((c) => c.addAll(["/app.js", "/app.css", "/manu/manu-boas-vindas.webp", "/icones/icone-192.png"])).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CASCA && k !== DADOS).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil((async () => {
+    const antigas = (await caches.keys()).filter((k) => k !== CASCA && k !== DADOS);
+    await Promise.all(antigas.map((k) => caches.delete(k)));
+    await self.clients.claim();
+    // troca de versão: avisa as abas abertas, que ainda rodam o app.js antigo, para recarregarem.
+    // na primeira instalação não há casca antiga, e recarregar seria à toa
+    if (antigas.length) for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage("versao-nova");
+  })());
 });
 self.addEventListener("message", (e) => { if (e.data === "limpar-dados") e.waitUntil(caches.delete(DADOS)); });
 
