@@ -3718,6 +3718,8 @@ document.addEventListener("change", async e => {
   if (el.id === "acaArquivo") {
     const arq = el.files && el.files[0]; if (!arq) return;
     const st = dlg.querySelector("#acaArqSt"), a = dlg._obj;
+    // arquivo novo descarta as respostas do anterior: se este falhar, salvar não pode trazer as do outro
+    dlg._importadas = null;
     st.textContent = "Lendo a planilha…";
     try {
       const achados = await acaLerPlanilha(arq);
