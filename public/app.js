@@ -1054,48 +1054,162 @@ function vAca() {
   const head = `<div class="page-head"><div><h1>ACA</h1><p class="muted">Atividade de Acompanhamento da Aprendizagem. Lance a letra que cada aluno marcou e veja os acertos, a nota e o desempenho por habilidade.</p></div><div class="toolbar"><a class="btn" href="https://vistta.sed.ms.gov.br/" target="_blank" rel="noopener">Abrir o Vistta</a></div></div>`;
   if (!t) return head + semTurma();
   const bim = bimSelecionado(t);
-  if (!bim) return head + chipsPeriodo(t) + `<div class="empty"><h3>Escolha um bimestre</h3><p>Cada bimestre tem uma ACA diferente, com gabarito e habilidades próprios. Toque no bimestre acima.</p></div>`;
+  if (!bim) return head + chipsPeriodo(t) + vAcaAno(t);
   const B = bimPorNum(t, bim), aca = acaDe(t, bim), al = t.alunos || [];
-  if (!aca) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-aca.webp" alt=""><h3>Nenhuma ACA no ${esc(B?.nome || bim + "º bimestre")}</h3><p>Monte o gabarito desta ACA: quantos itens ela tem, a letra certa de cada um e a habilidade que ele mede.</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="aca-config">${ico("plus")}Montar a ACA deste bimestre</button></div></div>`;
+  if (!aca) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-aca.webp" alt=""><h3>Nenhuma ACA no ${esc(B?.nome || bim + "º bimestre")}</h3><p>Mande a planilha da ACA e o gabarito, as habilidades e os descritores são lidos dela. Dá para montar à mão também.</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="aca-config">${ico("plus")}Montar a ACA deste bimestre</button></div></div>`;
   if (!al.length) return head + chipsPeriodo(t) + `<div class="empty"><h3>Esta turma ainda não tem alunos</h3><p>A ACA usa a mesma lista de alunos da turma.</p><div class="toolbar" style="justify-content:center"><a class="btn primary" href="${linkTurma(t.id, "alunos")}">Adicionar alunos</a></div></div>`;
 
   const itens = aca.itens || [];
   const linhas = al.map(s => Object.assign({ s }, acaAluno(aca, s.id)));
   const fez = linhas.filter(x => x.respondeu);
-  // desempenho de cada item entre quem fez a atividade
+  // participação: a planilha pede matriculados e presentes; aqui presentes sai de quem tem resposta lançada, então não dá para ficar maior que a turma
+  // o informado nunca pode ser menor que quem já fez: senão a participação passaria de 100%
+  const informado = Number(aca.matriculados) || al.length;
+  const matriculados = Math.max(informado, fez.length);
+  const participacao = matriculados ? Math.round((fez.length / matriculados) * 100) : null;
+  const avisoMatric = informado < fez.length ? `<div class="banner"><span><b>Confira o número de matriculados.</b> ${fez.length} ${fez.length === 1 ? "aluno fez" : "alunos fizeram"} a atividade, mas a ACA está com ${informado} ${informado === 1 ? "matriculado" : "matriculados"}. Corrija em "Editar o gabarito".</span></div>` : "";
+  const mediaGeral = fez.length ? fez.reduce((a, x) => a + x.nota, 0) / fez.length : null;
+
   const porItem = itens.map((it, i) => {
     const marcadas = fez.map(x => x.r[i] || ""), cont = {};
     ACA_LETRAS.forEach(L => cont[L] = marcadas.filter(v => v === L).length);
     cont.branco = marcadas.filter(v => !v).length;
     const acertos = marcadas.filter(v => v === it.certa).length;
-    return { it, i, cont, pct: fez.length ? Math.round((acertos / fez.length) * 100) : null };
+    return { it, i, cont, acertos, pct: fez.length ? Math.round((acertos / fez.length) * 100) : null };
   });
-  // vários itens podem medir a mesma habilidade, em níveis diferentes: a habilidade é a média deles
   const habs = [...new Set(itens.map(x => x.desc).filter(Boolean))].map(d => {
     const ps = porItem.filter(x => x.it.desc === d && x.pct !== null).map(x => x.pct);
-    return { desc: d, pct: ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null, nums: porItem.filter(x => x.it.desc === d).map(x => x.i + 1) };
+    const comTexto = itens.find(x => x.desc === d && (x.descritor || x.objeto));
+    return { desc: d, descritor: comTexto?.descritor || "", objeto: comTexto?.objeto || "",
+      pct: ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null,
+      nums: porItem.filter(x => x.it.desc === d).map(x => x.i + 1) };
   });
   const barra = p => `<span class="aca-barra${p !== null && p < 50 ? " baixo" : ""}"><span style="width:${p || 0}%"></span></span>`;
+  const pc = n => fez.length ? Math.round((n / fez.length) * 100) + "%" : "—";
+
+  const resumo = avisoMatric + `<section class="panel"><div class="aca-resumo">
+    <div><b class="num">${fez.length}</b><span class="small muted">de ${matriculados} fizeram a atividade</span></div>
+    <div><b class="num">${participacao === null ? "—" : participacao + "%"}</b><span class="small muted">de participação</span></div>
+    <div><b class="num">${fmtNota(mediaGeral)}</b><span class="small muted">média geral da turma</span></div>
+    <div><b class="num">${itens.length}</b><span class="small muted">${itens.length === 1 ? "item" : "itens"} nesta ACA</span></div>
+  </div></section>`;
 
   const tabela = `<div class="table-wrap"><table>
     <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
     <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c"><input class="grade aca" type="text" maxlength="1" autocapitalize="characters" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
 
-  const painelItens = `<section class="panel"><div class="panel-head"><div><h2>Desempenho por item</h2><span class="small muted">${fez.length} de ${al.length} ${fez.length === 1 ? "aluno fez" : "alunos fizeram"} a atividade</span></div></div>
+  const painelItens = `<section class="panel"><h2>Resultados por item</h2><p class="small muted">Quantos alunos marcaram cada letra, e quanto isso dá em porcentagem de quem fez a atividade.</p>
     <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Gabarito</th><th>Habilidade</th>${ACA_LETRAS.map(L => `<th class="c">${L}</th>`).join("")}<th class="c">Em branco</th><th class="c">Acertos</th></tr></thead>
-    <tbody>${porItem.map(({ it, i, cont, pct }) => `<tr><td class="c"><b>${i + 1}</b><div class="small muted" style="text-transform:none">${esc(it.nivel || "")}</div></td><td class="c num">${esc(it.certa || "—")}</td><td class="small">${esc(it.desc || "—")}</td>${ACA_LETRAS.map(L => `<td class="c num">${cont[L]}</td>`).join("")}<td class="c num">${cont.branco}</td><td class="c" style="min-width:110px">${pct === null ? "—" : `<span class="num">${pct}%</span>${barra(pct)}`}</td></tr>`).join("")}</tbody></table></div></section>`;
+    <tbody>${porItem.map(({ it, i, cont, acertos, pct }) => `<tr><td class="c"><b>${i + 1}</b><div class="small muted" style="text-transform:none">${esc(it.nivel || "")}</div></td><td class="c num">${esc(it.certa || "—")}</td><td class="small">${esc(it.desc || "—")}</td>${ACA_LETRAS.map(L => `<td class="c num${L === it.certa ? " aca-certa" : ""}">${cont[L]}<div class="small muted">${pc(cont[L])}</div></td>`).join("")}<td class="c num">${cont.branco}<div class="small muted">${pc(cont.branco)}</div></td><td class="c" style="min-width:110px">${pct === null ? "—" : `<span class="num">${acertos} · ${pct}%</span>${barra(pct)}`}</td></tr>`).join("")}</tbody></table></div></section>`;
 
   const painelHabs = habs.length ? `<section class="panel"><h2>Desempenho por habilidade</h2><p class="small muted">A média dos itens que medem a mesma habilidade. Abaixo de 50% vale retomar o conteúdo com a turma.</p>
-    <div class="aca-habs">${habs.map(h => `<div class="aca-hab"><div class="aca-hab-top"><b>${esc(h.desc)}</b><span class="num">${h.pct === null ? "—" : h.pct + "%"}</span></div>${barra(h.pct)}<span class="small muted">${h.nums.length === 1 ? "item" : "itens"} ${h.nums.join(", ")}</span></div>`).join("")}</div></section>` : "";
+    <div class="aca-habs">${habs.map(h => `<div class="aca-hab"><div class="aca-hab-top"><b>${esc(h.desc)}</b><span class="num">${h.pct === null ? "—" : h.pct + "%"}</span></div>${barra(h.pct)}<span class="small muted">${h.nums.length === 1 ? "item" : "itens"} ${h.nums.join(", ")}${h.objeto ? " · " + esc(h.objeto) : ""}</span></div>`).join("")}</div></section>` : "";
 
-  return head + chipsPeriodo(t) + `<div class="page-head"><div><h2>${esc(aca.nome || "ACA")}</h2><p class="small muted">${itens.length} ${itens.length === 1 ? "item" : "itens"} no ${esc(B?.nome || bim + "º bimestre")}</p></div>
+  // o que a planilha chama de "HABILIDADES (não preencher)": só aparece quando veio da planilha
+  const comCurriculo = itens.filter(x => x.descritor || x.habilidade || x.objeto);
+  const painelCurriculo = comCurriculo.length ? `<section class="panel"><h2>O que cada item mede</h2><p class="small muted">Veio da planilha da ACA: o objeto de conhecimento, a habilidade do currículo de MS e o descritor.</p>
+    <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th>Objeto de conhecimento</th><th>Habilidade do currículo de MS</th><th>Descritor</th></tr></thead>
+    <tbody>${itens.map((it, i) => `<tr><td class="c"><b>${i + 1}</b></td><td class="small">${esc(it.objeto || "—")}</td><td class="small">${esc(it.habilidade || "—")}</td><td class="small">${it.desc ? `<b>${esc(it.desc)}</b> ` : ""}${esc(it.descritor || "")}</td></tr>`).join("")}</tbody></table></div></section>` : "";
+
+  return head + chipsPeriodo(t) + `<div class="page-head"><div><h2>${esc(aca.nome || "ACA")}</h2><p class="small muted">${esc(B?.nome || bim + "º bimestre")}, ${esc(t.disciplina || "")}</p></div>
     <div class="toolbar"><button class="btn" data-act="aca-config" data-id="${esc(aca.id)}">Editar o gabarito</button><button class="btn primary" data-act="aca-lancar-notas" data-id="${esc(aca.id)}">Lançar as notas no bimestre</button></div></div>`
-    + tabela + `<p class="small muted">Digite a letra que o aluno marcou, de A a E, e saia do campo para salvar. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs;
+    + resumo + tabela + `<p class="small muted">Digite a letra que o aluno marcou, de A a E, e saia do campo para salvar. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs + painelCurriculo;
+}
+
+// Ano todo: as ACAs dos quatro bimestres lado a lado. A planilha não mostra isso, porque cada bimestre é um arquivo separado
+function vAcaAno(t) {
+  const al = t.alunos || [];
+  const cols = bimestresDe(t).map(b => ({ b, aca: acaDe(t, b.num) })).filter(x => x.aca);
+  if (!cols.length) return `<div class="empty"><img class="manu sm" src="/manu/manu-aca.webp" alt=""><h3>Nenhuma ACA lançada em ${esc(t.nome)}</h3><p>Escolha um bimestre acima e monte a ACA dele. Quando houver mais de um, esta tela mostra a evolução da turma de um para o outro.</p></div>`;
+  const dados = cols.map(({ b, aca }) => {
+    const fez = al.map(s => acaAluno(aca, s.id)).filter(x => x.respondeu);
+    const itens = aca.itens || [];
+    const pctItem = itens.map((it, i) => { const m = fez.map(x => x.r[i] || ""); return fez.length ? Math.round((m.filter(v => v === it.certa).length / fez.length) * 100) : null; });
+    const habs = {};
+    [...new Set(itens.map(x => x.desc).filter(Boolean))].forEach(d => {
+      const ps = itens.map((x, i) => x.desc === d ? pctItem[i] : null).filter(p => p !== null);
+      habs[d] = ps.length ? Math.round(ps.reduce((a, c) => a + c, 0) / ps.length) : null;
+    });
+    return { b, aca, fez: fez.length, media: fez.length ? fez.reduce((a, x) => a + x.nota, 0) / fez.length : null, habs };
+  });
+  const barra = p => `<span class="aca-barra${p !== null && p < 50 ? " baixo" : ""}"><span style="width:${p || 0}%"></span></span>`;
+
+  const resumo = `<div class="aca-habs">${dados.map(d => `<div class="aca-hab"><div class="aca-hab-top"><b>${esc(d.b.nome)}</b><span class="num">${fmtNota(d.media)}</span></div>${barra(d.media === null ? null : Math.round(d.media * 10))}<span class="small muted">${d.fez} ${d.fez === 1 ? "aluno fez" : "alunos fizeram"}, ${(d.aca.itens || []).length} itens</span></div>`).join("")}</div>`;
+
+  const porAluno = `<section class="panel"><h2>Nota de cada aluno por bimestre</h2>
+    <div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th>${dados.map(d => `<th class="c">${esc(d.b.nome)}</th>`).join("")}<th class="c">Média das ACAs</th></tr></thead>
+    <tbody>${al.map(s => { const ns = dados.map(d => acaAluno(d.aca, s.id)); const vs = ns.filter(x => x.respondeu).map(x => x.nota);
+      const m = vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null;
+      return `<tr><td class="sticky-col">${esc(s.nome)}</td>${ns.map(x => `<td class="${clsNota(x.respondeu ? x.nota : null)}">${x.respondeu ? fmtNota(x.nota) : "—"}</td>`).join("")}<td class="${clsNota(m)}" style="font-weight:600">${fmtNota(m)}</td></tr>`; }).join("")}
+    <tr><td class="sticky-col" style="font-weight:600">média da turma</td>${dados.map(d => `<td class="${clsNota(d.media)}" style="font-weight:600">${fmtNota(d.media)}</td>`).join("")}<td></td></tr></tbody></table></div></section>`;
+
+  const codigos = [...new Set(dados.flatMap(d => Object.keys(d.habs)))];
+  const porHab = codigos.length ? `<section class="panel"><h2>A mesma habilidade de um bimestre para o outro</h2><p class="small muted">Cada ACA tem o seu gabarito, então uma habilidade só aparece nos bimestres em que foi cobrada.</p>
+    <div class="table-wrap"><table><thead><tr><th>Habilidade</th>${dados.map(d => `<th class="c">${esc(d.b.nome)}</th>`).join("")}</tr></thead>
+    <tbody>${codigos.map(c => `<tr><td><b>${esc(c)}</b></td>${dados.map(d => { const p = d.habs[c]; return `<td class="c">${p === undefined || p === null ? `<span class="muted">—</span>` : `<span class="num">${p}%</span>${barra(p)}`}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div></section>` : "";
+
+  return resumo + porAluno + porHab;
+}
+
+/* Planilha oficial da ACA: o gabarito não aparece escrito em lugar nenhum, está dentro da fórmula que conta os acertos.
+   Os descritores ficam numa aba própria, um bloco por ano. Tudo é lido aqui no aparelho: a planilha não sai dele. */
+const acaTxt = v => {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object") return String(v.richText ? v.richText.map(r => r.text).join("") : (v.result ?? v.text ?? "")).trim();
+  return String(v).trim();
+};
+function acaGabaritoDaAba(ws) {
+  let achado = null;
+  ws.eachRow(row => row.eachCell({ includeEmpty: false }, cell => {
+    const f = cell.formula || (cell.value && cell.value.formula);
+    if (!f || achado) return;
+    const letras = [...String(f).matchAll(/IF\(\s*\$?[A-Z]+\$?\d+\s*=\s*"([A-E])"/gi)].map(m => m[1].toUpperCase());
+    if (letras.length >= 3) achado = letras;
+  }));
+  return achado;
+}
+function acaDescritores(wb) {
+  const ws = wb.worksheets.find(w => /descritor/i.test(w.name));
+  if (!ws) return {};
+  const blocos = {}; let ano = null, cols = {};
+  ws.eachRow(row => {
+    const cels = []; row.eachCell({ includeEmpty: true }, (c, n) => { cels[n] = acaTxt(c.value); });
+    const p = cels.find(v => v) || "";
+    if (/ITENS/i.test(p) && cels.some(v => /DESCRITOR/i.test(v || ""))) {
+      ano = (p.match(/(\d)\s*º?\s*ANO/i) || [])[1] || "?"; blocos[ano] = blocos[ano] || {}; cols = {};
+      cels.forEach((v, n) => {
+        if (/^DESCRITOR/i.test(v || "")) cols.descritor = n;
+        else if (/c[óo]digo/i.test(v || "")) cols.codigo = n;
+        else if (/habilidade/i.test(v || "")) cols.habilidade = n;
+        else if (/objeto/i.test(v || "")) cols.objeto = n;
+      });
+      return;
+    }
+    const m = p.match(/ITEM\s*0?(\d+)/i);
+    if (!m || !ano) return;
+    blocos[ano][Number(m[1])] = { nivel: (p.match(/\(([^)]+)\)/) || [])[1] || "", descritor: acaTxt(cels[cols.descritor]), codigo: acaTxt(cels[cols.codigo]).split(".")[0], habilidade: acaTxt(cels[cols.habilidade]), objeto: acaTxt(cels[cols.objeto]) };
+  });
+  return blocos;
+}
+async function acaLerPlanilha(arq) {
+  await carregarScript("/vendor/exceljs-4.4.0.min.js");
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await arq.arrayBuffer());
+  const blocos = acaDescritores(wb), achados = [];
+  for (const ws of wb.worksheets) {
+    const g = acaGabaritoDaAba(ws);
+    if (!g) continue;
+    const ano = (ws.name.match(/(\d)\s*º?\s*ano/i) || [])[1] || "?";
+    const d = blocos[ano] || {};
+    const itens = g.map((certa, i) => { const x = d[i + 1] || {}; return { certa, desc: x.codigo || "", nivel: x.nivel || ACA_NIVEIS[0], descritor: x.descritor || "", habilidade: x.habilidade || "", objeto: x.objeto || "" }; });
+    if (!achados.some(a => a.ano === ano)) achados.push({ ano, aba: ws.name, itens }); // abas do mesmo ano repetem o gabarito
+  }
+  return achados;
 }
 function acaLinhasItens(itens) {
   return itens.map((it, i) => `<tr><td class="c"><b>${i + 1}</b></td>
     <td><select class="input" id="acaC${i}" aria-label="Letra certa do item ${i + 1}"><option value="">—</option>${ACA_LETRAS.map(L => `<option value="${L}" ${it.certa === L ? "selected" : ""}>${L}</option>`).join("")}</select></td>
-    <td><input class="input" id="acaD${i}" maxlength="40" value="${esc(it.desc || "")}" placeholder="D1214" aria-label="Habilidade do item ${i + 1}"></td>
+    <td><input class="input" id="acaD${i}" maxlength="40" value="${esc(it.desc || "")}" placeholder="D1214" aria-label="Habilidade do item ${i + 1}">${it.objeto ? `<div class="small muted">${esc(it.objeto)}</div>` : ""}</td>
     <td><select class="input" id="acaN${i}" aria-label="Nível do item ${i + 1}">${ACA_NIVEIS.map(n => `<option ${it.nivel === n ? "selected" : ""}>${n}</option>`).join("")}</select></td></tr>`).join("");
 }
 function dlgAca(aca) {
@@ -1104,8 +1218,10 @@ function dlgAca(aca) {
   aca = aca ? JSON.parse(JSON.stringify(aca)) : { id: uid(), turmaId: t.id, bimestre: bim, nome: "ACA do " + (B?.nome || bim + "º bimestre"), itens: Array.from({ length: 12 }, () => ({ certa: "", desc: "", nivel: ACA_NIVEIS[0] })), respostas: {} };
   dlg._obj = aca;
   abrirDlg(S.acas.some(x => x.id === aca.id) ? "Editar o gabarito da ACA" : "Montar a ACA do bimestre", `
-    <div class="grid3"><div class="field" style="grid-column:span 2"><label for="acaNome">Nome</label><input class="input" id="acaNome" value="${esc(aca.nome || "")}" placeholder="4ª ACA 2026"></div>
-    <div class="field"><label for="acaQtd">Quantidade de itens</label><input class="input" id="acaQtd" type="number" min="1" max="60" value="${(aca.itens || []).length}"></div></div>
+    <div class="field"><label for="acaArquivo">Planilha da ACA</label><input class="input" id="acaArquivo" type="file" accept=".xlsx"><p class="small muted" id="acaArqSt">Mande a planilha oficial e o gabarito, os níveis e as habilidades são lidos dela. A leitura é feita no seu aparelho: a planilha não é enviada para a internet nem para a IA.</p></div>
+    <div class="grid3"><div class="field"><label for="acaNome">Nome</label><input class="input" id="acaNome" value="${esc(aca.nome || "")}" placeholder="4ª ACA 2026"></div>
+    <div class="field"><label for="acaQtd">Quantidade de itens</label><input class="input" id="acaQtd" type="number" min="1" max="60" value="${(aca.itens || []).length}"></div>
+    <div class="field"><label for="acaMatric">Alunos matriculados</label><input class="input" id="acaMatric" type="number" min="0" max="99" value="${esc(aca.matriculados || (turmaAtual()?.alunos || []).length)}"></div></div>
     <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th>Letra certa</th><th>Habilidade</th><th>Nível</th></tr></thead><tbody id="acaItens">${acaLinhasItens(aca.itens || [])}</tbody></table></div>
     <p class="small muted">A habilidade é o código do descritor que vem na planilha da ACA, como D1214 ou D12. Itens diferentes podem medir a mesma habilidade.</p>`,
     `${S.acas.some(x => x.id === aca.id) ? `<button type="button" class="btn danger" data-act="aca-apagar" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-aca">Salvar</button>`);
@@ -3474,9 +3590,13 @@ document.addEventListener("click", async e => {
     case "aca-config": dlgAca(S.acas.find(x => x.id === id)); break;
     case "salvar-aca": {
       const a = dlg._obj, qtd = Math.max(1, Math.min(60, Number(dlg.querySelector("#acaQtd").value) || 1)), novos = [];
-      for (let i = 0; i < qtd; i++) novos.push({ certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
+      // o que veio da planilha (descritor, objeto, habilidade do currículo) não aparece no formulário, então vem do item anterior
+      for (let i = 0; i < qtd; i++) novos.push({ ...((a.itens || [])[i] || {}), certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
       if (novos.some(x => !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item."); return; }
-      a.nome = val("acaNome") || "ACA"; a.itens = novos;
+      const fizeram = Object.values(a.respostas || {}).filter(r => (r || []).some(x => x)).length;
+      const matric = Number(dlg.querySelector("#acaMatric")?.value) || (turmaAtual()?.alunos || []).length;
+      if (matric < fizeram) { toast(`Já tem ${fizeram} ${fizeram === 1 ? "aluno com resposta lançada" : "alunos com respostas lançadas"}: o número de matriculados não pode ser menor que isso.`); return; }
+      a.nome = val("acaNome") || "ACA"; a.itens = novos; a.matriculados = matric;
       // item que deixou de existir leva junto as respostas dele
       a.respostas = Object.fromEntries(Object.entries(a.respostas || {}).map(([k, v]) => [k, (v || []).slice(0, qtd)]));
       a.atualizadoEm = new Date().toISOString();
@@ -3566,9 +3686,25 @@ document.addEventListener("click", async e => {
 document.addEventListener("change", async e => {
   const el = e.target;
   if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); _rotaDiario(); return; }
+  if (el.id === "acaArquivo") {
+    const arq = el.files && el.files[0]; if (!arq) return;
+    const st = dlg.querySelector("#acaArqSt"), a = dlg._obj;
+    st.textContent = "Lendo a planilha…";
+    try {
+      const achados = await acaLerPlanilha(arq);
+      if (!achados.length) { st.textContent = "Não encontrei o gabarito nesta planilha. Confira se é o arquivo da ACA, ou preencha os itens à mão."; return; }
+      const serie = String(turmaAtual()?.serie || turmaAtual()?.nome || "");
+      const escolhido = achados.find(x => serie.includes(x.ano)) || achados[0];
+      a.itens = escolhido.itens;
+      dlg.querySelector("#acaQtd").value = a.itens.length;
+      dlg.querySelector("#acaItens").innerHTML = acaLinhasItens(a.itens);
+      st.textContent = `Li ${a.itens.length} itens da aba "${escolhido.aba}"${achados.length > 1 ? ", que é a que combina com esta turma" : ""}. Confira abaixo antes de salvar.`;
+    } catch (err) { console.error(err); st.textContent = "Não consegui ler esta planilha. Confira se é o arquivo .xlsx da ACA."; }
+    return;
+  }
   if (el.id === "acaQtd") { // mexer na quantidade refaz as linhas sem perder o que já foi digitado
     const a = dlg._obj, q = Math.max(1, Math.min(60, Number(el.value) || 1)), atuais = [];
-    for (let i = 0; i < (a.itens || []).length; i++) atuais.push({ certa: dlg.querySelector("#acaC" + i)?.value || "", desc: dlg.querySelector("#acaD" + i)?.value || "", nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
+    for (let i = 0; i < (a.itens || []).length; i++) atuais.push({ ...((a.itens || [])[i] || {}), certa: dlg.querySelector("#acaC" + i)?.value || "", desc: dlg.querySelector("#acaD" + i)?.value || "", nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
     a.itens = Array.from({ length: q }, (_, i) => atuais[i] || { certa: "", desc: "", nivel: ACA_NIVEIS[0] });
     dlg.querySelector("#acaItens").innerHTML = acaLinhasItens(a.itens);
     return;

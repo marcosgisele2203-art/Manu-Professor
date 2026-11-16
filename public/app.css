@@ -137,6 +137,10 @@ td .grade.aca{width:44px;text-transform:uppercase}
 .aca-habs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px}
 .aca-hab{display:flex;flex-direction:column;gap:2px}
 .aca-hab-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.aca-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.aca-resumo>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.aca-resumo .num{font-family:var(--f-display);font-size:1.7rem;font-weight:800;line-height:1.1}
+td.aca-certa{background:var(--ok-soft);font-weight:700}
 
 .pres{display:inline-flex;border:1px solid var(--line-strong);border-radius:12px;overflow:hidden}
 .pres button{border:0;background:transparent;padding:8px 14px;min-height:40px;cursor:pointer;font-weight:600;font-family:var(--f-mono);color:var(--muted)}
