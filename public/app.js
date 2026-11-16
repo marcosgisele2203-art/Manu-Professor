@@ -1112,8 +1112,8 @@ function vAca() {
     <tbody>${itens.map((it, i) => `<tr><td class="c"><b>${i + 1}</b></td><td class="small">${esc(it.objeto || "—")}</td><td class="small">${esc(it.habilidade || "—")}</td><td class="small">${it.desc ? `<b>${esc(it.desc)}</b> ` : ""}${esc(it.descritor || "")}</td></tr>`).join("")}</tbody></table></div></section>` : "";
 
   return head + chipsPeriodo(t) + `<div class="page-head"><div><h2>${esc(aca.nome || "ACA")}</h2><p class="small muted">${esc(B?.nome || bim + "º bimestre")}, ${esc(t.disciplina || "")}</p></div>
-    <div class="toolbar"><button class="btn" data-act="aca-config" data-id="${esc(aca.id)}">Editar o gabarito</button><button class="btn primary" data-act="aca-lancar-notas" data-id="${esc(aca.id)}">Lançar as notas no bimestre</button></div></div>`
-    + resumo + tabela + `<p class="small muted">Digite a letra que o aluno marcou, de A a E, e saia do campo para salvar. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs + painelCurriculo;
+    <div class="toolbar"><button class="btn" data-act="aca-config" data-id="${esc(aca.id)}">Editar o gabarito</button><button class="btn ai" data-act="aca-foto" data-id="${esc(aca.id)}">${ico("spark")}Corrigir pela foto do cartão</button><button class="btn primary" data-act="aca-lancar-notas" data-id="${esc(aca.id)}">Lançar as notas no bimestre</button></div></div>`
+    + resumo + tabela + `<p class="small muted">Toque no quadrinho e escolha a letra que o aluno marcou, ou use <b>Corrigir pela foto do cartão</b> para a Manu ler o cartão-resposta. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs + painelCurriculo;
 }
 
 // Ano todo: as ACAs dos quatro bimestres lado a lado. A planilha não mostra isso, porque cada bimestre é um arquivo separado
@@ -1217,6 +1217,77 @@ document.addEventListener("keydown", e => {
 // a tabela rola de lado e a página de pé: o quadrinho acompanha a célula
 window.addEventListener("scroll", () => { if (acaPickAlvo) acaPickPosicionar(document.activeElement); }, true);
 window.addEventListener("resize", () => { if (acaPickAlvo) acaPickPosicionar(document.activeElement); });
+
+/* Correção da ACA pela foto do cartão-resposta: a Manu lê só as bolinhas (a mesma leitura da correção de provas);
+   o aluno é escolhido aqui, e a professora confere antes de salvar. A foto não fica guardada. */
+function dlgAcaFoto(acaId) {
+  const t = turmaAtual(), a = S.acas.find(x => x.id === acaId);
+  if (!t || !a) return;
+  if (!(t.alunos || []).length) { toast("Cadastre os alunos da turma para corrigir pela foto."); return; }
+  const semResposta = t.alunos.find(s => !acaAluno(a, s.id).respondeu);
+  dlg._cor = null; // a correção de provas usa o mesmo diálogo
+  dlg._af = { acaId, alunoId: (semResposta || t.alunos[0]).id, foto: "", leitura: null, marcadas: [], status: "" };
+  renderAcaFoto();
+}
+function renderAcaFoto() {
+  const c = dlg._af, t = turmaAtual(), a = S.acas.find(x => x.id === c.acaId), itens = a.itens || [];
+  let corpo = `<div class="grid2"><div class="field"><label for="afAluno">Aluno</label><select class="input" id="afAluno">${t.alunos.map(s => { const x = acaAluno(a, s.id); return `<option value="${esc(s.id)}" ${s.id === c.alunoId ? "selected" : ""}>${esc(s.nome)}${x.respondeu ? " ✓ (" + fmtNota(x.nota) + ")" : ""}</option>`; }).join("")}</select></div>
+    <div class="field"><label for="afFoto">Foto do cartão-resposta</label><input class="input" id="afFoto" type="file" accept="image/*" capture="environment"></div></div>
+    <p class="small muted">Fotografe o quadro do gabarito inteiro, com boa luz e sem sombra. Pode estar de lado ou de cabeça para baixo. Confira se o aluno escolhido acima é o dono do cartão.</p>`;
+  if (c.foto) corpo += `<div class="cor-wrap"><img class="cor-foto" src="${c.foto}" alt="Foto do cartão-resposta">
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-aca-foto" ${cap.ia ? "" : "disabled"}>${ico("spark")}${c.leitura ? "Ler de novo" : "Ler respostas"}</button><span class="ai-status" id="iaStatus">${esc(c.status || "A Manu lê as bolinhas pintadas. Você confere antes de salvar.")}</span></div></div></div>`;
+  if (c.leitura) {
+    const acertos = itens.filter((it, i) => c.marcadas[i] && c.marcadas[i] === it.certa).length;
+    const duvidas = itens.filter((_, i) => !c.marcadas[i]).length;
+    corpo += `${c.leitura.observacao ? `<div class="banner"><span>${esc(c.leitura.observacao)}</span></div>` : ""}
+      <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Marcada</th><th class="c">Gabarito</th><th class="c">Resultado</th></tr></thead><tbody>
+      ${itens.map((it, i) => { const m = c.marcadas[i] || "";
+        return `<tr><td class="c num">${i + 1}</td><td class="c"><select class="input af-sel" data-i="${i}" aria-label="Letra marcada no item ${i + 1}" style="width:auto;min-height:34px;padding:2px 8px"><option value="">—</option>${ACA_LETRAS.map(L => `<option ${m === L ? "selected" : ""}>${L}</option>`).join("")}</select></td><td class="c num">${esc(it.certa || "?")}</td><td class="c">${!m ? `<span class="chip warn">conferir</span>` : m === it.certa ? `<span class="chip ok">certa</span>` : `<span class="chip bad">errada</span>`}</td></tr>`; }).join("")}
+      </tbody></table></div>
+      <p><b class="num">${acertos} de ${itens.length}</b> acertos · nota <b class="num">${fmtNota(itens.length ? acertos / itens.length * 10 : null)}</b>${duvidas ? ` · <span style="color:var(--warn)">${duvidas} ${duvidas === 1 ? "item" : "itens"} para conferir na foto</span>` : ""}.</p>`;
+  }
+  abrirDlg("Corrigir pela foto · " + esc(a.nome || "ACA"), corpo, `<button type="button" class="btn" data-act="fechar">Fechar</button>${c.leitura ? `<button type="button" class="btn primary" data-act="aca-foto-salvar">Salvar e ir para o próximo aluno</button>` : ""}`);
+}
+async function lerCartaoAca() {
+  const c = dlg._af, a = S.acas.find(x => x.id === c.acaId), itens = a.itens || [];
+  await comIA(async (signal, st) => {
+    const [cab, dados] = c.foto.split(",");
+    const r = await iaJSON({ tipo: "correcao", imagem: dados, mime: cab.includes("png") ? "image/png" : "image/jpeg", questoes: itens.map((_, i) => ({ n: i + 1, opcoes: ACA_LETRAS.join("") })) }, signal);
+    if (!r || typeof r.respostas !== "object") throw { message: "Não consegui ler o cartão. Tire outra foto, mais de perto e com boa luz." };
+    c.leitura = r;
+    c.marcadas = itens.map((_, i) => { const v = r.respostas[String(i + 1)]; return typeof v === "string" && ACA_LETRAS.includes(v.toUpperCase()) ? v.toUpperCase() : ""; });
+    st.textContent = c.status = "Leitura feita. Confira as letras com a foto antes de salvar.";
+  });
+  const stEl = dlg.querySelector("#iaStatus"); if (stEl) c.status = stEl.textContent;
+  renderAcaFoto();
+}
+document.addEventListener("change", async e => {
+  const c = dlg._af, el = e.target;
+  if (!c || !dlg.open || !el.closest || !el.closest("dialog")) return;
+  if (el.id === "afAluno") { c.alunoId = el.value; renderAcaFoto(); }
+  else if (el.id === "afFoto" && el.files[0]) { try { c.foto = await prepararFoto(el.files[0]); c.leitura = null; c.marcadas = []; c.status = ""; renderAcaFoto(); } catch (_) { toast("Não consegui abrir essa imagem. Tente uma foto em JPG ou PNG."); } }
+  else if (el.classList.contains("af-sel")) { c.marcadas[Number(el.dataset.i)] = el.value; renderAcaFoto(); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act='aca-foto'],[data-act='ia-aca-foto'],[data-act='aca-foto-salvar']"); if (!b) return;
+  if (b.dataset.act === "aca-foto") { dlgAcaFoto(b.dataset.id); return; }
+  const c = dlg._af; if (!c) return;
+  if (b.dataset.act === "ia-aca-foto") { await lerCartaoAca(); return; }
+  const t = turmaAtual(), orig = S.acas.find(x => x.id === c.acaId); if (!orig) return;
+  const a = JSON.parse(JSON.stringify(orig)), nome = (t.alunos.find(s => s.id === c.alunoId) || {}).nome || "";
+  const ja = acaAluno(a, c.alunoId).respondeu;
+  // aluno que já tinha respostas: confirma antes de trocar, para um cartão do aluno errado não apagar o certo
+  if (ja && b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = `Substituir as respostas de ${nome.split(" ")[0]}`; return; }
+  a.respostas = a.respostas || {};
+  a.respostas[c.alunoId] = (a.itens || []).map((_, i) => c.marcadas[i] || "");
+  a.atualizadoEm = new Date().toISOString();
+  await salvar("acas", a);
+  toast(`Respostas de ${nome} salvas`);
+  const prox = t.alunos.find(s => !acaAluno(a, s.id).respondeu);
+  if (!prox) { fechar(); toast("Todos os alunos têm respostas lançadas."); return; }
+  dlg._af = { acaId: a.id, alunoId: prox.id, foto: "", leitura: null, marcadas: [], status: "" };
+  renderAcaFoto();
+});
 
 /* Planilha oficial da ACA: o gabarito não aparece escrito em lugar nenhum, está dentro da fórmula que conta os acertos.
    Os descritores ficam numa aba própria, um bloco por ano. Tudo é lido aqui no aparelho: a planilha não sai dele. */
@@ -3865,7 +3936,7 @@ document.addEventListener("submit", e => {
 document.addEventListener("keydown", e => {
   if (e.target.id === "chatInput" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatForm").requestSubmit(); }
 });
-dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); });
+dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); dlg._af = null; });
 
 function lerRota() {
   let h = location.hash.slice(1);

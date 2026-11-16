@@ -154,6 +154,7 @@ Responda SOMENTE com JSON: {"titulo": "", "colecao": "", "volume": "", "capitulo
       return { json: true, mensagens: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: p.mime, data: p.imagem } },
         { type: "text", text: `A imagem é a foto de uma folha de respostas de prova preenchida por um aluno. Cada questão tem um número e bolinhas com letras. Leia só as marcações; ignore nomes e outros dados pessoais escritos na folha.
+A foto pode estar girada ou de cabeça para baixo, e as questões podem estar em colunas com as letras nas linhas: localize o número de cada questão antes de ler.
 Questões e opções possíveis: ${p.questoes.map((q) => `${q.n}: ${q.opcoes.split("").join("/")}`).join("; ")}.
 Para cada questão, diga qual bolinha está preenchida ou marcada (pintada, com X ou com círculo forte). Se nenhuma estiver marcada, se houver mais de uma marcada ou se não der para ter certeza, use null e coloque o número da questão em "duvidas". Não tente adivinhar a resposta certa da prova: informe apenas o que está marcado.
 Responda SOMENTE com JSON: {"respostas": {"1": "A", "2": null}, "duvidas": [2], "observacao": "problema da foto, se houver (borrada, cortada, escura), ou vazio"}` },
