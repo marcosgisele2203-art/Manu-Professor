@@ -131,10 +131,10 @@ td.aviso{color:var(--warn);text-decoration:underline 2px;text-underline-offset:3
 td.risco{color:var(--bad);text-decoration:underline 2px;text-underline-offset:3px}
 /* ACA: campo de uma letra por item e barras de desempenho (o tamanho da barra já diz o resultado, a cor só reforça) */
 td .grade.aca{width:44px;text-transform:uppercase;cursor:pointer;caret-color:transparent}
-.aca-pick{position:fixed;z-index:60;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.aca-pick{position:fixed;z-index:60;max-width:calc(100vw - 16px);box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .aca-pick[hidden]{display:none}
 .aca-pick-tit{font-size:.8rem;color:var(--muted);max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
-.aca-pick-bts{display:flex;gap:6px}
+.aca-pick-bts{display:flex;flex-wrap:wrap;gap:6px}
 .aca-pick button{min-width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:inherit;font:inherit;font-weight:700;font-size:1.05rem;cursor:pointer}
 .aca-pick button.branco{font-size:.85rem;font-weight:600;padding:0 10px}
 .aca-pick button:hover{border-color:var(--accent)}

@@ -1151,16 +1151,28 @@ function vAcaAno(t) {
   return resumo + porAluno + porHab;
 }
 
+// grava no estado na hora; o envio ao servidor sai um de cada vez, sempre com a versão mais nova da ACA,
+// para um envio antigo que chegue por último não apagar as letras lançadas depois dele
+const acaEnvio = {};
+async function acaEnviar(id) {
+  const e = acaEnvio[id] = acaEnvio[id] || { rodando: false, sujo: false };
+  e.sujo = true;
+  if (e.rodando) return;
+  e.rodando = true;
+  try { while (e.sujo) { e.sujo = false; const a = S.acas.find(x => x.id === id); if (a) await salvar("acas", a); } }
+  finally { e.rodando = false; }
+}
 function acaGravarLetra(acaId, alunoId, item, letra) {
-  const orig = S.acas.find(x => x.id === acaId); if (!orig) return Promise.resolve();
-  const a = JSON.parse(JSON.stringify(orig));
+  const i = S.acas.findIndex(x => x.id === acaId); if (i < 0) return Promise.resolve();
+  const a = JSON.parse(JSON.stringify(S.acas[i]));
   a.respostas = a.respostas || {};
   const r = (a.respostas[alunoId] || []).slice();
   while (r.length < a.itens.length) r.push("");
   if (r[item] === letra) return Promise.resolve();
   r[item] = letra;
   a.respostas[alunoId] = r; a.atualizadoEm = new Date().toISOString();
-  return salvar("acas", a);
+  S.acas[i] = a;
+  return acaEnviar(acaId);
 }
 /* Escolha flutuante: tocar na célula abre A, B, C, D, E e "Em branco" ao lado dela. Escolher grava e já passa para o
    item seguinte (no último, para o aluno de baixo), como na folha de respostas. No celular não abre o teclado. */
@@ -1199,8 +1211,13 @@ function acaEscolher(letra) {
   const cel = acaCel(alvo.aca, alvo.aluno, alvo.item);
   const prox = acaCel(alvo.aca, alvo.aluno, alvo.item + 1) || cel?.closest("tr")?.nextElementSibling?.querySelector("input.aca");
   const chave = prox ? [prox.dataset.aluno, prox.dataset.item] : null;
-  // salvar redesenha a tela na hora: a próxima célula é procurada de novo depois disso
   acaGravarLetra(alvo.aca, alvo.aluno, alvo.item, letra);
+  // com uma célula em foco o render() espera; aqui a tela tem que mostrar a letra, os acertos e a nota na hora:
+  // tira o foco, redesenha (guardando a rolagem lateral da tabela) e foca a próxima célula
+  const rolagem = cel?.closest(".table-wrap")?.scrollLeft || 0;
+  document.activeElement?.blur?.();
+  render();
+  const wrap = document.querySelector(".table-wrap input.aca")?.closest(".table-wrap"); if (wrap) wrap.scrollLeft = rolagem;
   const nova = chave && acaCel(alvo.aca, chave[0], chave[1]);
   if (nova) { nova.focus(); nova.scrollIntoView({ block: "nearest", inline: "nearest" }); acaPickPosicionar(nova); }
   else { acaPickFechar(); document.activeElement?.blur?.(); }
