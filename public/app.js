@@ -8,7 +8,7 @@ const addDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d
 const fmtData = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
 const fmtDataLonga = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) : "—";
 const fmtNota = n => (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides", "calendario", "perfil"];
+const COLS = ["turmas", "planos", "chamadas", "avaliacoes", "atividades", "questoes", "provas", "materiais", "slides", "calendario", "perfil", "acas"];
 const CORES = ["#1d6b58", "#3d5a98", "#a0522d", "#7a4a8c", "#b08900", "#2f7f8f", "#b3261e"];
 const MEDIA_MIN = 6, FREQ_MIN = 75;
 // Classes da célula de nota e de frequência: as classes "aviso" e "risco" juntam cor e sublinhado (app.css), para o alerta não depender só da cor
@@ -48,7 +48,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["calendario", "Calendário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+const ABAS = [["resumo", "Resumo"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["aca", "ACA"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["bimestre", "planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
@@ -81,7 +81,7 @@ const irTurma = (id, aba = "resumo") => { location.hash = linkTurma(id, aba); };
 const S = {
   mode: "loading", // loading | live | demo
   uid: null, nome: "", base: null,
-  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [], materiais: [], slides: [],
+  turmas: [], planos: [], chamadas: [], avaliacoes: [], atividades: [], questoes: [], provas: [], materiais: [], slides: [], acas: [],
   turmaSel: null, view: "inicio",
   chamadaData: hoje(), filtroQ: { disc: "", dif: "", txt: "" },
   chat: [], loaded: new Set()
@@ -324,7 +324,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>${S.erroRede ? "Sem internet" : "Não foi possível carregar seus dados"}</h3><p>${S.erroRede ? "Este aparelho ainda não tem uma cópia dos seus dados. Abra o sistema uma vez com internet; depois ele funciona mesmo sem conexão." : "Verifique a internet e recarregue a página."}</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: vInicio, turmas: vTurmas, resumo: vResumoTurma, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, aca: vAca, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -985,7 +985,7 @@ function imprimirDiario(t) {
 /* ----- Notas ----- */
 function vNotas() {
   const t = turmaAtual();
-  const head = `<div class="page-head"><div><h1>${S.notasGeral ? "Média geral" : "Notas"}</h1><p class="muted">${S.notasGeral ? "As médias de todos os bimestres, a média final e, embaixo, as notas de cada bimestre." : `Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.`}</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
+  const head = `<div class="page-head"><div><h1>${S.notasGeral ? "Média geral" : "Notas"}</h1><p class="muted">${S.notasGeral ? "As médias de todos os bimestres, a média final e, embaixo, as notas de cada bimestre." : `Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.`}</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<a class="btn" href="${linkTurma(t.id, "aca")}">ACA</a><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
   if (!t) return head + semTurma();
   const bim = S.notasGeral ? "" : bimSelecionado(t), bs = bimestresDe(t);
   const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim))).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
@@ -1028,6 +1028,79 @@ function vNotas() {
       <td class="${clsNota(m)}" style="font-weight:600">${fmtNota(m)}</td><td class="${clsFreq(f)}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td>${temPara ? `<td class="c">${paraTxt(precisaNoBim(t, s.id, bim))}</td>` : ""}</tr>`; }).join("")}</tbody></table></div>
     ${temPara ? `<p class="small muted"><b>Para passar</b>: a média que o aluno precisa neste bimestre para fechar o ano com ${MEDIA_MIN}, contando as médias dos outros bimestres.</p>` : ""}
     <p class="small muted">Digite a nota de 0 a 10 e saia do campo para salvar. Use vírgula ou ponto.</p>`;
+}
+
+/* ----- ACA (Atividade de Acompanhamento da Aprendizagem) ----- */
+const ACA_LETRAS = ["A", "B", "C", "D", "E"];
+const ACA_NIVEIS = ["Básico", "Intermediário", "Avançado"];
+const acaDe = (t, bim) => S.acas.find(a => a.turmaId === t.id && String(a.bimestre) === String(bim));
+// acertos e nota de um aluno; quem não tem nenhuma letra lançada não fez a atividade e não entra nas contas
+function acaAluno(aca, alunoId) {
+  const r = (aca.respostas || {})[alunoId] || [], itens = aca.itens || [];
+  const respondeu = r.some(x => x);
+  const acertos = itens.reduce((n, it, i) => n + (r[i] && r[i] === it.certa ? 1 : 0), 0);
+  return { r, respondeu, acertos, nota: respondeu && itens.length ? (acertos / itens.length) * 10 : null };
+}
+function vAca() {
+  const t = turmaAtual();
+  const head = `<div class="page-head"><div><h1>ACA</h1><p class="muted">Atividade de Acompanhamento da Aprendizagem. Lance a letra que cada aluno marcou e veja os acertos, a nota e o desempenho por habilidade.</p></div><div class="toolbar"><a class="btn" href="https://vistta.sed.ms.gov.br/" target="_blank" rel="noopener">Abrir o Vistta</a></div></div>`;
+  if (!t) return head + semTurma();
+  const bim = bimSelecionado(t);
+  if (!bim) return head + chipsPeriodo(t) + `<div class="empty"><h3>Escolha um bimestre</h3><p>Cada bimestre tem uma ACA diferente, com gabarito e habilidades próprios. Toque no bimestre acima.</p></div>`;
+  const B = bimPorNum(t, bim), aca = acaDe(t, bim), al = t.alunos || [];
+  if (!aca) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma ACA no ${esc(B?.nome || bim + "º bimestre")}</h3><p>Monte o gabarito desta ACA: quantos itens ela tem, a letra certa de cada um e a habilidade que ele mede.</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="aca-config">${ico("plus")}Montar a ACA deste bimestre</button></div></div>`;
+  if (!al.length) return head + chipsPeriodo(t) + `<div class="empty"><h3>Esta turma ainda não tem alunos</h3><p>A ACA usa a mesma lista de alunos da turma.</p><div class="toolbar" style="justify-content:center"><a class="btn primary" href="${linkTurma(t.id, "alunos")}">Adicionar alunos</a></div></div>`;
+
+  const itens = aca.itens || [];
+  const linhas = al.map(s => Object.assign({ s }, acaAluno(aca, s.id)));
+  const fez = linhas.filter(x => x.respondeu);
+  // desempenho de cada item entre quem fez a atividade
+  const porItem = itens.map((it, i) => {
+    const marcadas = fez.map(x => x.r[i] || ""), cont = {};
+    ACA_LETRAS.forEach(L => cont[L] = marcadas.filter(v => v === L).length);
+    cont.branco = marcadas.filter(v => !v).length;
+    const acertos = marcadas.filter(v => v === it.certa).length;
+    return { it, i, cont, pct: fez.length ? Math.round((acertos / fez.length) * 100) : null };
+  });
+  // vários itens podem medir a mesma habilidade, em níveis diferentes: a habilidade é a média deles
+  const habs = [...new Set(itens.map(x => x.desc).filter(Boolean))].map(d => {
+    const ps = porItem.filter(x => x.it.desc === d && x.pct !== null).map(x => x.pct);
+    return { desc: d, pct: ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null, nums: porItem.filter(x => x.it.desc === d).map(x => x.i + 1) };
+  });
+  const barra = p => `<span class="aca-barra${p !== null && p < 50 ? " baixo" : ""}"><span style="width:${p || 0}%"></span></span>`;
+
+  const tabela = `<div class="table-wrap"><table>
+    <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
+    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c"><input class="grade aca" type="text" maxlength="1" autocapitalize="characters" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
+
+  const painelItens = `<section class="panel"><div class="panel-head"><div><h2>Desempenho por item</h2><span class="small muted">${fez.length} de ${al.length} ${fez.length === 1 ? "aluno fez" : "alunos fizeram"} a atividade</span></div></div>
+    <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Gabarito</th><th>Habilidade</th>${ACA_LETRAS.map(L => `<th class="c">${L}</th>`).join("")}<th class="c">Em branco</th><th class="c">Acertos</th></tr></thead>
+    <tbody>${porItem.map(({ it, i, cont, pct }) => `<tr><td class="c"><b>${i + 1}</b><div class="small muted" style="text-transform:none">${esc(it.nivel || "")}</div></td><td class="c num">${esc(it.certa || "—")}</td><td class="small">${esc(it.desc || "—")}</td>${ACA_LETRAS.map(L => `<td class="c num">${cont[L]}</td>`).join("")}<td class="c num">${cont.branco}</td><td class="c" style="min-width:110px">${pct === null ? "—" : `<span class="num">${pct}%</span>${barra(pct)}`}</td></tr>`).join("")}</tbody></table></div></section>`;
+
+  const painelHabs = habs.length ? `<section class="panel"><h2>Desempenho por habilidade</h2><p class="small muted">A média dos itens que medem a mesma habilidade. Abaixo de 50% vale retomar o conteúdo com a turma.</p>
+    <div class="aca-habs">${habs.map(h => `<div class="aca-hab"><div class="aca-hab-top"><b>${esc(h.desc)}</b><span class="num">${h.pct === null ? "—" : h.pct + "%"}</span></div>${barra(h.pct)}<span class="small muted">${h.nums.length === 1 ? "item" : "itens"} ${h.nums.join(", ")}</span></div>`).join("")}</div></section>` : "";
+
+  return head + chipsPeriodo(t) + `<div class="page-head"><div><h2>${esc(aca.nome || "ACA")}</h2><p class="small muted">${itens.length} ${itens.length === 1 ? "item" : "itens"} no ${esc(B?.nome || bim + "º bimestre")}</p></div>
+    <div class="toolbar"><button class="btn" data-act="aca-config" data-id="${esc(aca.id)}">Editar o gabarito</button><button class="btn primary" data-act="aca-lancar-notas" data-id="${esc(aca.id)}">Lançar as notas no bimestre</button></div></div>`
+    + tabela + `<p class="small muted">Digite a letra que o aluno marcou, de A a E, e saia do campo para salvar. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs;
+}
+function acaLinhasItens(itens) {
+  return itens.map((it, i) => `<tr><td class="c"><b>${i + 1}</b></td>
+    <td><select class="input" id="acaC${i}" aria-label="Letra certa do item ${i + 1}"><option value="">—</option>${ACA_LETRAS.map(L => `<option value="${L}" ${it.certa === L ? "selected" : ""}>${L}</option>`).join("")}</select></td>
+    <td><input class="input" id="acaD${i}" maxlength="40" value="${esc(it.desc || "")}" placeholder="D1214" aria-label="Habilidade do item ${i + 1}"></td>
+    <td><select class="input" id="acaN${i}" aria-label="Nível do item ${i + 1}">${ACA_NIVEIS.map(n => `<option ${it.nivel === n ? "selected" : ""}>${n}</option>`).join("")}</select></td></tr>`).join("");
+}
+function dlgAca(aca) {
+  const t = turmaAtual(), bim = String(bimSelecionado(t) || "1"), B = bimPorNum(t, bim);
+  // cópia: mexer na quantidade de itens não pode alterar a ACA salva se o professor desistir
+  aca = aca ? JSON.parse(JSON.stringify(aca)) : { id: uid(), turmaId: t.id, bimestre: bim, nome: "ACA do " + (B?.nome || bim + "º bimestre"), itens: Array.from({ length: 12 }, () => ({ certa: "", desc: "", nivel: ACA_NIVEIS[0] })), respostas: {} };
+  dlg._obj = aca;
+  abrirDlg(S.acas.some(x => x.id === aca.id) ? "Editar o gabarito da ACA" : "Montar a ACA do bimestre", `
+    <div class="grid3"><div class="field" style="grid-column:span 2"><label for="acaNome">Nome</label><input class="input" id="acaNome" value="${esc(aca.nome || "")}" placeholder="4ª ACA 2026"></div>
+    <div class="field"><label for="acaQtd">Quantidade de itens</label><input class="input" id="acaQtd" type="number" min="1" max="60" value="${(aca.itens || []).length}"></div></div>
+    <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th>Letra certa</th><th>Habilidade</th><th>Nível</th></tr></thead><tbody id="acaItens">${acaLinhasItens(aca.itens || [])}</tbody></table></div>
+    <p class="small muted">A habilidade é o código do descritor que vem na planilha da ACA, como D1214 ou D12. Itens diferentes podem medir a mesma habilidade.</p>`,
+    `${S.acas.some(x => x.id === aca.id) ? `<button type="button" class="btn danger" data-act="aca-apagar" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-aca">Salvar</button>`);
 }
 
 /* ----- Planejamento ----- */
@@ -3376,7 +3449,7 @@ document.addEventListener("click", async e => {
       toast(`${tt.nome} excluída`); if (S.dentroTurma) location.hash = "turmas"; break; }
     case "seed": {
       if (S.mode !== "live") return; b.disabled = true;
-      const sfx = uid().slice(0, 6); const ex = JSON.parse(JSON.stringify(exemplo()).replace(/"(ex(?:6a|8b|pl\d+|av\d+|at\d+|q\d+|pr\d+))(_|")/g, (m, id, fim) => `"${id}-${sfx}${fim}`)); for (const col of COLS) for (const o of ex[col]) await salvar(col, o);
+      const sfx = uid().slice(0, 6); const ex = JSON.parse(JSON.stringify(exemplo()).replace(/"(ex(?:6a|8b|pl\d+|av\d+|at\d+|q\d+|pr\d+))(_|")/g, (m, id, fim) => `"${id}-${sfx}${fim}`)); for (const col of COLS) for (const o of ex[col] || []) await salvar(col, o); // coleção sem exemplo não derruba a carga
       toast("Exemplo carregado. Apague ou edite quando quiser."); break; }
 
     case "marcar": {
@@ -3390,6 +3463,30 @@ document.addEventListener("click", async e => {
     case "abrir-chamada": S.chamadaData = b.dataset.data; render(); window.scrollTo(0, 0); break;
 
     case "nova-avaliacao": dlgAvaliacao(); break;
+    case "aca-config": dlgAca(S.acas.find(x => x.id === id)); break;
+    case "salvar-aca": {
+      const a = dlg._obj, qtd = Math.max(1, Math.min(60, Number(dlg.querySelector("#acaQtd").value) || 1)), novos = [];
+      for (let i = 0; i < qtd; i++) novos.push({ certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
+      if (novos.some(x => !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item."); return; }
+      a.nome = val("acaNome") || "ACA"; a.itens = novos;
+      // item que deixou de existir leva junto as respostas dele
+      a.respostas = Object.fromEntries(Object.entries(a.respostas || {}).map(([k, v]) => [k, (v || []).slice(0, qtd)]));
+      a.atualizadoEm = new Date().toISOString();
+      fechar(); await salvar("acas", a); break;
+    }
+    case "aca-apagar": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar com as respostas"; return; } { const aid = dlg._obj.id; fechar(); await apagar("acas", aid); toast("ACA apagada"); } break;
+    case "aca-lancar-notas": {
+      const tt = turmaAtual(), a = S.acas.find(x => x.id === id);
+      const ja = S.avaliacoes.find(x => x.turmaId === tt.id && x.acaId === a.id);
+      const av = ja ? JSON.parse(JSON.stringify(ja)) : { id: uid(), turmaId: tt.id, bimestre: String(a.bimestre), nome: a.nome || "ACA", sigla: "ACA", peso: 1, valor: 10, data: hoje(), acaId: a.id, notas: {} };
+      let n = 0;
+      av.notas = {}; // refaz do zero: aluno que teve as respostas apagadas não pode continuar com a nota antiga contando na média
+      (tt.alunos || []).forEach(s => { const x = acaAluno(a, s.id); if (x.nota !== null) { av.notas[s.id] = Number(x.nota.toFixed(1)); n++; } });
+      if (!n) { toast("Lance as respostas de pelo menos um aluno antes."); return; }
+      await salvar("avaliacoes", av);
+      toast(`Nota da ACA lançada para ${n} ${n === 1 ? "aluno" : "alunos"}. ${ja ? "A avaliação foi atualizada." : "Confira o peso dela em Notas."}`);
+      break;
+    }
     case "nota-media-bim": {
       const bi = bimPorNum(t, bimSelecionado(t)); if (!bi) return;
       await salvar("avaliacoes", { id: uid(), turmaId: t.id, nome: "Média do bimestre", peso: 1, data: bi.fim, bimestre: String(bi.num), notas: {} });
@@ -3461,6 +3558,27 @@ document.addEventListener("click", async e => {
 document.addEventListener("change", async e => {
   const el = e.target;
   if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); _rotaDiario(); return; }
+  if (el.id === "acaQtd") { // mexer na quantidade refaz as linhas sem perder o que já foi digitado
+    const a = dlg._obj, q = Math.max(1, Math.min(60, Number(el.value) || 1)), atuais = [];
+    for (let i = 0; i < (a.itens || []).length; i++) atuais.push({ certa: dlg.querySelector("#acaC" + i)?.value || "", desc: dlg.querySelector("#acaD" + i)?.value || "", nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
+    a.itens = Array.from({ length: q }, (_, i) => atuais[i] || { certa: "", desc: "", nivel: ACA_NIVEIS[0] });
+    dlg.querySelector("#acaItens").innerHTML = acaLinhasItens(a.itens);
+    return;
+  }
+  if (el.matches("input.aca")) {
+    const a = JSON.parse(JSON.stringify(S.acas.find(x => x.id === el.dataset.aca)));
+    const letra = el.value.trim().toUpperCase();
+    // letra inválida volta ao que está salvo: um erro de digitação não pode apagar a resposta que já estava lá
+    if (letra && !ACA_LETRAS.includes(letra)) { toast("Use uma letra de A a E, ou deixe em branco se o aluno não respondeu."); el.value = ((a.respostas || {})[el.dataset.aluno] || [])[Number(el.dataset.item)] || ""; return; }
+    a.respostas = a.respostas || {};
+    const r = (a.respostas[el.dataset.aluno] || []).slice();
+    while (r.length < a.itens.length) r.push("");
+    r[Number(el.dataset.item)] = letra;
+    a.respostas[el.dataset.aluno] = r; a.atualizadoEm = new Date().toISOString();
+    el.value = letra;
+    await salvar("acas", a);
+    return;
+  }
   if (el.matches("input.grade")) {
     const a = JSON.parse(JSON.stringify(S.avaliacoes.find(x => x.id === el.dataset.av))); a.notas = a.notas || {};
     const raw = el.value.trim().replace(",", ".");

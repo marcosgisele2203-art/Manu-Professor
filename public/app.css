@@ -129,6 +129,14 @@ td.col-foco,th.col-foco{background:var(--accent-soft)}
 /* Nota e frequência em risco: a cor vem com sublinhado, porque cor sozinha não avisa quem não distingue a cor */
 td.aviso{color:var(--warn);text-decoration:underline 2px;text-underline-offset:3px}
 td.risco{color:var(--bad);text-decoration:underline 2px;text-underline-offset:3px}
+/* ACA: campo de uma letra por item e barras de desempenho (o tamanho da barra já diz o resultado, a cor só reforça) */
+td .grade.aca{width:44px;text-transform:uppercase}
+.aca-barra{display:block;height:8px;margin-top:4px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.aca-barra>span{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.aca-barra.baixo>span{background:var(--warn)}
+.aca-habs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px}
+.aca-hab{display:flex;flex-direction:column;gap:2px}
+.aca-hab-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 
 .pres{display:inline-flex;border:1px solid var(--line-strong);border-radius:12px;overflow:hidden}
 .pres button{border:0;background:transparent;padding:8px 14px;min-height:40px;cursor:pointer;font-weight:600;font-family:var(--f-mono);color:var(--muted)}
