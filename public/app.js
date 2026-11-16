@@ -1098,6 +1098,11 @@ function vAca() {
     <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
     <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c${r[i] ? (r[i] === it.certa ? " aca-ok" : " aca-err") : ""}"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
 
+  // os mesmos campos, na mesma ordem e com os mesmos nomes do questionário da ACA no Vistta: é só copiar e colar
+  const camposVistta = [["Quantidade de estudantes matriculados", matriculados], ["Quantidade de estudantes que realizaram a avaliação (ACA)", fez.length], ...porItem.map(x => [`Quantidade de acertos do item ${x.i + 1}`, x.acertos])];
+  const painelVistta = `<section class="panel"><div class="panel-head"><div><h2>Para lançar no Vistta</h2><p class="small muted">Os números que o Vistta pede, na mesma ordem dele. Toque em Copiar e cole no campo de mesmo nome.</p></div><a class="btn" href="https://vistta.sed.ms.gov.br/" target="_blank" rel="noopener">Abrir o Vistta</a></div>
+    ${fez.length ? "" : `<div class="banner"><span>Nenhum aluno tem respostas lançadas ainda. Lance as letras na tabela acima para os números aparecerem.</span></div>`}
+    <div class="aca-vistta">${camposVistta.map(([n, v]) => `<div class="aca-vistta-linha"><span>${esc(n)}:</span><b class="num">${v}</b><button type="button" class="btn sm" data-act="aca-copiar" data-valor="${v}" data-nome="${esc(n)}" aria-label="Copiar ${esc(n)}">Copiar</button></div>`).join("")}</div></section>`;
   const painelItens = `<section class="panel"><h2>Resultados por item</h2><p class="small muted">Quantos alunos marcaram cada letra, e quanto isso dá em porcentagem de quem fez a atividade.</p>
     <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Gabarito</th><th>Habilidade</th>${ACA_LETRAS.map(L => `<th class="c">${L}</th>`).join("")}<th class="c">Em branco</th><th class="c">Acertos</th></tr></thead>
     <tbody>${porItem.map(({ it, i, cont, acertos, pct }) => `<tr><td class="c"><b>${i + 1}</b><div class="small muted" style="text-transform:none">${esc(it.nivel || "")}</div></td><td class="c num">${esc(it.certa || "—")}</td><td class="small">${esc(it.desc || "—")}</td>${ACA_LETRAS.map(L => `<td class="c num${L === it.certa ? " aca-certa" : ""}">${cont[L]}<div class="small muted">${pc(cont[L])}</div></td>`).join("")}<td class="c num">${cont.branco}<div class="small muted">${pc(cont.branco)}</div></td><td class="c" style="min-width:110px">${pct === null ? "—" : `<span class="num">${acertos} · ${pct}%</span>${barra(pct)}`}</td></tr>`).join("")}</tbody></table></div></section>`;
@@ -1113,7 +1118,7 @@ function vAca() {
 
   return head + chipsPeriodo(t) + `<div class="page-head"><div><h2>${esc(aca.nome || "ACA")}</h2><p class="small muted">${esc(B?.nome || bim + "º bimestre")}, ${esc(t.disciplina || "")}</p></div>
     <div class="toolbar"><button class="btn" data-act="aca-config" data-id="${esc(aca.id)}">Editar o gabarito</button><button class="btn ai" data-act="aca-foto" data-id="${esc(aca.id)}">${ico("spark")}Corrigir pela foto do cartão</button><button class="btn primary" data-act="aca-lancar-notas" data-id="${esc(aca.id)}">Lançar as notas no bimestre</button></div></div>`
-    + resumo + tabela + `<p class="small muted">Toque no quadrinho e escolha a letra que o aluno marcou, ou use <b>Corrigir pela foto do cartão</b> para a Manu ler o cartão-resposta. Verde com ✓ é acerto; vermelho é erro. Deixe em branco quem não respondeu o item.</p>` + painelItens + painelHabs + painelCurriculo;
+    + resumo + tabela + `<p class="small muted">Toque no quadrinho e escolha a letra que o aluno marcou, ou use <b>Corrigir pela foto do cartão</b> para a Manu ler o cartão-resposta. Verde com ✓ é acerto; vermelho é erro. Deixe em branco quem não respondeu o item.</p>` + painelVistta + painelItens + painelHabs + painelCurriculo;
 }
 
 // Ano todo: as ACAs dos quatro bimestres lado a lado. A planilha não mostra isso, porque cada bimestre é um arquivo separado
@@ -3772,6 +3777,7 @@ document.addEventListener("click", async e => {
 
     case "nova-avaliacao": dlgAvaliacao(); break;
     case "aca-config": dlgAca(S.acas.find(x => x.id === id)); break;
+    case "aca-copiar": { const v = b.dataset.valor; try { await navigator.clipboard.writeText(v); toast(`${v} copiado. Agora cole no Vistta, em "${b.dataset.nome}".`); } catch (_) { toast(`Não consegui copiar neste aparelho. Digite ${v} no Vistta.`); } break; }
     case "salvar-aca": {
       const a = dlg._obj, qtd = Math.max(1, Math.min(60, Number(dlg.querySelector("#acaQtd").value) || 1)), novos = [];
       // o que veio da planilha (descritor, objeto, habilidade do currículo) não aparece no formulário, então vem do item anterior
