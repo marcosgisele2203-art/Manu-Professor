@@ -218,6 +218,14 @@ async function iniciar() {
 }
 // app instalável e funcionando sem internet
 if ("serviceWorker" in navigator) { const reg = () => navigator.serviceWorker.register("/sw.js").catch(() => {}); if (document.readyState === "complete") reg(); else addEventListener("load", reg); }
+// versão nova publicada: o service worker avisa e a tela se atualiza sozinha, para ninguém seguir com o app antigo
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
+  if (e.data !== "versao-nova" || window._atualizando) return;
+  window._atualizando = true;
+  document.activeElement?.blur?.(); // tira o foco: o campo em edição salva antes de a página recarregar
+  toast("Atualizando para a versão nova…");
+  setTimeout(() => location.reload(), 1200); // tempo de a nota sair e de a professora ler o aviso
+});
 let pedidoInstalar = null;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); pedidoInstalar = e; if (S.view === "inicio" || S.view === "perfil") render(); });
 addEventListener("appinstalled", () => { pedidoInstalar = null; toast("Manu Professor instalado no aparelho"); render(); });
@@ -381,7 +389,7 @@ document.addEventListener("change", e => { if (e.target.id === "trocaTurma") irT
 try { S.turmaSel = localStorage.getItem("cp_turma"); } catch (_) {}
 
 function semTurma(msg) {
-  return `<div class="empty"><img class="manu" src="/manu/manu-agenda.webp" alt=""><h3>Crie sua primeira turma</h3><p>${esc(msg || "Cadastre uma turma com a lista de alunos para usar chamada, notas e atividades.")}</p>
+  return `<div class="empty"><img class="manu" src="/manu/manu-alunos.webp" alt=""><h3>Crie sua primeira turma</h3><p>${esc(msg || "Cadastre uma turma com a lista de alunos para usar chamada, notas e atividades.")}</p>
   <div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-turma">${ico("plus")}Nova turma</button>${S.mode === "live" ? `<button class="btn" data-act="seed">Carregar exemplo</button>` : ""}</div></div>`;
 }
 
@@ -1011,7 +1019,7 @@ function vNotas() {
             ${al.map(s => { const m = mediaAluno(t, s.id, b.num); return `<tr><td class="sticky-col">${esc(s.nome)}</td>${avsB.map(x => { const v = x.notas?.[s.id]; return `<td class="${clsNota(v == null || v === "" ? null : Number(v))}">${v == null || v === "" ? "—" : fmtNota(v)}</td>`; }).join("")}<td class="${clsNota(m)}" style="font-weight:700">${fmtNota(m)}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted small">Nenhuma nota lançada neste bimestre.</p>`}</section>`;
       }).join("")}`;
   }
-  if (!avs.length) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma avaliação ${bim ? "no " + esc(bimPorNum(t, bim)?.nome || "") : "em " + esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.${bim ? " Se o bimestre já passou e você só tem a média final de cada aluno, lance direto a média." : ""}</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>${bim ? `<button class="btn" data-act="nota-media-bim">Já tenho a média do bimestre</button>` : ""}</div></div>`;
+  if (!avs.length) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-notas.webp" alt=""><h3>Nenhuma avaliação ${bim ? "no " + esc(bimPorNum(t, bim)?.nome || "") : "em " + esc(t.nome)}</h3><p>Crie uma prova, trabalho ou participação com o peso dela na média.${bim ? " Se o bimestre já passou e você só tem a média final de cada aluno, lance direto a média." : ""}</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>${bim ? `<button class="btn" data-act="nota-media-bim">Já tenho a média do bimestre</button>` : ""}</div></div>`;
   const B = bim ? bimPorNum(t, bim) : null;
   // "Para passar": só faz sentido quando as médias dos outros bimestres já estão lançadas
   const temPara = B && al.some(s => precisaNoBim(t, s.id, bim) !== null);
@@ -1048,7 +1056,7 @@ function vAca() {
   const bim = bimSelecionado(t);
   if (!bim) return head + chipsPeriodo(t) + `<div class="empty"><h3>Escolha um bimestre</h3><p>Cada bimestre tem uma ACA diferente, com gabarito e habilidades próprios. Toque no bimestre acima.</p></div>`;
   const B = bimPorNum(t, bim), aca = acaDe(t, bim), al = t.alunos || [];
-  if (!aca) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhuma ACA no ${esc(B?.nome || bim + "º bimestre")}</h3><p>Monte o gabarito desta ACA: quantos itens ela tem, a letra certa de cada um e a habilidade que ele mede.</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="aca-config">${ico("plus")}Montar a ACA deste bimestre</button></div></div>`;
+  if (!aca) return head + chipsPeriodo(t) + `<div class="empty"><img class="manu sm" src="/manu/manu-aca.webp" alt=""><h3>Nenhuma ACA no ${esc(B?.nome || bim + "º bimestre")}</h3><p>Monte o gabarito desta ACA: quantos itens ela tem, a letra certa de cada um e a habilidade que ele mede.</p><div class="toolbar" style="justify-content:center"><button class="btn primary" data-act="aca-config">${ico("plus")}Montar a ACA deste bimestre</button></div></div>`;
   if (!al.length) return head + chipsPeriodo(t) + `<div class="empty"><h3>Esta turma ainda não tem alunos</h3><p>A ACA usa a mesma lista de alunos da turma.</p><div class="toolbar" style="justify-content:center"><a class="btn primary" href="${linkTurma(t.id, "alunos")}">Adicionar alunos</a></div></div>`;
 
   const itens = aca.itens || [];
@@ -1109,7 +1117,7 @@ function vPlanos() {
   const lista = S.planos.filter(p => !t || p.turmaId === t.id).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const head = `<div class="page-head"><div><h1>Planejamento</h1><p class="muted">Planos de aula de ${esc(t ? t.nome : "todas as turmas")}, com habilidades da BNCC.</p></div><div class="toolbar"><button class="btn" data-act="novo-plano">${ico("plus")}Plano em branco</button><button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Criar com IA</button></div></div>`;
   if (!S.turmas.length) return head + semTurma();
-  if (!lista.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Nenhum plano de aula ainda</h3><p>Diga o tema e a Manu monta objetivos, sequência didática, recursos e avaliação. Você revisa e salva.</p><button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Criar com IA</button></div>`;
+  if (!lista.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-planos.webp" alt=""><h3>Nenhum plano de aula ainda</h3><p>Diga o tema e a Manu monta objetivos, sequência didática, recursos e avaliação. Você revisa e salva.</p><button class="btn ai" data-act="novo-plano-ia">${ico("spark")}Criar com IA</button></div>`;
   const d0 = hoje();
   return head + `<div class="cards">${lista.map(p => { const tt = turma(p.turmaId); return `<article class="card"><div class="card-top"><div style="min-width:0"><span class="eyebrow">${fmtData(p.data)} · ${esc(tt?.nome || "")}</span><h3>${esc(p.titulo)}</h3></div><span class="chip ${p.status === "dada" ? "ok" : p.data < d0 ? "warn" : "acc"}">${p.status === "dada" ? "aula dada" : p.data < d0 ? "pendente" : "planejado"}</span></div>
     <p class="small muted" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(p.objetivos || "")}</p>
@@ -1123,7 +1131,7 @@ function vAtividades() {
   const head = `<div class="page-head"><div><h1>Atividades e entregas</h1><p class="muted">Tarefas com prazo e controle de quem entregou.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-atividade">${ico("plus")}Nova atividade</button></div></div>`;
   if (!t) return head + semTurma();
   const lista = S.atividades.filter(a => a.turmaId === t.id).sort((a, b) => (b.prazo || "").localeCompare(a.prazo || ""));
-  if (!lista.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhuma atividade em ${esc(t.nome)}</h3><p>Crie uma tarefa, descreva o que os alunos devem fazer (a IA ajuda) e marque as entregas.</p><button class="btn primary" data-act="nova-atividade">${ico("plus")}Nova atividade</button></div>`;
+  if (!lista.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-atividades.webp" alt=""><h3>Nenhuma atividade em ${esc(t.nome)}</h3><p>Crie uma tarefa, descreva o que os alunos devem fazer (a IA ajuda) e marque as entregas.</p><button class="btn primary" data-act="nova-atividade">${ico("plus")}Nova atividade</button></div>`;
   const n = (t.alunos || []).length, d0 = hoje();
   return head + lista.map(a => { const e = (t.alunos || []).filter(s => a.entregas?.[s.id]).length; const pct = n ? Math.round(e / n * 100) : 0; return `<section class="panel">
     <div class="panel-head"><div style="min-width:0"><span class="eyebrow">Prazo ${fmtData(a.prazo)}${a.valor ? " · vale " + esc(a.valor) + " ponto(s)" : ""}</span><h2>${esc(a.titulo)}</h2></div>
@@ -1153,7 +1161,7 @@ function vQuestoes() {
   const discs = [...new Set(S.questoes.map(q => q.disciplina).filter(Boolean))].sort();
   const lista = S.questoes.filter(q => (!f.disc || q.disciplina === f.disc) && (!f.dif || q.dificuldade === f.dif) && (!f.txt || (q.enunciado + " " + q.tema).toLowerCase().includes(f.txt.toLowerCase())));
   const head = `<div class="page-head"><div><h1>Banco de questões</h1><p class="muted">${S.questoes.length} questões guardadas para montar provas.</p></div><div class="toolbar"><button class="btn" data-act="nova-questao">${ico("plus")}Nova questão</button><a class="btn" href="${lk("enem")}">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
-  if (!S.questoes.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Seu banco está vazio</h3><p>Peça à Manu questões sobre um tema ou pegue questões oficiais do Enem.</p><div class="toolbar" style="justify-content:center"><a class="btn" href="${lk("enem")}">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
+  if (!S.questoes.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-questoes.webp" alt=""><h3>Seu banco está vazio</h3><p>Peça à Manu questões sobre um tema ou pegue questões oficiais do Enem.</p><div class="toolbar" style="justify-content:center"><a class="btn" href="${lk("enem")}">Banco do Enem</a><button class="btn ai" data-act="gerar-questoes">${ico("spark")}Gerar com IA</button></div></div>`;
   return head + `<section class="panel"><div class="toolbar">
       <div class="field" style="flex:1;min-width:180px"><label for="fTxt">Buscar</label><input class="input" type="search" id="fTxt" value="${esc(f.txt)}" placeholder="Tema ou trecho do enunciado"></div>
       <div class="field"><label for="fDisc">Disciplina</label><select class="input" id="fDisc"><option value="">Todas</option>${discs.map(d => `<option ${f.disc === d ? "selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
@@ -1166,14 +1174,14 @@ function vQuestoes() {
 function vProvas() {
   const head = `<div class="page-head"><div><h1>Provas</h1><p class="muted">Monte provas com questões do banco e baixe com gabarito.</p></div><div class="toolbar"><button class="btn primary" data-act="nova-prova">${ico("plus")}Nova prova</button></div></div>`;
   const provasT = S.provas.filter(p => !S.dentroTurma || p.turmaId === S.turmaSel);
-  if (!provasT.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhuma prova montada</h3><p>${S.questoes.length ? "Escolha questões do seu banco para montar a primeira." : "Primeiro guarde algumas questões no banco, depois monte a prova."}</p><button class="btn primary" data-act="${S.questoes.length ? "nova-prova" : "ir"}" data-view="questoes">${S.questoes.length ? "Nova prova" : "Ir ao banco de questões"}</button></div>`;
+  if (!provasT.length) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-provas.webp" alt=""><h3>Nenhuma prova montada</h3><p>${S.questoes.length ? "Escolha questões do seu banco para montar a primeira." : "Primeiro guarde algumas questões no banco, depois monte a prova."}</p><button class="btn primary" data-act="${S.questoes.length ? "nova-prova" : "ir"}" data-view="questoes">${S.questoes.length ? "Nova prova" : "Ir ao banco de questões"}</button></div>`;
   return head + `<div class="cards">${provasT.map(p => { const t = turma(p.turmaId); return `<article class="card"><span class="eyebrow">${fmtData(p.data)} · ${esc(t?.nome || "Sem turma")}</span><h3>${esc(p.titulo)}</h3><p class="small muted">${(p.questaoIds || []).length} questões</p><div class="toolbar"><button class="btn sm" data-act="ver-prova" data-id="${esc(p.id)}">Visualizar</button><button class="btn sm ghost" data-act="editar-prova" data-id="${esc(p.id)}">Editar</button><button class="btn sm ghost" data-act="corrigir-foto" data-id="${esc(p.id)}">Corrigir por foto</button></div>${p.correcoes && Object.keys(p.correcoes).length ? `<span class="small muted">${Object.keys(p.correcoes).length} de ${(t?.alunos || []).length} corrigidas</span>` : ""}</article>`; }).join("")}</div>`;
 }
 
 /* ----- Assistente ----- */
 function vAssistente() {
   const sugest = ["Sugira uma dinâmica de 10 minutos para começar a aula", "Como adaptar uma atividade para um aluno com TDAH?", "Escreva um bilhete para os responsáveis sobre a feira de ciências", "Ideias de avaliação formativa para minha turma"];
-  return `<div class="page-head"><div><div class="hello"><img src="/manu/manu-ajuda.webp" alt=""><div><h1>Fale com a Manu</h1><p class="muted">Sua assistente pedagógica. Ela conhece o nome, a série e a disciplina das suas turmas, mas não vê os nomes dos alunos.</p></div></div></div>${S.chat.length ? `<button class="btn ghost" data-act="limpar-chat">Nova conversa</button>` : ""}</div>
+  return `<div class="page-head"><div><div class="hello"><img src="/manu/manu-assistente.webp" alt=""><div><h1>Fale com a Manu</h1><p class="muted">Sua assistente pedagógica. Ela conhece o nome, a série e a disciplina das suas turmas, mas não vê os nomes dos alunos.</p></div></div></div>${S.chat.length ? `<button class="btn ghost" data-act="limpar-chat">Nova conversa</button>` : ""}</div>
   ${!cap.ia ? `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic (ANTHROPIC_API_KEY) no servidor.</span></div>` : ""}
   <section class="panel"><div class="chat" id="chatLog">${S.chat.length ? S.chat.map(m => `<div class="msg ${m.role === "user" ? "user" : "bot"}">${esc(m.content)}</div>`).join("") : `<div class="muted">Comece com uma pergunta ou escolha uma sugestão:</div><div class="suggest">${sugest.map(s => `<button class="btn sm" data-act="sugestao" data-txt="${esc(s)}">${esc(s)}</button>`).join("")}</div>`}</div>
   <form class="chat-form" id="chatForm"><textarea class="input" id="chatInput" placeholder="Pergunte algo sobre suas aulas…" ${cap.ia ? "" : "disabled"}></textarea><button class="btn primary" id="chatSend" ${cap.ia ? "" : "disabled"}>Enviar</button></form></section>`;
@@ -2397,7 +2405,7 @@ function vEnem() {
       <p class="small" style="color:var(--ok)"><b>Gabarito:</b> ${esc(q.certa)}</p></div>
       ${jaGuardada(r.ano, q) ? `<span class="chip ok">No seu banco</span>` : `<button class="btn sm primary" data-act="enem-guardar" data-k="${k}">Guardar no meu banco</button>`}</article>`).join("")}</div>`
       : `<p class="muted">Nenhuma questão encontrada com esses filtros. Tente outra palavra ou outra área.</p>`}
-  </section>` : `<div class="empty"><img class="manu sm" src="/manu/manu-ajuda.webp" alt=""><h3>Escolha o ano e a área</h3><p>As questões aparecem com texto, imagens, alternativas e gabarito oficiais.</p></div>`}
+  </section>` : `<div class="empty"><img class="manu sm" src="/manu/manu-questoes.webp" alt=""><h3>Escolha o ano e a área</h3><p>As questões aparecem com texto, imagens, alternativas e gabarito oficiais.</p></div>`}
   <p class="small muted">Questões do Exame Nacional do Ensino Médio, elaboradas e publicadas pelo INEP/MEC. Organização dos dados: projeto aberto enem.dev.</p>`;
 }
 async function buscarEnem() {
@@ -2708,7 +2716,7 @@ function passoEntrevista() {
     ? `<textarea class="input" id="entTxt" rows="4" maxlength="800" placeholder="${esc(q.ph)}">${esc(v || "")}</textarea>`
     : `<div class="ent-ops" role="group" aria-label="${esc(q.p)}">${opsDe(q).map(o => `<button type="button" class="tn-op" data-act="ent-op" data-v="${esc(o)}" aria-pressed="${q.tipo === "unica" ? v === o : (Array.isArray(v) ? v : []).includes(o)}">${esc(o)}</button>`).join("")}</div>
       ${q.tipo === "multi" ? `<input class="input" id="entOutro" maxlength="160" placeholder="Outro (opcional)" value="${esc(outros.join(", "))}">` : ""}<p class="small muted">${q.tipo === "multi" ? "Pode marcar mais de uma." : "Escolha uma."}</p>`;
-  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-ajuda.webp" alt=""><div class="ent-fala">${intro}<b>${esc(q.p)}</b></div></div>
+  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-entrevista.webp" alt=""><div class="ent-fala">${intro}<b>${esc(q.p)}</b></div></div>
     <div class="ent-prog"><i style="width:${Math.round((st.passo + 1) / n * 100)}%"></i></div><p class="small muted">Pergunta ${st.passo + 1} de ${n}</p>${campo}</div>`,
     `${st.passo ? `<button type="button" class="btn ghost" data-act="ent-voltar">Voltar</button>` : `<button type="button" class="btn ghost" data-act="ent-pular">Agora não</button>`}<button type="button" class="btn primary" data-act="ent-proxima">${st.passo === n - 1 ? "Ver resumo" : "Próxima"}</button>`);
 }
@@ -2722,7 +2730,7 @@ function guardarPasso() {
 }
 function resumoEntrevista() {
   const txt = textoEstilo(dlg._ent.r);
-  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-boas-vindas.webp" alt=""><div class="ent-fala"><b>${txt ? "Entendi! Vou planejar assim:" : "Você não marcou nada."}</b></div></div>
+  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-entrevista.webp" alt=""><div class="ent-fala"><b>${txt ? "Entendi! Vou planejar assim:" : "Você não marcou nada."}</b></div></div>
     ${txt ? listaEstilo(txt) : `<p class="muted">Sem problema: a Manu planeja do jeito padrão.</p>`}<p class="small muted">Dá para refazer quando quiser em Meu perfil.</p></div>`,
     `<button type="button" class="btn ghost" data-act="ent-voltar">Voltar</button><button type="button" class="btn primary" data-act="ent-salvar">Salvar</button>`);
 }
@@ -3186,7 +3194,7 @@ function vAlunos() {
       : `<div class="row"><span class="num muted small" style="width:26px">${String(i + 1).padStart(2, "0")}</span><div class="grow"><div class="title">${esc(a.nome)}</div><div class="small muted">Média ${fmtNota(m)} · Frequência ${f === null ? "—" : f + "%"}</div></div>
         <button class="btn sm ghost" data-act="al-renomear" data-id="${esc(a.id)}">Renomear</button><button class="btn sm ghost danger" data-act="al-remover" data-id="${esc(a.id)}">Remover</button></div>`; }).join("")}</div>
     <p class="small muted">Remover um aluno tira o nome dele da chamada, das notas e das entregas desta turma.</p></section>`
-    : `<div class="empty"><img class="manu sm" src="/manu/manu-agenda.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima, cole a lista da secretaria ou envie o PDF ou a foto da lista.</p></div>`}`;
+    : `<div class="empty"><img class="manu sm" src="/manu/manu-alunos.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima, cole a lista da secretaria ou envie o PDF ou a foto da lista.</p></div>`}`;
 }
 async function salvarAlunos(alunos, msg) {
   const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)); nt.alunos = alunos; S.alEdit = null;
