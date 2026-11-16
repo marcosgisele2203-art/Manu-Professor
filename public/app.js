@@ -1063,8 +1063,11 @@ function vAca() {
   const linhas = al.map(s => Object.assign({ s }, acaAluno(aca, s.id)));
   const fez = linhas.filter(x => x.respondeu);
   // participação: a planilha pede matriculados e presentes; aqui presentes sai de quem tem resposta lançada, então não dá para ficar maior que a turma
-  const matriculados = Number(aca.matriculados) || al.length;
+  // o informado nunca pode ser menor que quem já fez: senão a participação passaria de 100%
+  const informado = Number(aca.matriculados) || al.length;
+  const matriculados = Math.max(informado, fez.length);
   const participacao = matriculados ? Math.round((fez.length / matriculados) * 100) : null;
+  const avisoMatric = informado < fez.length ? `<div class="banner"><span><b>Confira o número de matriculados.</b> ${fez.length} ${fez.length === 1 ? "aluno fez" : "alunos fizeram"} a atividade, mas a ACA está com ${informado} ${informado === 1 ? "matriculado" : "matriculados"}. Corrija em "Editar o gabarito".</span></div>` : "";
   const mediaGeral = fez.length ? fez.reduce((a, x) => a + x.nota, 0) / fez.length : null;
 
   const porItem = itens.map((it, i) => {
@@ -1084,7 +1087,7 @@ function vAca() {
   const barra = p => `<span class="aca-barra${p !== null && p < 50 ? " baixo" : ""}"><span style="width:${p || 0}%"></span></span>`;
   const pc = n => fez.length ? Math.round((n / fez.length) * 100) + "%" : "—";
 
-  const resumo = `<section class="panel"><div class="aca-resumo">
+  const resumo = avisoMatric + `<section class="panel"><div class="aca-resumo">
     <div><b class="num">${fez.length}</b><span class="small muted">de ${matriculados} fizeram a atividade</span></div>
     <div><b class="num">${participacao === null ? "—" : participacao + "%"}</b><span class="small muted">de participação</span></div>
     <div><b class="num">${fmtNota(mediaGeral)}</b><span class="small muted">média geral da turma</span></div>
@@ -3590,8 +3593,10 @@ document.addEventListener("click", async e => {
       // o que veio da planilha (descritor, objeto, habilidade do currículo) não aparece no formulário, então vem do item anterior
       for (let i = 0; i < qtd; i++) novos.push({ ...((a.itens || [])[i] || {}), certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
       if (novos.some(x => !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item."); return; }
-      a.nome = val("acaNome") || "ACA"; a.itens = novos;
-      a.matriculados = Number(dlg.querySelector("#acaMatric")?.value) || (turmaAtual()?.alunos || []).length;
+      const fizeram = Object.values(a.respostas || {}).filter(r => (r || []).some(x => x)).length;
+      const matric = Number(dlg.querySelector("#acaMatric")?.value) || (turmaAtual()?.alunos || []).length;
+      if (matric < fizeram) { toast(`Já tem ${fizeram} ${fizeram === 1 ? "aluno com resposta lançada" : "alunos com respostas lançadas"}: o número de matriculados não pode ser menor que isso.`); return; }
+      a.nome = val("acaNome") || "ACA"; a.itens = novos; a.matriculados = matric;
       // item que deixou de existir leva junto as respostas dele
       a.respostas = Object.fromEntries(Object.entries(a.respostas || {}).map(([k, v]) => [k, (v || []).slice(0, qtd)]));
       a.atualizadoEm = new Date().toISOString();
