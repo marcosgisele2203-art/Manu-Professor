@@ -1252,7 +1252,7 @@ function renderAcaFoto() {
     <div class="field"><label for="afFoto">Foto do cartão-resposta</label><input class="input" id="afFoto" type="file" accept="image/*" capture="environment"></div></div>
     <p class="small muted">Fotografe o quadro do gabarito inteiro, com boa luz e sem sombra. Pode estar de lado ou de cabeça para baixo. Confira se o aluno escolhido acima é o dono do cartão.</p>`;
   if (c.foto) corpo += `<div class="cor-wrap"><img class="cor-foto" src="${c.foto}" alt="Foto do cartão-resposta">
-    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-aca-foto" ${cap.ia ? "" : "disabled"}>${ico("spark")}${c.leitura ? "Ler de novo" : "Ler respostas"}</button><span class="ai-status" id="iaStatus">${esc(c.status || "A Manu lê as bolinhas pintadas. Você confere antes de salvar.")}</span></div></div></div>`;
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-aca-foto" ${cap.ia ? "" : "disabled"}>${ico("spark")}${c.leitura ? "Ler de novo" : "Ler respostas"}</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">${esc(c.status || "A Manu lê as bolinhas pintadas. Você confere antes de salvar.")}</span></div></div></div>`;
   if (c.leitura) {
     const acertos = itens.filter((it, i) => c.marcadas[i] && c.marcadas[i] === it.certa).length;
     const duvidas = itens.filter((_, i) => !c.marcadas[i]).length;
