@@ -3449,7 +3449,7 @@ document.addEventListener("click", async e => {
       toast(`${tt.nome} excluída`); if (S.dentroTurma) location.hash = "turmas"; break; }
     case "seed": {
       if (S.mode !== "live") return; b.disabled = true;
-      const sfx = uid().slice(0, 6); const ex = JSON.parse(JSON.stringify(exemplo()).replace(/"(ex(?:6a|8b|pl\d+|av\d+|at\d+|q\d+|pr\d+))(_|")/g, (m, id, fim) => `"${id}-${sfx}${fim}`)); for (const col of COLS) for (const o of ex[col]) await salvar(col, o);
+      const sfx = uid().slice(0, 6); const ex = JSON.parse(JSON.stringify(exemplo()).replace(/"(ex(?:6a|8b|pl\d+|av\d+|at\d+|q\d+|pr\d+))(_|")/g, (m, id, fim) => `"${id}-${sfx}${fim}`)); for (const col of COLS) for (const o of ex[col] || []) await salvar(col, o); // coleção sem exemplo não derruba a carga
       toast("Exemplo carregado. Apague ou edite quando quiser."); break; }
 
     case "marcar": {
@@ -3480,6 +3480,7 @@ document.addEventListener("click", async e => {
       const ja = S.avaliacoes.find(x => x.turmaId === tt.id && x.acaId === a.id);
       const av = ja ? JSON.parse(JSON.stringify(ja)) : { id: uid(), turmaId: tt.id, bimestre: String(a.bimestre), nome: a.nome || "ACA", sigla: "ACA", peso: 1, valor: 10, data: hoje(), acaId: a.id, notas: {} };
       let n = 0;
+      av.notas = {}; // refaz do zero: aluno que teve as respostas apagadas não pode continuar com a nota antiga contando na média
       (tt.alunos || []).forEach(s => { const x = acaAluno(a, s.id); if (x.nota !== null) { av.notas[s.id] = Number(x.nota.toFixed(1)); n++; } });
       if (!n) { toast("Lance as respostas de pelo menos um aluno antes."); return; }
       await salvar("avaliacoes", av);
@@ -3567,7 +3568,8 @@ document.addEventListener("change", async e => {
   if (el.matches("input.aca")) {
     const a = JSON.parse(JSON.stringify(S.acas.find(x => x.id === el.dataset.aca)));
     const letra = el.value.trim().toUpperCase();
-    if (letra && !ACA_LETRAS.includes(letra)) { toast("Use uma letra de A a E, ou deixe em branco se o aluno não respondeu."); el.value = ""; return; }
+    // letra inválida volta ao que está salvo: um erro de digitação não pode apagar a resposta que já estava lá
+    if (letra && !ACA_LETRAS.includes(letra)) { toast("Use uma letra de A a E, ou deixe em branco se o aluno não respondeu."); el.value = ((a.respostas || {})[el.dataset.aluno] || [])[Number(el.dataset.item)] || ""; return; }
     a.respostas = a.respostas || {};
     const r = (a.respostas[el.dataset.aluno] || []).slice();
     while (r.length < a.itens.length) r.push("");
