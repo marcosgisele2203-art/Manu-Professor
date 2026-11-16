@@ -119,9 +119,16 @@ th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white
 th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;background:var(--surface-2);position:sticky;top:0}
 td.c,th.c{text-align:center}
 tr:last-child td{border-bottom:0}
-td .grade{width:64px;text-align:center;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-family:var(--f-mono)}
+td .grade{width:64px;text-align:center;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td .grade:focus{border-color:var(--accent)}
 .sticky-col{position:sticky;left:0;background:var(--surface);z-index:1}
 th.sticky-col{background:var(--surface-2);z-index:2}
+/* Régua de lançamento: a linha do aluno e a coluna da avaliação acendem enquanto a nota é digitada, para não lançar na linha errada em turma grande */
+tbody tr:has(.grade:focus) td,tbody tr:has(.grade:focus) td.sticky-col{background:var(--accent-soft)}
+td.col-foco,th.col-foco{background:var(--accent-soft)}
+/* Nota e frequência em risco: a cor vem com sublinhado, porque cor sozinha não avisa quem não distingue a cor */
+td.aviso{color:var(--warn);text-decoration:underline 2px;text-underline-offset:3px}
+td.risco{color:var(--bad);text-decoration:underline 2px;text-underline-offset:3px}
 
 .pres{display:inline-flex;border:1px solid var(--line-strong);border-radius:12px;overflow:hidden}
 .pres button{border:0;background:transparent;padding:8px 14px;min-height:40px;cursor:pointer;font-weight:600;font-family:var(--f-mono);color:var(--muted)}
