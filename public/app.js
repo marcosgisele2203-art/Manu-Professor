@@ -3738,6 +3738,9 @@ document.addEventListener("change", async e => {
       st.innerHTML = esc(`Li ${a.itens.length} itens da aba "${escolhido.aba}"`) + (escolhido.alunos.length
         ? esc(` e as respostas de ${n} ${n === 1 ? "aluno" : "alunos"} desta turma`) + (sobra.length ? `<br><b>${sobra.length === 1 ? "Este nome não foi encontrado" : "Estes nomes não foram encontrados"} na turma:</b> ${esc(sobra.join(", "))}. Lance as letras ${sobra.length === 1 ? "dele" : "deles"} à mão ou confira o nome em Alunos.` : "")
         : esc(". A planilha não tinha respostas de alunos")) + ". Confira e toque em Salvar.";
+      // cada bimestre é uma prova diferente: o nome do arquivo oficial traz o número da ACA ("4ªACA 2026 ...")
+      const numArq = (arq.name.match(/(\d)\s*[ªaº°o]?\s*ACA/i) || [])[1], bimDlg = String(a.bimestre || "");
+      if (numArq && bimDlg && numArq !== bimDlg) st.innerHTML = `<b>Atenção: esta parece ser a planilha da ${numArq}ª ACA, mas você está no ${esc(bimDlg)}º bimestre.</b> Se for engano, feche e escolha o bimestre certo antes de mandar a planilha.<br>` + st.innerHTML;
     } catch (err) { console.error(err); st.textContent = "Não consegui ler esta planilha. Confira se é o arquivo .xlsx da ACA."; }
     return;
   }
