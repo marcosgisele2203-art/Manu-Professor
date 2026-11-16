@@ -1046,8 +1046,10 @@ const acaDe = (t, bim) => S.acas.find(a => a.turmaId === t.id && String(a.bimest
 function acaAluno(aca, alunoId) {
   const r = (aca.respostas || {})[alunoId] || [], itens = aca.itens || [];
   const respondeu = r.some(x => x);
-  const acertos = itens.reduce((n, it, i) => n + (r[i] && r[i] === it.certa ? 1 : 0), 0);
-  return { r, respondeu, acertos, nota: respondeu && itens.length ? (acertos / itens.length) * 10 : null };
+  // item anulado não conta: nem acerto, nem no total da nota (é o "Não se aplica" do Vistta)
+  const validos = itens.filter(it => !it.anulado).length;
+  const acertos = itens.reduce((n, it, i) => n + (!it.anulado && r[i] && r[i] === it.certa ? 1 : 0), 0);
+  return { r, respondeu, acertos, validos, nota: respondeu && validos ? (acertos / validos) * 10 : null };
 }
 function vAca() {
   const t = turmaAtual();
@@ -1074,8 +1076,8 @@ function vAca() {
     const marcadas = fez.map(x => x.r[i] || ""), cont = {};
     ACA_LETRAS.forEach(L => cont[L] = marcadas.filter(v => v === L).length);
     cont.branco = marcadas.filter(v => !v).length;
-    const acertos = marcadas.filter(v => v === it.certa).length;
-    return { it, i, cont, acertos, pct: fez.length ? Math.round((acertos / fez.length) * 100) : null };
+    const acertos = it.anulado ? null : marcadas.filter(v => v === it.certa).length;
+    return { it, i, cont, acertos, pct: fez.length && !it.anulado ? Math.round((acertos / fez.length) * 100) : null };
   });
   const habs = [...new Set(itens.map(x => x.desc).filter(Boolean))].map(d => {
     const ps = porItem.filter(x => x.it.desc === d && x.pct !== null).map(x => x.pct);
@@ -1091,21 +1093,21 @@ function vAca() {
     <div><b class="num">${fez.length}</b><span class="small muted">de ${matriculados} fizeram a atividade</span></div>
     <div><b class="num">${participacao === null ? "—" : participacao + "%"}</b><span class="small muted">de participação</span></div>
     <div><b class="num">${fmtNota(mediaGeral)}</b><span class="small muted">média geral da turma</span></div>
-    <div><b class="num">${itens.length}</b><span class="small muted">${itens.length === 1 ? "item" : "itens"} nesta ACA</span></div>
+    <div><b class="num">${itens.length}</b><span class="small muted">${itens.length === 1 ? "item" : "itens"} nesta ACA${itens.some(x => x.anulado) ? ` (${itens.filter(x => x.anulado).length} anulado${itens.filter(x => x.anulado).length > 1 ? "s" : ""})` : ""}</span></div>
   </div></section>`;
 
   const tabela = `<div class="table-wrap"><table>
-    <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
-    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c${r[i] ? (r[i] === it.certa ? " aca-ok" : " aca-err") : ""}"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
+    <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}${it.anulado ? `<div class="small muted" style="text-transform:none">anulado</div>` : ""}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
+    <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c${it.anulado ? " aca-anul" : r[i] ? (r[i] === it.certa ? " aca-ok" : " aca-err") : ""}"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.filter(x => !x.anulado).length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
 
   // os mesmos campos, na mesma ordem e com os mesmos nomes do questionário da ACA no Vistta: é só copiar e colar
-  const camposVistta = [["Quantidade de estudantes matriculados", matriculados], ["Quantidade de estudantes que realizaram a avaliação (ACA)", fez.length], ...porItem.map(x => [`Quantidade de acertos do item ${x.i + 1}`, x.acertos])];
+  const camposVistta = [["Quantidade de estudantes matriculados", matriculados], ["Quantidade de estudantes que realizaram a avaliação (ACA)", fez.length], ...porItem.map(x => [`Quantidade de acertos do item ${x.i + 1}`, x.it.anulado ? null : x.acertos])];
   const painelVistta = `<section class="panel"><div class="panel-head"><div><h2>Para lançar no Vistta</h2><p class="small muted">Os números que o Vistta pede, na mesma ordem dele. Toque em Copiar e cole no campo de mesmo nome.</p></div><a class="btn" href="https://vistta.sed.ms.gov.br/" target="_blank" rel="noopener">Abrir o Vistta</a></div>
     ${fez.length ? "" : `<div class="banner"><span>Nenhum aluno tem respostas lançadas ainda. Lance as letras na tabela acima para os números aparecerem.</span></div>`}
-    <div class="aca-vistta">${camposVistta.map(([n, v]) => `<div class="aca-vistta-linha"><span>${esc(n)}:</span><b class="num">${v}</b><button type="button" class="btn sm" data-act="aca-copiar" data-valor="${v}" data-nome="${esc(n)}" aria-label="Copiar ${esc(n)}">Copiar</button></div>`).join("")}</div></section>`;
+    <div class="aca-vistta">${camposVistta.map(([n, v]) => `<div class="aca-vistta-linha"><span>${esc(n)}:</span>${v === null ? `<b>Não se aplica</b><span class="small muted">marque no Vistta</span>` : `<b class="num">${v}</b><button type="button" class="btn sm" data-act="aca-copiar" data-valor="${v}" data-nome="${esc(n)}" aria-label="Copiar ${esc(n)}">Copiar</button>`}</div>`).join("")}</div></section>`;
   const painelItens = `<section class="panel"><h2>Resultados por item</h2><p class="small muted">Quantos alunos marcaram cada letra, e quanto isso dá em porcentagem de quem fez a atividade.</p>
     <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Gabarito</th><th>Habilidade</th>${ACA_LETRAS.map(L => `<th class="c">${L}</th>`).join("")}<th class="c">Em branco</th><th class="c">Acertos</th></tr></thead>
-    <tbody>${porItem.map(({ it, i, cont, acertos, pct }) => `<tr><td class="c"><b>${i + 1}</b><div class="small muted" style="text-transform:none">${esc(it.nivel || "")}</div></td><td class="c num">${esc(it.certa || "—")}</td><td class="small">${esc(it.desc || "—")}</td>${ACA_LETRAS.map(L => `<td class="c num${L === it.certa ? " aca-certa" : ""}">${cont[L]}<div class="small muted">${pc(cont[L])}</div></td>`).join("")}<td class="c num">${cont.branco}<div class="small muted">${pc(cont.branco)}</div></td><td class="c" style="min-width:110px">${pct === null ? "—" : `<span class="num">${acertos} · ${pct}%</span>${barra(pct)}`}</td></tr>`).join("")}</tbody></table></div></section>`;
+    <tbody>${porItem.map(({ it, i, cont, acertos, pct }) => `<tr><td class="c"><b>${i + 1}</b><div class="small muted" style="text-transform:none">${esc(it.nivel || "")}</div></td><td class="c num">${esc(it.certa || "—")}</td><td class="small">${esc(it.desc || "—")}</td>${ACA_LETRAS.map(L => `<td class="c num${L === it.certa ? " aca-certa" : ""}">${cont[L]}<div class="small muted">${pc(cont[L])}</div></td>`).join("")}<td class="c num">${cont.branco}<div class="small muted">${pc(cont.branco)}</div></td><td class="c" style="min-width:110px">${it.anulado ? `<span class="chip">anulado</span>` : pct === null ? "—" : `<span class="num">${acertos} · ${pct}%</span>${barra(pct)}`}</td></tr>`).join("")}</tbody></table></div></section>`;
 
   const painelHabs = habs.length ? `<section class="panel"><h2>Desempenho por habilidade</h2><p class="small muted">A média dos itens que medem a mesma habilidade. Abaixo de 50% vale retomar o conteúdo com a turma.</p>
     <div class="aca-habs">${habs.map(h => `<div class="aca-hab"><div class="aca-hab-top"><b>${esc(h.desc)}</b><span class="num">${h.pct === null ? "—" : h.pct + "%"}</span></div>${barra(h.pct)}<span class="small muted">${h.nums.length === 1 ? "item" : "itens"} ${h.nums.join(", ")}${h.objeto ? " · " + esc(h.objeto) : ""}</span></div>`).join("")}</div></section>` : "";
@@ -1129,7 +1131,7 @@ function vAcaAno(t) {
   const dados = cols.map(({ b, aca }) => {
     const fez = al.map(s => acaAluno(aca, s.id)).filter(x => x.respondeu);
     const itens = aca.itens || [];
-    const pctItem = itens.map((it, i) => { const m = fez.map(x => x.r[i] || ""); return fez.length ? Math.round((m.filter(v => v === it.certa).length / fez.length) * 100) : null; });
+    const pctItem = itens.map((it, i) => { const m = fez.map(x => x.r[i] || ""); return fez.length && !it.anulado ? Math.round((m.filter(v => v === it.certa).length / fez.length) * 100) : null; });
     const habs = {};
     [...new Set(itens.map(x => x.desc).filter(Boolean))].forEach(d => {
       const ps = itens.map((x, i) => x.desc === d ? pctItem[i] : null).filter(p => p !== null);
@@ -1259,14 +1261,14 @@ function renderAcaFoto() {
   if (c.foto) corpo += `<div class="cor-wrap"><img class="cor-foto" src="${c.foto}" alt="Foto do cartão-resposta">
     <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-aca-foto" ${cap.ia ? "" : "disabled"}>${ico("spark")}${c.leitura ? "Ler de novo" : "Ler respostas"}</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">${esc(c.status || "A Manu lê as bolinhas pintadas. Você confere antes de salvar.")}</span></div></div></div>`;
   if (c.leitura) {
-    const acertos = itens.filter((it, i) => c.marcadas[i] && c.marcadas[i] === it.certa).length;
+    const acertos = itens.filter((it, i) => !it.anulado && c.marcadas[i] && c.marcadas[i] === it.certa).length, validos = itens.filter(it => !it.anulado).length;
     const duvidas = itens.filter((_, i) => !c.marcadas[i]).length;
     corpo += `${c.leitura.observacao ? `<div class="banner"><span>${esc(c.leitura.observacao)}</span></div>` : ""}
       <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th class="c">Marcada</th><th class="c">Gabarito</th><th class="c">Resultado</th></tr></thead><tbody>
       ${itens.map((it, i) => { const m = c.marcadas[i] || "";
-        return `<tr><td class="c num">${i + 1}</td><td class="c"><select class="input af-sel" data-i="${i}" aria-label="Letra marcada no item ${i + 1}" style="width:auto;min-height:34px;padding:2px 8px"><option value="">—</option>${ACA_LETRAS.map(L => `<option ${m === L ? "selected" : ""}>${L}</option>`).join("")}</select></td><td class="c num">${esc(it.certa || "?")}</td><td class="c">${!m ? `<span class="chip warn">conferir</span>` : m === it.certa ? `<span class="chip ok">certa</span>` : `<span class="chip bad">errada</span>`}</td></tr>`; }).join("")}
+        return `<tr><td class="c num">${i + 1}</td><td class="c"><select class="input af-sel" data-i="${i}" aria-label="Letra marcada no item ${i + 1}" style="width:auto;min-height:34px;padding:2px 8px"><option value="">—</option>${ACA_LETRAS.map(L => `<option ${m === L ? "selected" : ""}>${L}</option>`).join("")}</select></td><td class="c num">${esc(it.certa || "?")}</td><td class="c">${it.anulado ? `<span class="chip">anulado</span>` : !m ? `<span class="chip warn">conferir</span>` : m === it.certa ? `<span class="chip ok">certa</span>` : `<span class="chip bad">errada</span>`}</td></tr>`; }).join("")}
       </tbody></table></div>
-      <p><b class="num">${acertos} de ${itens.length}</b> acertos · nota <b class="num">${fmtNota(itens.length ? acertos / itens.length * 10 : null)}</b>${duvidas ? ` · <span style="color:var(--warn)">${duvidas} ${duvidas === 1 ? "item" : "itens"} para conferir na foto</span>` : ""}.</p>`;
+      <p><b class="num">${acertos} de ${validos}</b> acertos · nota <b class="num">${fmtNota(validos ? acertos / validos * 10 : null)}</b>${duvidas ? ` · <span style="color:var(--warn)">${duvidas} ${duvidas === 1 ? "item" : "itens"} para conferir na foto</span>` : ""}.</p>`;
   }
   abrirDlg("Corrigir pela foto · " + esc(a.nome || "ACA"), corpo, `<button type="button" class="btn" data-act="fechar">Fechar</button>${c.leitura ? `<button type="button" class="btn primary" data-act="aca-foto-salvar">Salvar e ir para o próximo aluno</button>` : ""}`);
 }
@@ -1399,7 +1401,8 @@ function acaLinhasItens(itens) {
   return itens.map((it, i) => `<tr><td class="c"><b>${i + 1}</b></td>
     <td><select class="input" id="acaC${i}" aria-label="Letra certa do item ${i + 1}"><option value="">—</option>${ACA_LETRAS.map(L => `<option value="${L}" ${it.certa === L ? "selected" : ""}>${L}</option>`).join("")}</select></td>
     <td><input class="input" id="acaD${i}" maxlength="40" value="${esc(it.desc || "")}" placeholder="D1214" aria-label="Habilidade do item ${i + 1}">${it.objeto ? `<div class="small muted">${esc(it.objeto)}</div>` : ""}</td>
-    <td><select class="input" id="acaN${i}" aria-label="Nível do item ${i + 1}">${ACA_NIVEIS.map(n => `<option ${it.nivel === n ? "selected" : ""}>${n}</option>`).join("")}</select></td></tr>`).join("");
+    <td><select class="input" id="acaN${i}" aria-label="Nível do item ${i + 1}">${ACA_NIVEIS.map(n => `<option ${it.nivel === n ? "selected" : ""}>${n}</option>`).join("")}</select></td>
+    <td class="c"><input type="checkbox" id="acaX${i}" ${it.anulado ? "checked" : ""} aria-label="Item ${i + 1} anulado"></td></tr>`).join("");
 }
 function dlgAca(aca) {
   const t = turmaAtual(), bim = String(bimSelecionado(t) || "1"), B = bimPorNum(t, bim);
@@ -1411,8 +1414,8 @@ function dlgAca(aca) {
     <div class="grid3"><div class="field"><label for="acaNome">Nome</label><input class="input" id="acaNome" value="${esc(aca.nome || "")}" placeholder="4ª ACA 2026"></div>
     <div class="field"><label for="acaQtd">Quantidade de itens</label><input class="input" id="acaQtd" type="number" min="1" max="60" value="${(aca.itens || []).length}"></div>
     <div class="field"><label for="acaMatric">Alunos matriculados</label><input class="input" id="acaMatric" type="number" min="0" max="99" value="${esc(aca.matriculados || (turmaAtual()?.alunos || []).length)}"></div></div>
-    <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th>Letra certa</th><th>Habilidade</th><th>Nível</th></tr></thead><tbody id="acaItens">${acaLinhasItens(aca.itens || [])}</tbody></table></div>
-    <p class="small muted">A habilidade é o código do descritor que vem na planilha da ACA, como D1214 ou D12. Itens diferentes podem medir a mesma habilidade.</p>`,
+    <div class="table-wrap"><table><thead><tr><th class="c">Item</th><th>Letra certa</th><th>Habilidade</th><th>Nível</th><th class="c">Anulado</th></tr></thead><tbody id="acaItens">${acaLinhasItens(aca.itens || [])}</tbody></table></div>
+    <p class="small muted">A habilidade é o código do descritor que vem na planilha da ACA, como D1214 ou D12. Itens diferentes podem medir a mesma habilidade. Marque <b>Anulado</b> no item que a Secretaria anulou: ele não conta na nota e aparece como "Não se aplica" no quadro do Vistta.</p>`,
     `${S.acas.some(x => x.id === aca.id) ? `<button type="button" class="btn danger" data-act="aca-apagar" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-aca">Salvar</button>`);
 }
 
@@ -3781,8 +3784,8 @@ document.addEventListener("click", async e => {
     case "salvar-aca": {
       const a = dlg._obj, qtd = Math.max(1, Math.min(60, Number(dlg.querySelector("#acaQtd").value) || 1)), novos = [];
       // o que veio da planilha (descritor, objeto, habilidade do currículo) não aparece no formulário, então vem do item anterior
-      for (let i = 0; i < qtd; i++) novos.push({ ...((a.itens || [])[i] || {}), certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
-      if (novos.some(x => !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item."); return; }
+      for (let i = 0; i < qtd; i++) novos.push({ ...((a.itens || [])[i] || {}), certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0], anulado: !!dlg.querySelector("#acaX" + i)?.checked });
+      if (novos.some(x => !x.anulado && !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item (o item anulado pode ficar sem)."); return; }
       // respostas lidas da planilha substituem as daquele aluno; quem não estava nela fica como estava
       a.respostas = { ...(a.respostas || {}), ...(dlg._importadas || {}) };
       const fizeram = Object.values(a.respostas || {}).filter(r => (r || []).some(x => x)).length;
@@ -3909,7 +3912,7 @@ document.addEventListener("change", async e => {
   }
   if (el.id === "acaQtd") { // mexer na quantidade refaz as linhas sem perder o que já foi digitado
     const a = dlg._obj, q = Math.max(1, Math.min(60, Number(el.value) || 1)), atuais = [];
-    for (let i = 0; i < (a.itens || []).length; i++) atuais.push({ ...((a.itens || [])[i] || {}), certa: dlg.querySelector("#acaC" + i)?.value || "", desc: dlg.querySelector("#acaD" + i)?.value || "", nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0] });
+    for (let i = 0; i < (a.itens || []).length; i++) atuais.push({ ...((a.itens || [])[i] || {}), certa: dlg.querySelector("#acaC" + i)?.value || "", desc: dlg.querySelector("#acaD" + i)?.value || "", nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0], anulado: !!dlg.querySelector("#acaX" + i)?.checked });
     a.itens = Array.from({ length: q }, (_, i) => atuais[i] || { certa: "", desc: "", nivel: ACA_NIVEIS[0] });
     dlg.querySelector("#acaItens").innerHTML = acaLinhasItens(a.itens);
     return;
