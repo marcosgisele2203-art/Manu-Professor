@@ -2,10 +2,11 @@
 // - Telas e arquivos do sistema ficam guardados no aparelho.
 // - Os dados do professor (turmas, diário, notas...) são buscados na internet e, sem conexão, vêm da última cópia.
 // - O que for salvo sem internet fica numa fila no próprio app (app.js) e é enviado quando a conexão volta.
-const CASCA = "manu-casca-v1", DADOS = "manu-dados";
+// v2: as artes da Manu mudaram, e o activate apaga a casca antiga para ninguém continuar vendo as imagens velhas
+const CASCA = "manu-casca-v2", DADOS = "manu-dados";
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CASCA).then((c) => c.addAll(["/app.js", "/app.css", "/manu/manu-boas-vindas.webp", "/manu/manu-ajuda.webp", "/manu/manu-agenda.webp", "/icones/icone-192.png"])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CASCA).then((c) => c.addAll(["/app.js", "/app.css", "/manu/manu-boas-vindas.webp", "/icones/icone-192.png"])).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CASCA && k !== DADOS).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
