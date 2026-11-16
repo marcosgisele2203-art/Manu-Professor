@@ -25,12 +25,22 @@ async function redePrimeiro(req, cache, chave) {
     throw err;
   }
 }
+const arteDaManu = (req) => { const u = new URL(req.url); return u.origin === location.origin && u.pathname.startsWith("/manu/"); };
+// a aba aberta desde antes de uma versão nova continua pedindo a arte pelo nome antigo, que já saiu do servidor e do cache:
+// devolve a Manu de boas-vindas até a pessoa recarregar, porque imagem quebrada é pior que a imagem errada
+const manuAtual = async () => (await caches.match("/manu/manu-boas-vindas.webp")) || fetch("/manu/manu-boas-vindas.webp");
+
 async function cachePrimeiro(req) {
   const c = await caches.match(req);
   if (c) return c;
-  const r = await fetch(req);
-  if (r.ok) (await caches.open(CASCA)).put(req, r.clone());
-  return r;
+  try {
+    const r = await fetch(req);
+    if (r.ok) { (await caches.open(CASCA)).put(req, r.clone()); return r; }
+    return arteDaManu(req) ? manuAtual() : r;
+  } catch (err) {
+    if (arteDaManu(req)) return manuAtual(); // sem internet, idem
+    throw err;
+  }
 }
 
 self.addEventListener("fetch", (e) => {
