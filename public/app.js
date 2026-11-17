@@ -993,7 +993,7 @@ function imprimirDiario(t) {
 /* ----- Notas ----- */
 function vNotas() {
   const t = turmaAtual();
-  const head = `<div class="page-head"><div><h1>${S.notasGeral ? "Média geral" : "Notas"}</h1><p class="muted">${S.notasGeral ? "As médias de todos os bimestres, a média final e, embaixo, as notas de cada bimestre." : `Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.`}</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}<a class="btn" href="${linkTurma(t.id, "aca")}">ACA</a><button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
+  const head = `<div class="page-head"><div><h1>${S.notasGeral ? "Média geral" : "Notas"}</h1><p class="muted">${S.notasGeral ? "As médias de todos os bimestres, a média final e, embaixo, as notas de cada bimestre." : `Média ponderada pelos pesos. Abaixo de ${MEDIA_MIN} fica em destaque.`}</p></div><div class="toolbar">${t ? `<button class="btn" data-act="exp" data-fmt="arquivo" data-turma="${esc(t.id)}">${ico("dl")}Excel</button>${S.googleClientId ? `<button class="btn" data-act="exp" data-fmt="drive" data-turma="${esc(t.id)}">${ico("drive")}Google Planilhas</button>` : ""}${temAca(t) ? `<a class="btn" href="${linkTurma(t.id, "aca")}">ACA</a>` : ""}<button class="btn primary" data-act="nova-avaliacao">${ico("plus")}Nova avaliação</button>` : ""}</div></div>`;
   if (!t) return head + semTurma();
   const bim = S.notasGeral ? "" : bimSelecionado(t), bs = bimestresDe(t);
   const avs = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim))).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
@@ -1053,6 +1053,7 @@ function vAca() {
   const t = turmaAtual();
   const head = `<div class="page-head"><div><h1>ACA</h1><p class="muted">Atividade de Acompanhamento da Aprendizagem. Lance a letra que cada aluno marcou e veja os acertos, a nota e o desempenho por habilidade.</p></div><div class="toolbar"><a class="btn" href="https://vistta.sed.ms.gov.br/" target="_blank" rel="noopener">Abrir o Vistta</a></div></div>`;
   if (!t) return head + semTurma();
+  if (!temAca(t)) return head + `<div class="empty"><img class="manu sm" src="/manu/manu-aca.webp" alt=""><h3>A ACA é só da rede estadual</h3><p>${esc(escolaDe(t) || "A escola desta turma")} está marcada como escola municipal, e a rede municipal não aplica a ACA. Se a escola for estadual, troque a rede em Meu perfil.</p><div class="toolbar" style="justify-content:center"><a class="btn primary" href="#perfil">Abrir Meu perfil</a></div></div>`;
   const bim = bimSelecionado(t);
   if (!bim) return head + chipsPeriodo(t) + vAcaAno(t);
   const B = bimPorNum(t, bim), aca = acaDe(t, bim), al = t.alunos || [];
@@ -3063,11 +3064,14 @@ document.addEventListener("click", async e => {
 });
 
 // modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano por aula no Tagnos
-const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
+// palpite pela sigla ou pelo nome: Escola Municipal, Escola Mun., E.M., EM, EMEF, E.M.E.F., EMEI, CMEI, CEMEI, CEIM, Prefeitura
+const modeloDaEscola = e => /\bmunicipal\b|\bmun\b|^\s*e\.?\s*m\.?(\s*e\.?\s*[fi]\.?)?(\s|$)|\bemef\b|\bemei\b|\bc\.?\s*e?\.?\s*m\.?\s*e\.?\s*i\b|\bceim\b|\bprefeitura\b/i.test(String(e || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")) ? "municipal" : "estadual";
 // rede de cada escola marcada em Meu perfil (registro "redes" na coleção perfil); sem marcação, vale o palpite pelo nome
 const REDES = [["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (Tagnos)"]];
 const registroRedes = () => (S.perfil || []).filter(x => x.tipo === "redes").sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")))[0];
 const chaveEscola = e => String(e || "").trim().toLocaleLowerCase("pt-BR");
+// a ACA (Atividade de Acompanhamento da Aprendizagem) é da rede estadual de MS; a municipal não aplica
+const temAca = t => (redeEscolhida(escolaDe(t)) || modeloDaEscola(escolaDe(t))) === "estadual";
 const redeEscolhida = e => (registroRedes()?.redes || {})[chaveEscola(e)] || "";
 async function salvarRede(escola, rede) {
   const r = registroRedes();
