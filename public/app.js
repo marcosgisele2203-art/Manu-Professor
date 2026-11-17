@@ -344,7 +344,9 @@ function renderNav() {
     // Provas fica fora do menu: abre pelo atalho do Resumo e pelo bimestre ("Corrigir prova por foto")
     const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]) && a[0] !== "provas");
     $("#nav").innerHTML = `<a href="#inicio">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join(""); // cada bimestre se abre pelos cartões da página Bimestres
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("") // cada bimestre se abre pelos cartões da página Bimestres
+      // o geral (turmas, horário, calendário) continua à mão dentro da turma; no celular a barra de baixo já leva ao Início
+      + `<div class="nav-turma nav-geral"><span>Geral</span></div>` + VIEWS.filter(v => NAV_PRINCIPAL.includes(v[0]) && v[0] !== "inicio").map(([k, n]) => `<a href="#${k}" class="so-pc">${ico(k)}<span>${n}</span></a>`).join("");
     document.body.classList.add("na-turma");
   } else {
     document.body.classList.remove("na-turma");
