@@ -316,7 +316,7 @@ td .grade{border-radius:8px;min-height:36px}
 .abas .ai{font-size:.7rem;font-weight:700;background:var(--mark);color:var(--mark-ink);padding:0 6px;border-radius:999px}
 .atalhos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 .atalho{display:flex;flex-direction:column;gap:3px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);text-decoration:none;cursor:pointer;font:inherit;box-shadow:var(--shadow)}
-.atalho b{display:flex;align-items:center;gap:6px;font-size:.95rem}.atalho b svg{width:16px;height:16px}
+.atalho b{display:flex;align-items:center;gap:6px;font-size:.95rem}.atalho b svg{width:16px;height:16px;flex:none}
 .atalho span{font-size:.8rem;color:var(--muted)}
 .atalho:hover{border-color:var(--accent)}
 .atalho.ai{background:color-mix(in srgb,var(--mark) 55%,var(--surface));border-color:color-mix(in srgb,var(--mark-ink) 25%,var(--line))}
@@ -327,6 +327,8 @@ td .grade{border-radius:8px;min-height:36px}
 
 /* Painel da turma */
 .turma-conteudo{display:flex;flex-direction:column;gap:20px;min-width:0}
+.alertas-turma summary{cursor:pointer;color:var(--accent);font-size:.9rem;font-weight:600}
+.alertas-turma .chip{white-space:normal;max-width:65%;overflow-wrap:anywhere}
 .atalhos{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:760px){.atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mat-escolhido{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--mark) 55%,var(--surface));color:var(--ink)}
