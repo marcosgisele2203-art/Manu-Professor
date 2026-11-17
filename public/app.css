@@ -141,6 +141,13 @@ td.aca-ok::after{content:"✓";position:absolute;top:2px;right:4px;font-size:.7r
 .aca-vistta-linha:first-child{border-top:0}
 .aca-vistta-linha .num{font-size:1.15rem;min-width:2.5ch;text-align:right}
 td.aca-anul .grade.aca{opacity:.45}
+/* tabela da ACA compacta: 12 itens + nome + acertos + nota cabem na tela do computador sem rolar de lado */
+.aca-tab th,.aca-tab td{padding:6px 3px}
+.aca-tab th.sticky-col,.aca-tab td.sticky-col{padding-left:12px;padding-right:8px;white-space:normal;min-width:150px;max-width:220px;font-size:.85rem;line-height:1.25}
+.aca-tab td .grade.aca{width:36px;min-height:34px;padding:2px}
+.aca-tab td.aca-ok::after{top:0;right:0}
+.aca-tab th:nth-last-child(-n+2),.aca-tab td:nth-last-child(-n+2){padding-left:8px;padding-right:10px}
+@media (max-width:700px){.aca-tab th.sticky-col,.aca-tab td.sticky-col{min-width:110px;max-width:130px;font-size:.8rem}}
 .aca-pick{position:fixed;z-index:60;max-width:calc(100vw - 16px);box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .aca-pick[hidden]{display:none}
 .aca-pick-tit{font-size:.8rem;color:var(--muted);max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
