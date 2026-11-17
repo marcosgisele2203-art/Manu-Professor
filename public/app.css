@@ -140,6 +140,7 @@ td.aca-ok::after{content:"✓";position:absolute;top:2px;right:4px;font-size:.7r
 .aca-vistta-linha{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:8px 12px;border-top:1px solid var(--line)}
 .aca-vistta-linha:first-child{border-top:0}
 .aca-vistta-linha .num{font-size:1.15rem;min-width:2.5ch;text-align:right}
+td.aca-anul .grade.aca{opacity:.45}
 .aca-pick{position:fixed;z-index:60;max-width:calc(100vw - 16px);box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .aca-pick[hidden]{display:none}
 .aca-pick-tit{font-size:.8rem;color:var(--muted);max-width:330px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
