@@ -785,8 +785,9 @@ function boletimTurma(t) {
   const bs = bimestresDe(t);
   return (t.alunos || []).map((s, i) => {
     const x = situacaoAno(t, s.id), faltas = S.chamadas.filter(c => c.turmaId === t.id && c.presencas?.[s.id] === "F").length;
-    const sit = s.situacao || { aprovado: "Aprovado", garantido: "Média garantida", exame: "Exame final" }[x.estado] || "Em curso";
-    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, faltas, sit, cls: s.situacao ? "" : x.estado === "exame" ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "" };
+    // frequência abaixo do mínimo reprova mesmo com média: nunca aparece como aprovado
+    const sit = s.situacao || (x.estado === "exame" ? "Exame final" : x.freqRisco ? `Frequência baixa (${x.f}%)` : { aprovado: "Aprovado", garantido: "Média garantida" }[x.estado] || "Em curso");
+    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, faltas, sit, cls: s.situacao ? "" : x.estado === "exame" || x.freqRisco ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "" };
   });
 }
 function painelNotasTurma(t) {
