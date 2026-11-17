@@ -1057,7 +1057,7 @@ async function paginasDoPdf(arquivo) {
   return paginas;
 }
 // situações que tiram o aluno da turma; "Em curso", "Aprovado" etc. ficam como aluno ativo
-const SIT_SGDE = { TRANSFERIDO: "Transferido", REMANEJADO: "Remanejado", MATRICULAINDEFERIDA: "Matrícula indeferida", DESISTENTE: "Desistente", ABANDONO: "Abandono", FALECIDO: "Falecido", CANCELADO: "Cancelado", MATRICULACANCELADA: "Matrícula cancelada" };
+const SIT_SGDE = { TRANSFERIDO: "Transferido", REMANEJADO: "Remanejado", MATRICULAINDEFERIDA: "Matrícula indeferida", DESISTENTE: "Desistente", ABANDONO: "Abandono", FALECIDO: "Falecido", CANCELADO: "Cancelado", MATRICULACANCELADA: "Matrícula cancelada", NAOFREQUENTA: "Não frequenta", TRANSFERENCIAINTERNA: "Transferência interna", EVADIDO: "Evadido", DEIXOUDEFREQUENTAR: "Deixou de frequentar" };
 // Vale para qualquer rede cujo relatório tenha o mesmo desenho do SGDE (colunas 1º a 4º bimestre e Situação).
 // Cada célula é achada pela posição: as colunas saem do cabeçalho da tabela (só na 1ª página, as outras repetem o desenho)
 function lerRelatorioSgde(paginas) {
@@ -1161,7 +1161,8 @@ async function importarSgde() {
     const ja = S.avaliacoes.find(a => a.turmaId === t.id && String(a.bimestre) === String(n) && a.origem === "sgde");
     const av = ja ? JSON.parse(JSON.stringify(ja)) : { id: uid(), turmaId: t.id, nome: "Média do bimestre (importada)", sigla: "IMP", peso: 1, data: B.fim, bimestre: String(n), origem: "sgde", notas: {} };
     if (tipoMediaBim(t, n) === "somatoria") av.valor = 10;
-    c.rel.linhas.forEach((l, i) => { if (idDe[i] && l.notas[n] !== null) { av.notas[idDe[i]] = l.notas[n]; notas++; } });
+    // relatório corrigido sem a nota de um aluno: a nota antiga da importação anterior sai também
+    c.rel.linhas.forEach((l, i) => { if (!idDe[i]) return; if (l.notas[n] === null) delete av.notas[idDe[i]]; else { av.notas[idDe[i]] = l.notas[n]; notas++; } });
     await salvar("avaliacoes", av);
   }
   const partes = [notas ? `${notas} ${notas === 1 ? "nota lançada" : "notas lançadas"}` : "", novos ? `${novos} ${novos === 1 ? "aluno novo" : "alunos novos"}` : "", mudouSit ? `${mudouSit} ${mudouSit === 1 ? "situação atualizada" : "situações atualizadas"}` : ""].filter(Boolean);
