@@ -1079,12 +1079,13 @@ function vAca() {
     const acertos = it.anulado ? null : marcadas.filter(v => v === it.certa).length;
     return { it, i, cont, acertos, pct: fez.length && !it.anulado ? Math.round((acertos / fez.length) * 100) : null };
   });
-  const habs = [...new Set(itens.map(x => x.desc).filter(Boolean))].map(d => {
+  // item anulado fica fora do desempenho por habilidade: nem na média nem na lista de itens
+  const habs = [...new Set(itens.filter(x => !x.anulado).map(x => x.desc).filter(Boolean))].map(d => {
     const ps = porItem.filter(x => x.it.desc === d && x.pct !== null).map(x => x.pct);
     const comTexto = itens.find(x => x.desc === d && (x.descritor || x.objeto));
     return { desc: d, descritor: comTexto?.descritor || "", objeto: comTexto?.objeto || "",
       pct: ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null,
-      nums: porItem.filter(x => x.it.desc === d).map(x => x.i + 1) };
+      nums: porItem.filter(x => x.it.desc === d && !x.it.anulado).map(x => x.i + 1) };
   });
   const barra = p => `<span class="aca-barra${p !== null && p < 50 ? " baixo" : ""}"><span style="width:${p || 0}%"></span></span>`;
   const pc = n => fez.length ? Math.round((n / fez.length) * 100) + "%" : "—";
@@ -1133,7 +1134,7 @@ function vAcaAno(t) {
     const itens = aca.itens || [];
     const pctItem = itens.map((it, i) => { const m = fez.map(x => x.r[i] || ""); return fez.length && !it.anulado ? Math.round((m.filter(v => v === it.certa).length / fez.length) * 100) : null; });
     const habs = {};
-    [...new Set(itens.map(x => x.desc).filter(Boolean))].forEach(d => {
+    [...new Set(itens.filter(x => !x.anulado).map(x => x.desc).filter(Boolean))].forEach(d => {
       const ps = itens.map((x, i) => x.desc === d ? pctItem[i] : null).filter(p => p !== null);
       habs[d] = ps.length ? Math.round(ps.reduce((a, c) => a + c, 0) / ps.length) : null;
     });
@@ -3785,6 +3786,7 @@ document.addEventListener("click", async e => {
       const a = dlg._obj, qtd = Math.max(1, Math.min(60, Number(dlg.querySelector("#acaQtd").value) || 1)), novos = [];
       // o que veio da planilha (descritor, objeto, habilidade do currículo) não aparece no formulário, então vem do item anterior
       for (let i = 0; i < qtd; i++) novos.push({ ...((a.itens || [])[i] || {}), certa: (dlg.querySelector("#acaC" + i)?.value || "").toUpperCase(), desc: (dlg.querySelector("#acaD" + i)?.value || "").trim(), nivel: dlg.querySelector("#acaN" + i)?.value || ACA_NIVEIS[0], anulado: !!dlg.querySelector("#acaX" + i)?.checked });
+      if (novos.every(x => x.anulado)) { toast("Deixe pelo menos um item sem anular: sem item valendo, não há nota."); return; }
       if (novos.some(x => !x.anulado && !ACA_LETRAS.includes(x.certa))) { toast("Escolha a letra certa de cada item (o item anulado pode ficar sem)."); return; }
       // respostas lidas da planilha substituem as daquele aluno; quem não estava nela fica como estava
       a.respostas = { ...(a.respostas || {}), ...(dlg._importadas || {}) };
