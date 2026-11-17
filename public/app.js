@@ -312,7 +312,7 @@ function precisaNoBim(t, alunoId, num) {
 }
 function alertas() {
   const out = [];
-  S.turmas.forEach(t => (t.alunos || []).forEach(a => {
+  S.turmas.forEach(t => (t.alunos || []).filter(a => !a.situacao).forEach(a => {
     const sit = situacaoAno(t, a.id), bAt = bimDaData(t, hoje()), mAt = bAt ? mediaAluno(t, a.id, bAt.num) : null;
     if (sit.freqRisco) out.push({ t, a, tipo: "freq", txt: `Frequência ${sit.f}%`, cls: "bad" });
     if (sit.estado === "exame") out.push({ t, a, tipo: "nota", txt: sit.faltam ? "Não alcança a média nem com 10: exame final" : `Exame final (média ${fmtNota(sit.ms.reduce((x, y) => x + y, 0) / sit.ms.length)})`, cls: "bad" });
@@ -766,6 +766,7 @@ function vResumoTurma() {
     <div class="stat"><span class="eyebrow">Frequência${Br ? " no período" : " média"}</span><span class="v">${fm === null ? "—" : fm + "%"}</span><span class="small muted">${S.chamadas.filter(c => c.turmaId === t.id).length} aulas registradas</span></div>
     <div class="stat"><span class="eyebrow">Alunos em alerta</span><span class="v" style="color:${al2.length ? "var(--bad)" : "var(--ok)"}">${new Set(al2.map(x => x.a.id)).size}</span><span class="small muted">frequência ou média baixa</span></div>
   </div>
+  ${painelNotasTurma(t)}
   <div class="cols">
     <section class="panel"><div class="panel-head"><h2>Próximas aulas</h2><a class="btn sm ghost" href="${linkTurma(t.id, "planos")}">Ver planejamento</a></div>
       ${aulas.length ? `<div class="list">${aulas.map(p => `<div class="row"><div class="grow"><div class="title">${esc(p.titulo)}</div><div class="small muted">${esc(p.duracao || "")}</div></div>${p.bncc ? `<span class="bncc">${esc(p.bncc.split(/[,;\s]+/)[0])}</span>` : ""}<span class="chip num">${fmtData(p.data)}</span><button class="btn sm" data-act="ver-plano" data-id="${esc(p.id)}">Abrir</button></div>`).join("")}</div>` : `<p class="muted">Nenhuma aula planejada. <a class="btn sm ai" href="${linkTurma(t.id, "bimestres")}">${ico("spark")}Planejar no bimestre</a></p>`}
@@ -778,6 +779,47 @@ function vResumoTurma() {
     ${ativ.length ? `<div class="list">${ativ.map(a => `<div class="row"><div class="grow title">${esc(a.titulo)}</div><span class="small muted num">${al.filter(s => a.entregas?.[s.id]).length}/${al.length} entregues</span><span class="chip num">${fmtData(a.prazo)}</span></div>`).join("")}</div>` : `<p class="muted">Nenhuma atividade com prazo aberto.</p>`}
   </section>`;
 }
+
+/* ----- Quadro de notas da turma (como o relatório do SGDE): no Resumo e para imprimir ----- */
+function boletimTurma(t) {
+  const bs = bimestresDe(t);
+  return (t.alunos || []).map((s, i) => {
+    const x = situacaoAno(t, s.id), faltas = S.chamadas.filter(c => c.turmaId === t.id && c.presencas?.[s.id] === "F").length;
+    const sit = s.situacao || { aprovado: "Aprovado", garantido: "Média garantida", exame: "Exame final" }[x.estado] || "Em curso";
+    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, faltas, sit, cls: s.situacao ? "" : x.estado === "exame" ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "" };
+  });
+}
+function painelNotasTurma(t) {
+  const bs = bimestresDe(t), ls = boletimTurma(t);
+  const botoes = `<div class="toolbar"><button class="btn sm" data-act="sgde-importar">Importar notas (PDF)</button>${ls.length ? `<button class="btn sm primary" data-act="imprimir-boletim">${ico("dl")}Imprimir em PDF</button>` : ""}</div>`;
+  if (!ls.length) return `<section class="panel"><div class="panel-head"><h2>Notas da turma</h2>${botoes}</div><p class="muted">Adicione os alunos, ou importe o relatório de notas em PDF, que os alunos entram junto.</p></section>`;
+  return `<section class="panel"><div class="panel-head"><div><h2>Notas da turma</h2><span class="small muted">Média de cada bimestre, média anual, faltas do Diário e situação.</span></div>${botoes}</div>
+    <div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th><th class="c">Faltas</th><th>Situação</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td class="c num">${l.n}</td><td class="sticky-col">${esc(l.s.nome)}</td>${l.ms.map(m => `<td class="${clsNota(m)}">${fmtNota(m)}</td>`).join("")}<td class="${clsNota(l.anual)}" style="font-weight:700">${fmtNota(l.anual)}</td><td class="c num">${l.faltas}</td><td><span class="chip ${l.cls}">${esc(l.sit)}</span></td></tr>`).join("")}
+    </tbody></table></div>${bs.length ? "" : `<p class="small muted">Cadastre os bimestres da turma para ver a nota de cada um.</p>`}</section>`;
+}
+// Relatório no mesmo desenho do SGDE, para imprimir ou salvar em PDF
+function imprimirBoletim(t) {
+  const bs = bimestresDe(t), ls = boletimTurma(t), h = x => esc(x == null ? "" : String(x));
+  const ativos = ls.filter(l => !l.s.situacao), abaixo = ativos.filter(l => l.anual !== null && l.anual < MEDIA_MIN).length, sem = ativos.filter(l => l.anual === null).length;
+  const css = `@page{size:A4;margin:10mm}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:10px}
+    .cab{display:grid;grid-template-columns:1.2fr 1fr;border:1px solid #333;margin-bottom:6px}.cab>div{padding:6px 8px}.cab>div+div{border-left:1px solid #333}.cab h1{font-size:13px;margin:4px 0 0}
+    .comp{border:1px solid #333;padding:3px 8px;margin-bottom:6px}
+    table{border-collapse:collapse;width:100%}th,td{border:1px solid #333;padding:4px 3px;text-align:center;vertical-align:middle}th{background:#eee;font-size:9px}td.al{text-align:left}
+    .bad{color:#b42318;font-weight:bold}.tot{margin-top:6px}.res{margin-top:10px;display:flex;gap:16px;flex-wrap:wrap}.res span{border:1px solid #333;padding:4px 8px}tr{page-break-inside:avoid}thead{display:table-header-group}`;
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Notas ${h(t.nome)} ${h(t.disciplina)}</title><style>${css}</style></head><body>
+    <div class="cab"><div><b>Escola:</b> ${h(escolaDe(t) || "—")}<br><b>Professor(a):</b> ${h(S.nome)}<h1>Relatório de Notas por Componente Curricular</h1></div>
+      <div><b>Ano letivo:</b> ${h(t.ano || "")}<br><b>Ano/Série:</b> ${h(t.serie || "—")}<br><b>Turma:</b> ${h(t.nome)}${t.turno ? " · " + h(t.turno) : ""}<br><b>Data de emissão:</b> ${fmtData(hoje())}</div></div>
+    <div class="comp"><b>Componente curricular:</b> ${h(t.disciplina)}</div>
+    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th><th>Total de faltas</th><th>Situação</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td>${l.n}</td><td class="al">${h(l.s.nome)}</td>${l.ms.map(m => `<td class="${m !== null && m < MEDIA_MIN ? "bad" : ""}">${m === null ? "" : fmtNota(m)}</td>`).join("")}<td class="${l.anual !== null && l.anual < MEDIA_MIN ? "bad" : ""}"><b>${l.anual === null ? "" : fmtNota(l.anual)}</b></td><td>${l.faltas || ""}</td><td>${h(l.sit)}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="tot">Total: ${ls.length}</div>
+    <div class="res"><span>Abaixo da média: <b>${abaixo}</b></span><span>Média ${fmtNota(MEDIA_MIN)} ou mais: <b>${ativos.length - abaixo - sem}</b></span><span>Sem avaliações: <b>${sem}</b></span>${ls.length - ativos.length ? `<span>Saíram da turma: <b>${ls.length - ativos.length}</b></span>` : ""}</div>
+    </body></html>`;
+  imprimir(html);
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-act='imprimir-boletim']")) { const t = turmaAtual(); if (t) imprimirBoletim(t); } });
 
 /* ----- Turmas ----- */
 function vTurmas() {
