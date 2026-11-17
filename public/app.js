@@ -3064,7 +3064,8 @@ document.addEventListener("click", async e => {
 });
 
 // modelo de planejamento pela rede da escola: "EE"/estadual = SGDE; "EM"/municipal = plano por aula no Tagnos
-const modeloDaEscola = e => /\bmunicipal\b|^\s*e\.?\s*m\.?\b|\bemei\b|\bcemei\b/i.test(e || "") ? "municipal" : "estadual";
+// palpite pela sigla ou pelo nome: Escola Municipal, Escola Mun., E.M., EM, EMEF, E.M.E.F., EMEI, CMEI, CEMEI, CEIM, Prefeitura
+const modeloDaEscola = e => /\bmunicipal\b|\bmun\b|^\s*e\.?\s*m\.?(\s*e\.?\s*[fi]\.?)?(\s|$)|\bemef\b|\bemei\b|\bc\.?\s*e?\.?\s*m\.?\s*e\.?\s*i\b|\bceim\b|\bprefeitura\b/i.test(String(e || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")) ? "municipal" : "estadual";
 // rede de cada escola marcada em Meu perfil (registro "redes" na coleção perfil); sem marcação, vale o palpite pelo nome
 const REDES = [["estadual", "Estadual (SGDE)"], ["municipal", "Municipal (Tagnos)"]];
 const registroRedes = () => (S.perfil || []).filter(x => x.tipo === "redes").sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")))[0];
