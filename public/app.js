@@ -1100,7 +1100,7 @@ function vAca() {
     <div><b class="num">${itens.length}</b><span class="small muted">${itens.length === 1 ? "item" : "itens"} nesta ACA${itens.some(x => x.anulado) ? ` (${itens.filter(x => x.anulado).length} anulado${itens.filter(x => x.anulado).length > 1 ? "s" : ""})` : ""}</span></div>
   </div></section>`;
 
-  const tabela = `<div class="table-wrap"><table>
+  const tabela = `<div class="table-wrap"><table class="aca-tab">
     <thead><tr><th class="sticky-col">Aluno</th>${itens.map((it, i) => `<th class="c" title="${esc(it.desc || "")}">${i + 1}${it.anulado ? `<div class="small muted" style="text-transform:none">anulado</div>` : ""}</th>`).join("")}<th class="c">Acertos</th><th class="c">Nota</th></tr></thead>
     <tbody>${linhas.map(({ s, r, acertos, nota, respondeu }) => `<tr><td class="sticky-col">${esc(s.nome)}</td>${itens.map((it, i) => `<td class="c${it.anulado ? " aca-anul" : r[i] ? (r[i] === it.certa ? " aca-ok" : " aca-err") : ""}"><input class="grade aca" type="text" inputmode="none" maxlength="1" autocapitalize="characters" autocomplete="off" aria-label="Item ${i + 1} de ${esc(s.nome)}" data-aca="${esc(aca.id)}" data-aluno="${esc(s.id)}" data-item="${i}" value="${esc(r[i] || "")}"></td>`).join("")}<td class="c num">${respondeu ? acertos + " de " + itens.filter(x => !x.anulado).length : "—"}</td><td class="${clsNota(nota)}" style="font-weight:600">${fmtNota(nota)}</td></tr>`).join("")}</tbody></table></div>`;
 
