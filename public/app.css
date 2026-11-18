@@ -329,6 +329,8 @@ td .grade{border-radius:8px;min-height:36px}
 .turma-conteudo{display:flex;flex-direction:column;gap:20px;min-width:0}
 .alertas-turma summary{cursor:pointer;color:var(--accent);font-size:.9rem;font-weight:600}
 .alertas-turma .chip{white-space:normal;max-width:65%;overflow-wrap:anywhere}
+.notas-da-turma .situacao-nota .chip{white-space:normal;max-width:20rem;overflow-wrap:anywhere}
+.exame-final .sticky-col{min-width:8rem;max-width:14rem;white-space:normal;overflow-wrap:anywhere}
 .atalhos{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:760px){.atalhos{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mat-escolhido{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--mark) 55%,var(--surface));color:var(--ink)}
