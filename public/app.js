@@ -819,6 +819,7 @@ function vInicioTurma() {
     <div class="stat"><span class="eyebrow">${Br ? "Frequência no período" : "Frequência no ano"}</span><span class="v num">${freq === null ? "—" : freq + "%"}</span><span class="small muted">${nAulas} ${nAulas === 1 ? "aula registrada" : "aulas registradas"}</span><a class="small" href="${linkTurma(t.id, "chamada")}">Ver Diário</a></div>
     <div class="stat"><span class="eyebrow">Alunos em alerta</span><span class="v num" style="color:${nAlertas ? "var(--bad)" : "var(--ok)"}">${nAlertas}</span><span class="small muted">Notas ou frequência</span></div>
   </div>
+  ${painelNotasTurma(t)}
   ${nAlertas ? `<section class="panel alertas-turma">
     <div class="panel-head"><h2>Precisam de atenção</h2></div>
     ${listaAlertas(alertasDaTurma.slice(0, 3))}
