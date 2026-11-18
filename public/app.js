@@ -135,47 +135,89 @@ function exemplo() {
 // Sem internet: o que o professor salva fica numa fila no aparelho e é enviado quando a conexão volta
 const FILA = "manu_fila";
 const lerFila = () => { try { return JSON.parse(localStorage.getItem(FILA) || "[]"); } catch (_) { return []; } };
-const gravarFila = f => { try { localStorage.setItem(FILA, JSON.stringify(f)); } catch (_) { toast("A memória do aparelho está cheia: conecte à internet para enviar o que falta."); } };
+function gravarFila(f) {
+  try { localStorage.setItem(FILA, JSON.stringify(f)); return true; }
+  catch (_) { toast("A memória do aparelho está cheia: conecte à internet para enviar o que falta."); return false; }
+}
 const semRede = e => e instanceof TypeError || (typeof navigator !== "undefined" && navigator.onLine === false && !(e && e.code));
 // vale tentar de novo: sem rede, servidor fora do ar (5xx), tempo esgotado (408) ou muitas requisições (429)
 const temporario = e => semRede(e) || !e || typeof e.code !== "number" || e.code >= 500 || e.code === 408 || e.code === 429;
 // o que o servidor recusou de vez (dado inválido) não é apagado: fica guardado à parte no aparelho
 const RECUSADOS = "manu_fila_recusados";
 function guardarRecusado(op, e) { try { const l = JSON.parse(localStorage.getItem(RECUSADOS) || "[]"); l.push({ ...op, erro: (e && e.message) || String(e && e.code || ""), recusadoEm: Date.now() }); localStorage.setItem(RECUSADOS, JSON.stringify(l.slice(-100))); } catch (_) {} }
-function enfileirar(op) { gravarFila([...lerFila().filter(x => !(x.col === op.col && x.id === op.id)), { ...op, em: Date.now() }]); mostrarSync(); }
+function enfileirar(op) {
+  const item = { ...op, em: Date.now(), chave: uid() };
+  if (!gravarFila([...lerFila().filter(x => !(x.col === op.col && x.id === op.id)), item])) return null;
+  mostrarSync();
+  return item;
+}
 function mostrarSync(txt) {
   const n = lerFila().length, el = $("#syncState");
   document.body.classList.toggle("sem-rede", n > 0);
   if (el) el.textContent = txt || (n ? `Aguardando envio · ${n} ${n === 1 ? "alteração guardada" : "alterações guardadas"} no aparelho` : "Tudo salvo");
 }
-let enviandoFila = false;
-async function enviarFila() {
-  if (enviandoFila || !lerFila().length) return;
-  enviandoFila = true; let enviados = 0;
-  try {
-    for (const op of lerFila()) {
+let enviandoFila = null;
+const avaliacoesEmEnvio = new Map();
+function enviarFila(avisar = true) {
+  if (enviandoFila) return enviandoFila;
+  if (!lerFila().length) return Promise.resolve(new Set());
+  enviandoFila = (async () => {
+    const recusados = new Set();
+    let enviados = 0;
+    for (let op = lerFila()[0]; op; op = lerFila()[0]) {
       try {
         if (op.tipo === "put") await api("PUT", "/api/dados/" + op.col, op.obj);
         else await api("DELETE", "/api/dados/" + op.col + "/" + encodeURIComponent(op.id));
+        if (op.col === "avaliacoes" && op.tipo === "put") {
+          const envio = avaliacoesEmEnvio.get(op.id);
+          if (envio) envio.anterior = op.obj;
+        }
         enviados++;
       } catch (e) {
-        // erro passageiro: a alteração continua na fila e é tentada de novo depois
-        if (temporario(e) || (e && e.code === "auth")) throw e;
-        // recusa definitiva (dado inválido): sai da fila, mas fica guardada à parte, não é perdida
+        if (temporario(e) || e?.code === "auth") break;
         guardarRecusado(op, e);
-        toast("Uma alteração feita sem internet não pôde ser salva: " + ((e && e.message) || "dado recusado") + ". Ela ficou guardada no aparelho.");
+        recusados.add(op.chave || op.em);
+        toast("Uma alteração não pôde ser salva: " + (e?.message || "dado recusado") + ". Ela ficou guardada no aparelho.");
       }
-      gravarFila(lerFila().filter(x => !(x.col === op.col && x.id === op.id && x.em === op.em)));
+      // Uma edição feita durante o envio fica na fila, mesmo que seja do mesmo registro.
+      const restantes = lerFila().filter(x => !(x.col === op.col && x.id === op.id && (x.chave || x.em) === (op.chave || op.em)));
+      if (!gravarFila(restantes)) break;
     }
-  } catch (_) { /* continua sem internet: tenta de novo depois */ }
-  finally { enviandoFila = false; mostrarSync(); if (enviados && !lerFila().length) toast("Internet de volta: tudo o que foi feito sem conexão já foi salvo."); }
+    mostrarSync(recusados.size && !lerFila().length ? "Erro ao salvar" : "");
+    if (avisar && enviados && !recusados.size && !lerFila().length) toast("Internet de volta: tudo o que foi feito sem conexão já foi salvo.");
+    return recusados;
+  })().finally(() => { enviandoFila = null; });
+  return enviandoFila;
 }
-addEventListener("online", enviarFila);
+addEventListener("online", () => enviarFila());
 setInterval(() => { if (lerFila().length) enviarFila(); }, 30000);
-async function salvar(col, obj) {
+async function salvar(col, obj, { adiarRender = false } = {}) {
   const arr = S[col]; const i = arr.findIndex(x => x.id === obj.id);
+  const anterior = arr[i];
   if (i >= 0) arr[i] = obj; else arr.push(obj);
-  render();
+  if (adiarRender) pending = true; else render();
+  if (col === "avaliacoes") {
+    // As notas de uma avaliação são enviadas juntas. A fila evita que uma gravação antiga sobrescreva a mais recente.
+    const item = enfileirar({ tipo: "put", col, id: obj.id, obj });
+    let restaurar = anterior;
+    if (item) {
+      const envio = avaliacoesEmEnvio.get(obj.id) || { anterior, pendentes: 0 };
+      avaliacoesEmEnvio.set(obj.id, envio);
+      envio.pendentes++;
+      if (navigator.onLine !== false) mostrarSync("Salvando notas…");
+      const recusados = await enviarFila(false);
+      if (--envio.pendentes === 0) avaliacoesEmEnvio.delete(obj.id);
+      if (!recusados.has(item.chave)) return true;
+      restaurar = envio.anterior;
+    }
+    if (!item) mostrarSync("Erro ao salvar notas");
+    const atual = S[col].indexOf(obj);
+    if (atual >= 0) {
+      if (restaurar) S[col][atual] = restaurar; else S[col].splice(atual, 1);
+      render();
+    }
+    return false;
+  }
   if (lerFila().length) { enfileirar({ tipo: "put", col, id: obj.id, obj }); enviarFila(); return true; } // mantém a ordem
   mostrarSync("Salvando…");
   try { await api("PUT", "/api/dados/" + col, obj); mostrarSync(); return true; }
@@ -1095,7 +1137,7 @@ function vNotas() {
       return `<tr><td class="sticky-col">${esc(s.nome)}${marcaSit(s)}</td>${avs.map(a => { const n = a.notas?.[s.id]; return `<td class="c"><input class="grade" type="text" inputmode="decimal" aria-label="Nota de ${esc(s.nome)} em ${esc(a.nome)}" data-av="${esc(a.id)}" data-aluno="${esc(s.id)}" value="${n === undefined || n === null ? "" : esc(String(n).replace(".", ","))}"></td>`; }).join("")}
       <td class="${clsNota(m)}" style="font-weight:600">${fmtNota(m)}</td><td class="${clsFreq(f)}">${f === null ? "—" : f + "%"}</td><td class="c">${sit}</td>${temPara ? `<td class="c">${paraTxt(precisaNoBim(t, s.id, bim))}</td>` : ""}</tr>`; }).join("")}</tbody></table></div>
     ${temPara ? `<p class="small muted"><b>Para passar</b>: a média que o aluno precisa neste bimestre para fechar o ano com ${MEDIA_MIN}, contando as médias dos outros bimestres.</p>` : ""}
-    <p class="small muted">Digite a nota de 0 a 10 e saia do campo para salvar. Use vírgula ou ponto.</p>`;
+    <p class="small muted">Digite a nota e pressione Enter ou saia do campo para salvar. Use vírgula ou ponto.</p>`;
 }
 
 /* ----- Importar o Relatório de Notas por Componente Curricular do SGDE (PDF) ----- */
@@ -1211,18 +1253,23 @@ async function importarSgde() {
     if ((s.situacao || "") !== l.sit) mudouSit++;
     if (l.sit) s.situacao = l.sit; else delete s.situacao;
   });
+  const confirmar = dlg.querySelector("#sgdeOk");
+  confirmar.disabled = true;
+  if (!await salvarAlunos(alunos)) { confirmar.disabled = false; return; }
   fechar();
-  await salvarAlunos(alunos);
-  let notas = 0;
+  let notas = 0, falhas = 0;
   for (const n of bims) {
     const B = bimPorNum(t, n); if (!B) continue;
     const ja = S.avaliacoes.find(a => a.turmaId === t.id && String(a.bimestre) === String(n) && a.origem === "sgde");
     const av = ja ? JSON.parse(JSON.stringify(ja)) : { id: uid(), turmaId: t.id, nome: "Média do bimestre (importada)", sigla: "IMP", peso: 1, data: B.fim, bimestre: String(n), origem: "sgde", notas: {} };
     if (tipoMediaBim(t, n) === "somatoria") av.valor = 10;
     // relatório corrigido sem a nota de um aluno: a nota antiga da importação anterior sai também
-    c.rel.linhas.forEach((l, i) => { if (!idDe[i]) return; if (l.notas[n] === null) delete av.notas[idDe[i]]; else { av.notas[idDe[i]] = l.notas[n]; notas++; } });
-    await salvar("avaliacoes", av);
+    c.rel.linhas.forEach((l, i) => { if (!idDe[i]) return; if (l.notas[n] === null) delete av.notas[idDe[i]]; else av.notas[idDe[i]] = l.notas[n]; });
+    const total = c.rel.linhas.filter((l, i) => idDe[i] && l.notas[n] !== null).length;
+    if (await salvar("avaliacoes", av)) notas += total;
+    else falhas++;
   }
+  if (falhas) { toast("Alguns bimestres não puderam ser importados. Confira as notas e tente importar esses bimestres de novo."); return; }
   const partes = [notas ? `${notas} ${notas === 1 ? "nota lançada" : "notas lançadas"}` : "", novos ? `${novos} ${novos === 1 ? "aluno novo" : "alunos novos"}` : "", mudouSit ? `${mudouSit} ${mudouSit === 1 ? "situação atualizada" : "situações atualizadas"}` : ""].filter(Boolean);
   toast(partes.length ? partes.join(" · ") : "Nada novo para importar.");
 }
@@ -1901,7 +1948,8 @@ function dlgVerPlano(p) {
 }
 
 document.addEventListener("change", e => {
-  if (e.target.id !== "aTipoMedia" && e.target.id !== "aTipo") return;
+  if (!["aTipoMedia", "aTipo", "aBim"].includes(e.target.id)) return;
+  if (e.target.id === "aBim") dlg.querySelector("#aTipoMedia").value = tipoMediaBim(turmaAtual(), e.target.value);
   const soma = val2("aTipoMedia") === "somatoria", rec = val2("aTipo") === "recuperacao";
   document.getElementById("aPesoBox").hidden = soma || rec; document.getElementById("aValorBox").hidden = !soma || rec;
 });
@@ -3001,7 +3049,17 @@ function lerTabelaSGDE(txt) {
   }
   return [...out.values()];
 }
-async function mudarBim(num, fn, msg) { const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)), nb = bimPorNum(nt, num); fn(nb, nt); await salvar("turmas", nt); if (msg) toast(msg); }
+async function mudarBim(num, fn, msg, t = turmaAtual()) {
+  const nt = JSON.parse(JSON.stringify(t)), nb = bimPorNum(nt, num);
+  fn(nb, nt);
+  const salvo = await salvar("turmas", nt);
+  if (salvo && msg) toast(msg);
+  if (!salvo && turma(t.id) === nt) {
+    S.turmas[S.turmas.indexOf(nt)] = t;
+    render();
+  }
+  return salvo;
+}
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
 function bimIA(b) {
   const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
@@ -3713,10 +3771,14 @@ function vAlunos() {
 }
 async function salvarAlunos(alunos, msg) {
   const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)); nt.alunos = alunos; S.alEdit = null;
-  await salvar("turmas", nt);
+  if (!await salvar("turmas", nt)) {
+    if (turma(t.id) === nt) { S.turmas[S.turmas.indexOf(nt)] = t; render(); }
+    return false;
+  }
   // mesma turma em outras disciplinas: a lista de alunos é a mesma
   for (const o of irmasDe(t)) { const c = JSON.parse(JSON.stringify(o)); c.alunos = JSON.parse(JSON.stringify(alunos)); await salvar("turmas", c); }
   if (msg) toast(msg);
+  return true;
 }
 function adicionarNomes(nomes) {
   const t = turmaAtual(), atuais = (t.alunos || []).slice(), vistos = new Set(atuais.map(a => a.nome.toLowerCase()));
@@ -4015,24 +4077,43 @@ document.addEventListener("click", async e => {
       av.notas = {}; // refaz do zero: aluno que teve as respostas apagadas não pode continuar com a nota antiga contando na média
       (tt.alunos || []).forEach(s => { const x = acaAluno(a, s.id); if (x.nota !== null) { av.notas[s.id] = Number(x.nota.toFixed(1)); n++; } });
       if (!n) { toast("Lance as respostas de pelo menos um aluno antes."); return; }
-      await salvar("avaliacoes", av);
+      if (!await salvar("avaliacoes", av)) return;
       toast(`Nota da ACA lançada para ${n} ${n === 1 ? "aluno" : "alunos"}. ${ja ? "A avaliação foi atualizada." : "Confira o peso dela em Notas."}`);
       break;
     }
     case "nota-media-bim": {
       const bi = bimPorNum(t, bimSelecionado(t)); if (!bi) return;
-      await salvar("avaliacoes", { id: uid(), turmaId: t.id, nome: "Média do bimestre", peso: 1, data: bi.fim, bimestre: String(bi.num), notas: {} });
+      const av = { id: uid(), turmaId: t.id, nome: "Média do bimestre", peso: 1, data: bi.fim, bimestre: String(bi.num), notas: {} };
+      if (tipoMediaBim(t, bi.num) === "somatoria") av.valor = 10;
+      if (!await salvar("avaliacoes", av)) return;
       toast("Digite a média de cada aluno na coluna e saia do campo para salvar."); break; }
     case "editar-avaliacao": dlgAvaliacao(JSON.parse(JSON.stringify(S.avaliacoes.find(a => a.id === id)))); break;
     case "salvar-avaliacao": {
-      const o = dlg._obj; o.nome = val("aNome"); if (!o.nome) { toast("Dê um nome à avaliação."); return; }
+      const o = { ...dlg._obj }; o.nome = val("aNome"); if (!o.nome) { toast("Dê um nome à avaliação."); return; }
       o.tipo = val("aTipo") || "normal"; o.sigla = val("aSigla").toUpperCase(); o.peso = Number(val("aPeso")) || 1; o.data = val("aData"); o.bimestre = val("aBim");
       const tmNovo = val("aTipoMedia"), vRaw = val("aValor").replace(",", ".");
       if (tmNovo === "somatoria" && o.tipo !== "recuperacao") { const v = Number(vRaw); if (!vRaw || isNaN(v) || v <= 0 || v > 10) { toast("Diga quanto a avaliação vale (de 0,5 a 10)."); return; } o.valor = v; } else delete o.valor;
-      delete o.exemplo; fechar(); await salvar("avaliacoes", o);
-      // tipo de média é do bimestre: guarda na turma
-      const bi = bimPorNum(t, o.bimestre);
-      if (bi && (bi.tipoMedia || "aritmetica") !== tmNovo) await mudarBim(bi.num, nb => { nb.tipoMedia = tmNovo; });
+      delete o.exemplo;
+      b.disabled = true;
+      const salvo = await salvar("avaliacoes", o);
+      if (!salvo) { b.disabled = false; return; }
+      // O tipo de média pertence ao período, mesmo que a turma aberta mude enquanto a avaliação é enviada.
+      const turmaDaAvaliacao = turma(o.turmaId);
+      const bi = bimPorNum(turmaDaAvaliacao, o.bimestre);
+      if (bi && (bi.tipoMedia || "aritmetica") !== tmNovo) {
+        const tipoSalvo = await mudarBim(bi.num, nb => { nb.tipoMedia = tmNovo; }, "", turmaDaAvaliacao);
+        if (!tipoSalvo) { b.disabled = false; toast("A avaliação foi salva, mas o tipo de média não. Tente salvar de novo."); return; }
+      }
+      if (o.turmaId === turmaAtual()?.id && S.view === "notas") {
+        S.notasGeral = false;
+        S.bimSel[t.id] = bi ? String(bi.num) : "";
+        render();
+      }
+      if (b.isConnected) fechar();
+      if (lerFila().some(op => op.col === "avaliacoes" && op.id === o.id)) {
+        toast("Avaliação guardada neste aparelho. O envio será tentado de novo.");
+        break;
+      }
       if (tmNovo === "somatoria") { const tot = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(o.bimestre) && x.tipo !== "recuperacao").reduce((a, x) => a + (Number(x.valor) || 0), 0); toast(`Avaliação salva. Total do bimestre: ${fmtNota(tot)} de 10.`); }
       else toast("Avaliação salva"); break; }
     case "apagar-avaliacao": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar: apagar com as notas"; return; } { const aid = dlg._obj.id; fechar(); await apagar("avaliacoes", aid); toast("Avaliação apagada"); } break;
@@ -4135,11 +4216,22 @@ document.addEventListener("change", async e => {
     return;
   }
   if (el.matches("input.grade")) {
-    const a = JSON.parse(JSON.stringify(S.avaliacoes.find(x => x.id === el.dataset.av))); a.notas = a.notas || {};
+    const anterior = S.avaliacoes.find(x => x.id === el.dataset.av);
+    if (!anterior) return;
+    const aluno = el.dataset.aluno;
+    const a = { ...anterior, notas: { ...anterior.notas } };
     const raw = el.value.trim().replace(",", ".");
-    if (raw === "") delete a.notas[el.dataset.aluno];
-    else { const n = Number(raw), max = a.tipo !== "recuperacao" && a.valor ? Number(a.valor) : 10; if (isNaN(n) || n < 0 || n > max) { toast(`A nota deve ser um número de 0 a ${fmtNota(max)}.`); el.value = ""; return; } a.notas[el.dataset.aluno] = n; }
-    await salvar("avaliacoes", a);
+    const n = Number(raw), max = a.tipo !== "recuperacao" && a.valor ? Number(a.valor) : 10;
+    if (raw && (!/^\d*(?:\.\d*)?$/.test(raw) || !Number.isFinite(n) || n < 0 || n > max)) {
+      toast(`A nota deve ser um número de 0 a ${fmtNota(max)}.`);
+      el.value = String(anterior.notas?.[aluno] ?? "").replace(".", ",");
+      return;
+    }
+    if (raw) a.notas[aluno] = n; else delete a.notas[aluno];
+    if (!await salvar("avaliacoes", a, { adiarRender: true })) {
+      if (el.isConnected && document.activeElement !== el) el.value = String(S.avaliacoes.find(x => x.id === a.id)?.notas?.[aluno] ?? "").replace(".", ",");
+      return;
+    }
     // aviso de recuperação quando o aluno já tem todas as notas do bimestre
     const t = turma(a.turmaId), al = (t?.alunos || []).find(x => x.id === el.dataset.aluno);
     if (t && al && raw !== "") {
@@ -4171,6 +4263,7 @@ document.addEventListener("submit", e => {
   if (e.target.id === "chatForm") { e.preventDefault(); const i = $("#chatInput"); const v = i.value.trim(); i.value = ""; i.blur(); enviarChat(v); }
 });
 document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.matches("input.grade")) { e.preventDefault(); e.target.blur(); }
   if (e.target.id === "chatInput" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatForm").requestSubmit(); }
 });
 dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); dlg._af = null; });
