@@ -47,7 +47,7 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["calendario", "Calendário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["inicio", "Início"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["aca", "ACA"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+const ABAS = [["inicio", "Painel"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["aca", "ACA"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["bimestre", "planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
@@ -340,10 +340,10 @@ document.addEventListener("focusout", () => setTimeout(() => { if (pending) rend
 function renderNav() {
   const tt = S.dentroTurma && turmaAtual();
   if (tt) { // dentro da turma: só Início e as seções da turma
-    // Provas fica fora do menu: abre pelo atalho do Início da turma e pelo bimestre ("Corrigir prova por foto")
+    // Provas fica fora do menu: abre pelo atalho do Painel da turma e pelo bimestre ("Corrigir prova por foto")
     const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]) && a[0] !== "provas");
     $("#nav").innerHTML = `<a href="#inicio" aria-label="Início geral">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Início da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("") // cada bimestre se abre pelos cartões da página Bimestres
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("") // cada bimestre se abre pelos cartões da página Bimestres
       // o geral (turmas, horário, calendário) continua à mão dentro da turma; no celular a barra de baixo já leva ao Início
       + `<div class="nav-turma nav-geral"><span>Geral</span></div>` + VIEWS.filter(v => NAV_PRINCIPAL.includes(v[0]) && v[0] !== "inicio").map(([k, n]) => `<a href="#${k}" class="so-pc">${ico(k)}<span>${n}</span></a>`).join("");
     document.body.classList.add("na-turma");
@@ -379,7 +379,7 @@ function cabecalhoTurma() {
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(rotuloTurma(x))}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(periodo) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${periodo === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
-  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Início da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
   ${DO_BIMESTRE.includes(S.view) && S.view !== "bimestre" && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestre")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
 }
 document.addEventListener("click", e => {
@@ -738,7 +738,7 @@ function vInicio() {
   </section>`;
 }
 
-/* ----- Início da turma ----- */
+/* ----- Painel da turma ----- */
 function vInicioTurma() {
   const t = turmaAtual(), d0 = hoje(), al = t.alunos || [];
   const bimR = bimSelecionado(t), Br = bimR ? bimPorNum(t, bimR) : null;
