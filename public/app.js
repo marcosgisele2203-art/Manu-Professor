@@ -49,13 +49,14 @@ const ico = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const VIEWS = [["inicio", "Início"], ["turmas", "Turmas"], ["horario", "Meu horário"], ["calendario", "Calendário"], ["questoes", "Questões", true], ["assistente", "Manu", true]];
 // Dentro de cada turma: #turma-<id>-<aba>
-const ABAS = [["inicio", "Painel"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["aca", "ACA"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"]];
+const ABAS = [["inicio", "Painel"], ["alunos", "Alunos"], ["bimestres", "Bimestres"], ["bimestre", "Bimestre"], ["chamada", "Diário"], ["notas", "Média geral"], ["provas", "Provas"], ["aca", "ACA"], ["planos", "Planejamento"], ["atividades", "Atividades"], ["materiais", "Materiais"], ["slides", "Slides"], ["questoes", "Banco de questões"], ["enem", "Enem"], ["assistente", "Manu"], ["construir", "Construir com a Manu IA"]];
 // ferramentas que se abrem a partir do bimestre: no menu da turma, quem fica marcado é Bimestres
 const DO_BIMESTRE = ["bimestre", "planos", "atividades", "materiais", "slides", "questoes", "enem", "assistente"];
 // link que respeita a turma aberta (banco, Enem, Manu)
 const lk = v => S.dentroTurma && turmaAtual() ? linkTurma(turmaAtual().id, v) : "#" + v;
 const NAV_PRINCIPAL = ["inicio", "turmas", "horario", "calendario"];
-const ABAS_TOPO = ["inicio", "alunos", "bimestres", "chamada", "notas", "provas"];
+// Provas fica fora do menu e das abas: abre pelo atalho do Painel e pelo bimestre ("Corrigir prova por foto")
+const ABAS_TOPO = ["inicio", "alunos", "bimestres", "chamada", "notas"];
 // Ferramentas de IA da coluna esquerda do painel da turma
 const FERRAMENTAS_IA = [
   { aba: "planos", nome: "Plano de aula", desc: "Alinhado à BNCC" },
@@ -415,7 +416,7 @@ function render() {
   if (S.mode === "loading") { v.innerHTML = `<div class="empty"><img class="manu sm" src="/manu/manu-boas-vindas.webp" alt=""><h3>Abrindo seu espaço…</h3><p>Carregando turmas, aulas e notas.</p></div>`; return; }
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>${S.erroRede ? "Sem internet" : "Não foi possível carregar seus dados"}</h3><p>${S.erroRede ? "Este aparelho ainda não tem uma cópia dos seus dados. Abra o sistema uma vez com internet; depois ele funciona mesmo sem conexão." : "Verifique a internet e recarregue a página."}</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
-  const fn = { inicio: S.dentroTurma ? vInicioTurma : vInicio, turmas: vTurmas, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, aca: vAca, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente }[S.view] || vInicio;
+  const fn = { inicio: S.dentroTurma ? vInicioTurma : vInicio, turmas: vTurmas, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, aca: vAca, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente, construir: vConstruir }[S.view] || vInicio;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
@@ -424,10 +425,9 @@ document.addEventListener("focusout", () => setTimeout(() => { if (pending) rend
 function renderNav() {
   const tt = S.dentroTurma && turmaAtual();
   if (tt) { // dentro da turma: só Início e as seções da turma
-    // Provas fica fora do menu: abre pelo atalho do Painel da turma e pelo bimestre ("Corrigir prova por foto")
-    const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]) && a[0] !== "provas");
+    const sec = ABAS.filter(a => ABAS_TOPO.includes(a[0]));
     $("#nav").innerHTML = `<a href="#inicio" aria-label="Início geral">${ico("inicio")}<span>Início</span></a><div class="nav-turma" title="${esc(rotuloTurma(tt))}"><span class="swatch" style="background:${esc(tt.cor)}"></span><span>${esc(tt.nome)}</span></div>`
-      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("") // cada bimestre se abre pelos cartões da página Bimestres
+      + sec.map(([k, n]) => `<a href="${linkTurma(tt.id, k)}" class="${["chamada", "notas"].includes(k) ? "" : "so-pc"}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) || (k === "inicio" && S.view === "construir") ? 'aria-current="page"' : ""}>${ico(k)}<span>${n}</span></a>`).join("") // cada bimestre se abre pelos cartões da página Bimestres
       // o geral (turmas, horário, calendário) continua à mão dentro da turma; no celular a barra de baixo já leva ao Início
       + `<div class="nav-turma nav-geral"><span>Geral</span></div>` + VIEWS.filter(v => NAV_PRINCIPAL.includes(v[0]) && v[0] !== "inicio").map(([k, n]) => `<a href="#${k}" class="so-pc">${ico(k)}<span>${n}</span></a>`).join("");
     document.body.classList.add("na-turma");
@@ -463,7 +463,7 @@ function cabecalhoTurma() {
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(rotuloTurma(x))}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(periodo) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${periodo === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
-  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) || (k === "inicio" && S.view === "construir") ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
   ${DO_BIMESTRE.includes(S.view) && S.view !== "bimestre" && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestre")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
 }
 document.addEventListener("click", e => {
@@ -850,7 +850,9 @@ function vInicioTurma() {
   const linhaHor = px ? `<a class="faixa-hor" href="#horario">${px.agora ? `<b>Aula agora</b><span>${px.inicio}–${px.fim}</span>` : `<b>Próxima aula</b><span>${px.hoje ? "hoje" : DIAS[px.dia].toLowerCase() + ", " + fmtData(px.data)} · ${tempoDe(t, px) ? tempoDe(t, px) + "º tempo · " : ""}${px.inicio}–${px.fim}</span>`}</a>`
     : `<a class="faixa-hor vazio" href="#horario"><b>${horarioDe(t).length ? "Ver horário da turma" : "Cadastre o horário de aula"}</b><span>Dias e horários desta turma</span></a>`;
   const listaAlertas = itens => `<div class="list">${itens.map(x => `<div class="row"><div class="grow title">${esc(x.a.nome)}</div><span class="chip ${x.cls}">${esc(x.txt)}</span></div>`).join("")}</div>`;
-  return faixa + linhaHor + `<div class="atalhos">
+  // botão principal do Painel: abre a página com as ferramentas de IA da turma
+  const btnIA = cap.ia ? `<a class="atalho ai atalho-ia" href="${linkTurma(t.id, "construir")}"><b>${ico("spark")}Construir conteúdo com a Manu IA</b><span>Plano de aula, slides, questões, materiais e mais, já no bimestre certo</span></a>` : "";
+  return faixa + linhaHor + `<div class="atalhos">${btnIA}
     <a class="atalho" href="${linkTurma(t.id, "chamada")}" ${temAulaHoje ? "data-diario-hoje" : ""}><b>${ico("chamada")}${chamadaHoje}</b><span>Frequência e conteúdo</span></a>
     <a class="atalho" href="${linkTurma(t.id, "notas")}" data-media-geral="0"><b>${ico("notas")}Lançar notas</b><span>Avaliações e recuperação</span></a>
     <a class="atalho" href="${linkTurma(t.id, "atividades")}"><b>${ico("atividades")}Entregas</b><span>Quem entregou as atividades</span></a>
@@ -3147,9 +3149,24 @@ async function mudarBim(num, fn, msg, t = turmaAtual()) {
   }
   return salvo;
 }
+/* ----- Construir com a Manu IA ----- */
+// Reúne as ferramentas de IA da turma numa página só, a partir do botão do Painel.
+// Usa a mesma caixa "Criar com IA" do bimestre (bimIA), já no bimestre de hoje; o professor pode trocar o período.
+function vConstruir() {
+  // com "Ano todo" escolhido no alto da turma, abre no bimestre de hoje (as ferramentas são sempre de um bimestre)
+  const t = turmaAtual(), bs = bimestresDe(t), sel = bimSelecionado(t), B = sel ? bimPorNum(t, sel) : bimDaData(t, hoje());
+  const head = `<div class="page-head"><div><h1>Construir com a Manu IA</h1><p class="muted">Tudo o que a Manu cria para ${esc(t.nome)} · ${esc(t.disciplina)}, no bimestre escolhido.</p></div><div class="toolbar"><a class="btn" href="${linkTurma(t.id)}">Voltar ao Painel</a></div></div>`;
+  const semIA = cap.ia ? "" : `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic no servidor.</span></div>`;
+  if (!bs.length) return head + semIA + `<div class="empty"><img class="manu sm" src="/manu/manu-planos.webp" alt=""><h3>Cadastre os bimestres da turma</h3><p>A Manu cria tudo pensando no período: habilidades, semanas e recursos de cada bimestre.</p><a class="btn primary" href="${linkTurma(t.id, "bimestres")}">Ir para Bimestres</a></div>`;
+  const escolha = `<div class="esc-rede" role="group" aria-label="Bimestre">${bs.map(b => `<button type="button" class="tn-op" data-act="bim-ativar" data-num="${b.num}" aria-pressed="${!!B && String(b.num) === String(B.num)}">${esc(b.nome)}</button>`).join("")}</div>`;
+  return head + semIA + `<section class="panel"><p class="small muted" style="margin:0 0 8px">Escolha o período:</p>${escolha}</section>`
+    + (B ? `<section class="panel">${bimIA(B, true)}<p class="small muted" style="margin:10px 0 0">Habilidades e recursos do ${esc(B.nome)} ficam em <a href="${linkTurma(t.id, "bimestres")}">Bimestres</a>.</p></section>`
+      : `<p class="muted">Escolha um bimestre acima.</p>`);
+}
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
-function bimIA(b) {
-  const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
+// foraDoBimestre: na página "Construir com a Manu IA", sem o número do passo e com o aviso apontando para Bimestres
+function bimIA(b, foraDoBimestre = false) {
+  const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = foraDoBimestre || sel === String(b.num);
   if (!ativo) return `<div class="toolbar">${b.preparado ? "" : '<span class="passo-n">2</span>'}<button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
   const item = f => {
     const href = f.acao ? "" : f.href ? linkTurma(t.id, f.href.replace("#", "")) : linkTurma(t.id, f.aba);
@@ -3162,7 +3179,8 @@ function bimIA(b) {
   for (const f of ferr) { if (f.grupo) { atual = { nome: f.grupo, itens: [] }; grupos.push(atual); } else atual.itens.push(f); }
   grupos.push({ nome: "Banco e Enem", itens: [{ href: "#questoes", nome: "Banco de questões", desc: "Suas questões guardadas" }, { href: "#enem", nome: "Questões do Enem", desc: "Provas oficiais do INEP" }] });
   const prontos = habsDe(b).length || (b.recursos || []).length;
-  return `<div class="bim-ia"><div class="bim-ia-tit">${b.preparado ? "" : '<span class="passo-n">2</span>'}${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${prontos ? "" : `<p class="small aviso-pop" style="margin:0">Preencha antes o passo 1 (habilidades e recursos): a Manu usa essas informações para criar tudo.</p>`}${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
+  const aviso = foraDoBimestre ? `Marque antes as habilidades e os recursos do ${esc(b.nome)} em <a href="${linkTurma(t.id, "bimestres")}">Bimestres</a>: a Manu usa essas informações para criar tudo.` : "Preencha antes o passo 1 (habilidades e recursos): a Manu usa essas informações para criar tudo.";
+  return `<div class="bim-ia"><div class="bim-ia-tit">${b.preparado || foraDoBimestre ? "" : '<span class="passo-n">2</span>'}${ico("spark")}<b>Criar com IA no ${esc(b.nome)}</b></div>${prontos ? "" : `<p class="small aviso-pop" style="margin:0">${aviso}</p>`}${grupos.map(g => `<div class="bim-ia-grupo"><span>${esc(g.nome)}</span><div class="bim-ia-itens">${g.itens.map(item).join("")}</div></div>`).join("")}</div>`;
 }
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-bim-ir]"); if (a) { const t = turmaAtual(); if (t) S.bimSel[t.id] = String(a.dataset.bimIr); }
