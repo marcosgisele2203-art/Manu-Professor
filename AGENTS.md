@@ -80,6 +80,8 @@ Plano de aula e slides seguem o "jeito Manu de ensinar" completo (`ESTILO` em `a
 
 O estilo e as questões também se adaptam à idade da turma: `src/lib/faixas.ts` descobre a faixa pela série/etapa digitada (Educação Infantil, anos iniciais, anos finais, Ensino Médio, EJA) e devolve as regras daquela idade (`regrasFaixa("aula" | "questoes", serie)`). Sem série reconhecível, o prompt leva as cinco faixas e pede para a IA escolher a mais provável pelo tema.
 
+Catálogo oficial da BNCC (Fundamental e Médio, sem a Educação Infantil): `data/bncc/2018.json`, lido por `src/lib/bncc.ts`. As habilidades sugeridas pela IA (`tipo: "habilidades"`) passam por `conferirHabilidades()`: código EF/EM que não existe é retirado e a descrição vira a oficial. A busca sem IA fica em `GET /api/bncc`.
+
 O modelo de cada função e o cálculo de custo ficam em `src/lib/uso.ts` (`modeloDe()` e `PRECOS`): Opus em todo conteúdo criativo; só as instruções de atividade usam um modelo mais barato. Ao trocar ou incluir um modelo, atualize os dois.
 
 ### Padrões do `public/app.js`

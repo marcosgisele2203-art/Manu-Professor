@@ -5,6 +5,7 @@ import { iaEmAndamento, iaComecou, iaTerminou } from "@/lib/limite";
 import { situacaoIA, registrarUso, modeloDe } from "@/lib/uso";
 import { promptMaterial, SUBTIPOS, ADAPTACOES } from "@/lib/materiais";
 import { regrasFaixa } from "@/lib/faixas";
+import { conferirHabilidades } from "@/lib/bncc";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -284,8 +285,12 @@ export async function POST(req: Request) {
       await registrar(msg);
       if (msg.stop_reason === "refusal") return Response.json({ erro: "A IA não atendeu esse pedido. Tente reformular o tema." }, { status: 422 });
       const texto = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-      try { return Response.json({ dados: extrairJSON(texto) }); }
+      let dados;
+      try { dados = extrairJSON(texto); }
       catch { return Response.json({ erro: "A resposta veio num formato inesperado. Tente de novo." }, { status: 502 }); }
+      // habilidades sugeridas: só códigos que existem na BNCC, com a descrição oficial
+      if (tipo === "habilidades" && dados && typeof dados === "object") dados = { ...dados, ...conferirHabilidades((dados as { habilidades?: unknown }).habilidades) };
+      return Response.json({ dados });
     } catch (e) { fim(); if (req.signal.aborted) await registrarUso(pid, tipo, 0, 0); const x = erroAPI(e); return Response.json({ erro: x.erro }, { status: x.status }); }
   }
 

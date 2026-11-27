@@ -3561,7 +3561,8 @@ function dlgHabIA(num) {
   const t = turmaAtual(), b = bimPorNum(t, num); dlg._bim = num; dlg._habs = [];
   abrirDlg(`Habilidades do ${esc(b.nome)}`, `<p class="small muted">${esc(t.nome)} · ${esc(t.disciplina)}${t.serie ? " · " + esc(t.serie) : ""}</p>
     <div class="field"><label for="hbCont">Conteúdos do bimestre (opcional)</label><textarea class="input" id="hbCont" rows="3" placeholder="Ex.: frações e números decimais. Se deixar vazio, a Manu segue o esperado para a série.">${esc(b.conteudos || "")}</textarea></div>
-    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-habs">${ico("spark")}Sugerir habilidades</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Confira os códigos antes de usar.</span></div></div>
+    <div class="ai-box"><div class="toolbar"><button type="button" class="btn ai" data-act="ia-habs">${ico("spark")}Sugerir habilidades</button><button type="button" class="btn ghost sm" data-act="parar-ia" hidden id="iaStop">Parar</button><span class="ai-status" id="iaStatus">Os códigos são conferidos no catálogo oficial da BNCC.</span></div></div>
+    ${etapaDaSerie(t.serie || t.nome) === "ei" ? "" : `<div class="field"><label for="hbBusca">Ou busque na BNCC, sem usar a IA</label><div class="toolbar"><input class="input" id="hbBusca" type="search" placeholder="Código ou palavra. Ex.: frações" style="flex:1;min-width:12rem"><button type="button" class="btn" data-act="bim-hab-buscar">Buscar</button></div><p class="small muted" id="hbBuscaSt" style="margin:4px 0 0">Mostra as habilidades de ${esc(t.disciplina)}${t.serie ? " do " + esc(t.serie) : ""}.</p></div>`}
     <div id="hbLista"></div>`,
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-hab-salvar" disabled id="hbOk">Adicionar marcadas</button>`);
 }
@@ -3569,14 +3570,35 @@ async function iaHabs() {
   const t = turmaAtual(), bs = bimestresDe(t), b = bimPorNum(t, dlg._bim);
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "habilidades", periodo: b.nome, numero: Math.max(1, bs.indexOf(b) + 1), total: Math.max(1, bs.length), conteudos: val("hbCont") || undefined, turma: turmaIA(t.id) }, signal);
-    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").toUpperCase().slice(0, 20), descricao: String(h.descricao || "").slice(0, 380) })).filter(h => h.descricao);
-    if (!hs.length) throw { message: "A resposta veio vazia. Tente de novo." };
-    const ja = new Set(habsDe(b).map(h => h.codigo).filter(Boolean));
-    dlg._habs = hs;
-    document.getElementById("hbLista").innerHTML = `<div class="list">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="hbSel" value="${i}" ${ja.has(h.codigo) ? "disabled" : "checked"}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${ja.has(h.codigo) ? ' <span class="small muted">(já está)</span>' : ""}</span></label>`).join("")}</div>`;
-    document.getElementById("hbOk").disabled = false; st.textContent = "Marque as que vai usar.";
+    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").toUpperCase().slice(0, 20), descricao: String(h.descricao || "").slice(0, 600) })).filter(h => h.descricao);
+    // o servidor tira os códigos que não existem na BNCC
+    const fora = Array.isArray(r?.retiradas) ? r.retiradas.length : 0;
+    if (!hs.length) throw { message: fora ? "A Manu sugeriu códigos que não existem na BNCC. Tente de novo ou use a busca abaixo." : "A resposta veio vazia. Tente de novo." };
+    listarHabsDlg(b, hs);
+    st.textContent = fora ? `Marque as que vai usar. ${fora === 1 ? "1 código sugerido não existe" : fora + " códigos sugeridos não existem"} na BNCC e ${fora === 1 ? "foi retirado" : "foram retirados"}.` : "Marque as que vai usar.";
   });
 }
+// lista de habilidades para marcar na janela: as sugeridas pela IA já vêm marcadas; as da busca, não
+function listarHabsDlg(b, hs, marcar = true) {
+    const ja = new Set(habsDe(b).map(h => h.codigo).filter(Boolean));
+    dlg._habs = hs;
+    document.getElementById("hbLista").innerHTML = `<div class="list">${hs.map((h, i) => `<label class="check"><input type="checkbox" name="hbSel" value="${i}" ${ja.has(h.codigo) ? "disabled" : marcar ? "checked" : ""}><span>${h.codigo ? `<span class="bncc">${esc(h.codigo)}</span> ` : ""}${esc(h.descricao)}${ja.has(h.codigo) ? ' <span class="small muted">(já está)</span>' : ""}</span></label>`).join("")}</div>`;
+    document.getElementById("hbOk").disabled = !hs.some(h => !ja.has(h.codigo));
+}
+// busca no catálogo oficial da BNCC (sem IA), filtrada pela série e disciplina da turma
+async function buscarBNCC() {
+  const t = turmaAtual(), b = bimPorNum(t, dlg._bim), st = document.getElementById("hbBuscaSt"), q = val("hbBusca");
+  if (!b || !st) return;
+  st.textContent = "Buscando…";
+  try {
+    const r = await api("GET", `/api/bncc?${new URLSearchParams({ q, serie: t.serie || t.nome || "", disciplina: t.disciplina || "" })}`);
+    const hs = (r.habilidades || []).map(h => ({ codigo: h.codigo, descricao: h.descricao }));
+    if (!hs.length) { document.getElementById("hbLista").innerHTML = ""; st.textContent = q ? "Nada encontrado. Tente outra palavra ou só o código." : "Nada encontrado para esta série e disciplina."; return; }
+    listarHabsDlg(b, hs, false);
+    st.textContent = r.total > hs.length ? `Mostrando ${hs.length} de ${r.total}. Digite uma palavra para achar mais rápido.` : `${hs.length} ${hs.length === 1 ? "habilidade encontrada" : "habilidades encontradas"}. Marque as que vai usar.`;
+  } catch (e) { if (e?.code !== "auth") st.textContent = navigator.onLine === false ? "Sem internet. A busca precisa de conexão." : "Não foi possível buscar agora. Tente de novo."; }
+}
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "hbBusca") { e.preventDefault(); buscarBNCC(); } });
 function dlgTecIA(num) {
   const t = turmaAtual(), b = bimPorNum(t, num); dlg._bim = num;
   const tec = (b.recursos || []).filter(x => TEC.has(x));
@@ -3646,6 +3668,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "pe-copiar") { const ta = document.querySelector(`.pe-txt[data-campo="${b.dataset.campo}"][data-num="${num}"]`); if (!ta) return; try { await navigator.clipboard.writeText(ta.value); } catch (_) { ta.select(); document.execCommand("copy"); } toast("Copiado. Agora cole no campo do SGDE (Ctrl+V)."); return; }
   if (act === "ia-habs") return iaHabs();
+  if (act === "bim-hab-buscar") return buscarBNCC();
   if (act === "bim-tec-ia") return dlgTecIA(num);
   if (act === "ia-tec") return iaTec();
   if (act === "bim-hab-salvar") {
