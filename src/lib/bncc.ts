@@ -10,7 +10,8 @@ const POR_CODIGO = new Map(TODAS.map((h) => [h.codigo, h]));
 
 export const habilidadePorCodigo = (codigo: string) => POR_CODIGO.get(String(codigo || "").trim().toUpperCase());
 // Só EF e EM estão no catálogo; outros códigos (EI, currículos estaduais) não dá para conferir aqui.
-export const codigoConferivel = (codigo: string) => /^E[FM]\d/i.test(String(codigo || "").trim());
+// Qualquer código que comece com EF ou EM é conferido, mesmo mal escrito (ex.: "EFMA07"), para não passar inventado.
+export const codigoConferivel = (codigo: string) => /^E[FM]/i.test(String(codigo || "").trim());
 
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -64,10 +65,12 @@ export function buscarHabilidades({ texto = "", serie = "", disciplina = "", lim
 export function conferirHabilidades(lista: unknown): { habilidades: { codigo: string; descricao: string; oficial?: boolean }[]; retiradas: string[] } {
   const habilidades: { codigo: string; descricao: string; oficial?: boolean }[] = [], retiradas: string[] = [];
   for (const h of Array.isArray(lista) ? lista : []) {
-    const codigo = String((h as { codigo?: unknown })?.codigo || "").trim().toUpperCase();
+    // maiúsculas só na parte da BNCC: o final do currículo de MS (".s.01") fica como veio
+    const codigo = String((h as { codigo?: unknown })?.codigo || "").trim().replace(/^[a-z]{2}\d{2}[a-z]{2,4}\d{2,3}|^[a-z]+/i, (m) => m.toUpperCase());
     const descricao = String((h as { descricao?: unknown })?.descricao || "");
     if (codigoConferivel(codigo)) {
-      const o = habilidadePorCodigo(codigo);
+      // códigos do currículo de MS têm um final a mais (EF06MA07.s.01): confere só a parte da BNCC
+      const o = habilidadePorCodigo(codigo.match(/^E[FM]\d{2}[A-Z]{2,4}\d{2,3}/)?.[0] || codigo);
       if (!o) { retiradas.push(codigo); continue; }
       habilidades.push({ codigo, descricao: o.descricao, oficial: true });
     } else habilidades.push({ codigo, descricao });

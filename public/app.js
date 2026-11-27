@@ -3116,6 +3116,8 @@ S.bimAberto = {};
 document.addEventListener("toggle", e => { const d = e.target; if (d.classList && d.classList.contains("bim-det")) S.bimAberto[d.dataset.chave] = d.open; }, true);
 const habsDe = b => Array.isArray(b.habs) ? b.habs : [];
 const textoHab = h => (h.codigo ? h.codigo + " – " : "") + h.descricao;
+// para os pedidos à IA: o código vai sempre inteiro e a descrição oficial (que pode ser longa) encurta, para caberem todas
+const textoHabIA = h => { const d = String(h.descricao || ""); return textoHab({ ...h, descricao: d.length > 220 ? d.slice(0, 217).trimEnd() + "…" : d }); };
 const RE_HAB = /(?:MS\.)?(?:EI|EF|EM)\d{2}[A-Z]{2,4}\d{2,3}(?:\.[a-z]\.\d+)?/i;
 function lerHab(txt) { const m = String(txt).trim().match(new RegExp("^(" + RE_HAB.source + ")\\s*[-–:.)]?\\s*(.*)$", "i")); return m ? { codigo: m[1], descricao: m[2].trim() } : { codigo: "", descricao: String(txt).trim() }; }
 // cola das tabelas do SGDE: "código | descrição | unidade" e "unidade | código | objeto de conhecimento"
@@ -3570,7 +3572,7 @@ async function iaHabs() {
   const t = turmaAtual(), bs = bimestresDe(t), b = bimPorNum(t, dlg._bim);
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "habilidades", periodo: b.nome, numero: Math.max(1, bs.indexOf(b) + 1), total: Math.max(1, bs.length), conteudos: val("hbCont") || undefined, turma: turmaIA(t.id) }, signal);
-    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").toUpperCase().slice(0, 20), descricao: String(h.descricao || "").slice(0, 2000) })).filter(h => h.descricao);
+    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").trim().slice(0, 40), descricao: String(h.descricao || "").slice(0, 2000) })).filter(h => h.descricao);
     // o servidor tira os códigos que não existem na BNCC
     const fora = Array.isArray(r?.retiradas) ? r.retiradas.length : 0;
     if (!hs.length) throw { message: fora ? "A Manu sugeriu códigos que não existem na BNCC. Tente de novo ou use a busca abaixo." : "A resposta veio vazia. Tente de novo." };
@@ -3590,13 +3592,16 @@ async function buscarBNCC() {
   const t = turmaAtual(), b = bimPorNum(t, dlg._bim), st = document.getElementById("hbBuscaSt"), q = val("hbBusca");
   if (!b || !st) return;
   st.textContent = "Buscando…";
+  const vez = (buscarBNCC.vez = (buscarBNCC.vez || 0) + 1);
   try {
     const r = await api("GET", `/api/bncc?${new URLSearchParams({ q, serie: t.serie || t.nome || "", disciplina: t.disciplina || "" })}`);
+    // outra busca começou depois desta, ou a janela já é outra: descarta a resposta antiga
+    if (vez !== buscarBNCC.vez || !st.isConnected) return;
     const hs = (r.habilidades || []).map(h => ({ codigo: h.codigo, descricao: h.descricao }));
     if (!hs.length) { document.getElementById("hbLista").innerHTML = ""; st.textContent = q ? "Nada encontrado. Tente outra palavra ou só o código." : "Nada encontrado para esta série e disciplina."; return; }
     listarHabsDlg(b, hs, false);
     st.textContent = r.total > hs.length ? `Mostrando ${hs.length} de ${r.total}. Digite uma palavra para achar mais rápido.` : `${hs.length} ${hs.length === 1 ? "habilidade encontrada" : "habilidades encontradas"}. Marque as que vai usar.`;
-  } catch (e) { if (e?.code !== "auth") st.textContent = navigator.onLine === false ? "Sem internet. A busca precisa de conexão." : "Não foi possível buscar agora. Tente de novo."; }
+  } catch (e) { if (vez === buscarBNCC.vez && e?.code !== "auth") st.textContent = navigator.onLine === false ? "Sem internet. A busca precisa de conexão." : "Não foi possível buscar agora. Tente de novo."; }
 }
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "hbBusca") { e.preventDefault(); buscarBNCC(); } });
 function dlgTecIA(num) {
@@ -3610,7 +3615,7 @@ function dlgTecIA(num) {
 }
 async function iaTec() {
   const t = turmaAtual(), b = bimPorNum(t, dlg._bim);
-  const habs = habsDe(b).length ? habsDe(b).map(textoHab) : (b.plano?.habilidades || []);
+  const habs = habsDe(b).length ? habsDe(b).map(textoHabIA) : (b.plano?.habilidades || []);
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "tecnologia", periodo: b.nome, habilidades: habs.slice(0, 25).map(x => String(x).slice(0, 400)), recursos: ((b.recursos || []).length ? b.recursos : meuEstilo()?.escolaTem || []).slice(0, 40), quantidade: Number(val("tcQtd")) || 4, observacoes: val("tcObs") || undefined, turma: turmaIA(t.id), perfil: textoEstilo(meuEstilo()) || undefined }, signal);
     const ids = (r && Array.isArray(r.ideias) ? r.ideias : []).map(x => ({ id: uid(), titulo: String(x.titulo || "Atividade").slice(0, 160), eixo: String(x.eixo || "").slice(0, 60), habilidade: String(x.habilidade || "").slice(0, 40), precisa: String(x.precisa || "").slice(0, 60),
@@ -3805,7 +3810,7 @@ async function iaBimestre() {
   const aulas = Math.max(1, Math.min(20, parseInt(val("biAulas")) || 2)), cont = val("biCont");
   await comIA(async (signal, st) => {
     const fer = []; for (let d = b.inicio; d <= b.fim; d = addDias(d, 1)) { const x = semAula(d, escolaDe(t)); if (x && diaSemana(d) <= 5) fer.push(`${fmtData(d)} (${x.nome})`); }
-    const extras = [fer.length ? "Dias sem aula no período: " + fer.join(", ") + "." : "", habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHab).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
+    const extras = [fer.length ? "Dias sem aula no período: " + fer.join(", ") + "." : "", habsDe(b).length ? "Habilidades escolhidas pelo professor para o período: " + habsDe(b).map(textoHabIA).join("; ") : "", (b.recursos || []).length ? "Recursos disponíveis: " + b.recursos.join(", ") + ". Inclua uso de tecnologia quando houver." : ""].filter(Boolean).join("\n");
     const r = await iaJSON({ tipo: "bimestre", periodo: b.nome, semanas: sem.map(s => `Semana ${s.n} (${s.rotulo})`), aulasPorSemana: aulas, conteudos: [cont, extras].filter(Boolean).join("\n").slice(0, 3000) || undefined, observacoes: val("biObs") || undefined, turma: turmaIA(t.id), perfil: textoEstilo(meuEstilo()) || undefined, livro: textoLivro(t, b) || undefined }, signal);
     if (!r || !Array.isArray(r.semanas) || !r.semanas.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
     const nt = JSON.parse(JSON.stringify(t)); nt.aulasSemana = aulas;
