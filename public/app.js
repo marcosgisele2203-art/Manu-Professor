@@ -372,8 +372,10 @@ function situacaoAno(t, alunoId) {
   const precisa = faltam && com.length ? (MEDIA_MIN * n - soma) / faltam : null;
   const estado = !com.length ? "sem" : !faltam ? (aprox(t, soma / n) >= MEDIA_MIN ? "aprovado" : "exame") : precisa <= 0 ? "garantido" : precisa > 10 ? "exame" : "andamento";
   const sit = { ms, anual, faltam, precisa, f, estado, freqRisco: f !== null && f < FREQ_MIN };
-  // Exame final: só depois que todos os períodos têm nota, e só na escola que usa essa regra
-  if (temExameFinal(t) && estado === "exame" && !faltam) {
+  // Ano fechado: todo período tem média E nenhuma avaliação ficou em branco (uma nota só já daria média)
+  sit.anoCompleto = !faltam && bs.length > 0 && bs.every(b => bimCompleto(t, alunoId, b.num));
+  // Exame final: só com o ano fechado, e só na escola que usa essa regra
+  if (temExameFinal(t) && estado === "exame" && sit.anoCompleto) {
     sit.notaMin = notaMinExame(anual);
     sit.semChance = sit.notaMin === null || sit.notaMin > 10; // nem com 10 no exame alcança a média final
     sit.notaExame = (t.exame || {})[alunoId];
@@ -882,9 +884,12 @@ function boletimTurma(t) {
   return (t.alunos || []).map((s, i) => {
     const x = situacaoAno(t, s.id), faltas = S.chamadas.filter(c => c.turmaId === t.id && c.presencas?.[s.id] === "F").length;
     // frequência abaixo do mínimo reprova mesmo com média: nunca aparece como aprovado
-    const sit = s.situacao || (x.estado === "exame" ? (x.resultado === "aprovado" ? `Aprovado no exame (${fmtNota(x.mediaFinal)})` : x.resultado === "retido" ? (x.semChance ? "Retido" : `Retido no exame (${fmtNota(x.mediaFinal)})`) : "Exame final") : x.freqRisco ? `Frequência baixa (${x.f}%)` : { aprovado: "Aprovado", garantido: "Média garantida" }[x.estado] || "Em curso");
+    const sit = s.situacao || (x.estado === "exame"
+      ? (x.resultado === "aprovado" ? (x.freqRisco ? `Frequência baixa (${x.f}%)` : `Aprovado no exame (${fmtNota(x.mediaFinal)})`)
+        : x.resultado === "retido" ? (x.semChance ? "Retido" : `Retido no exame (${fmtNota(x.mediaFinal)})`) : "Exame final")
+      : x.freqRisco ? `Frequência baixa (${x.f}%)` : { aprovado: "Aprovado", garantido: "Média garantida" }[x.estado] || "Em curso");
     const cls = s.situacao ? "" : x.resultado === "aprovado" && !x.freqRisco ? "ok" : x.estado === "exame" || x.freqRisco ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "";
-    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, freq: x.f, faltas, sit, cls, emExame: x.estado === "exame" && !x.faltam, exame: x.notaExame, final: x.mediaFinal };
+    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, freq: x.f, faltas, sit, cls, emExame: x.estado === "exame" && x.anoCompleto, exame: x.notaExame, final: x.mediaFinal };
   });
 }
 function painelNotasTurma(t) {
@@ -1144,10 +1149,10 @@ function imprimirDiario(t) {
 // Exame final: só os alunos que fecharam o ano abaixo da média, na escola que usa essa regra
 function painelExameFinal(t, sits) {
   if (!temExameFinal(t)) return "";
-  const emExame = sits.filter(({ x }) => x.estado === "exame" && !x.faltam);
+  const emExame = sits.filter(({ x }) => x.estado === "exame" && x.anoCompleto);
   if (!emExame.length) return "";
   const chip = x => x.semChance ? `<span class="chip bad">retido</span>`
-    : x.resultado === "aprovado" ? `<span class="chip ok">aprovado</span>`
+    : x.resultado === "aprovado" ? (x.freqRisco ? `<span class="chip bad">nota ok, mas frequência ${x.f}%</span>` : `<span class="chip ok">aprovado</span>`)
     : x.resultado === "retido" ? `<span class="chip bad">retido</span>`
     : `<span class="chip">falta a nota</span>`;
   return `<section class="panel"><div class="panel-head"><div><h2>Exame final</h2><span class="small muted">${emExame.length} ${emExame.length === 1 ? "aluno" : "alunos"} · passa quem alcança a nota mínima. Média final = (3 × média anual + 2 × nota do exame) ÷ 5.</span></div></div>
@@ -2746,9 +2751,12 @@ async function boletimXlsx(t) {
   const cab = ws.addRow(["Aluno", ...avs.map(a => `${a.nome} (peso ${a.peso})`), "Média", "Frequência", "Situação"]);
   cab.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; c.alignment = { vertical: "middle", horizontal: "center", wrapText: true }; });
   cab.height = 32;
+  // com períodos cadastrados, a situação é a do ano (boletimTurma), a mesma da tela e do PDF
+  const linhas = bimestresDe(t).length ? boletimTurma(t) : null;
   (t.alunos || []).forEach(s => {
     const m = mediaAluno(t, s.id), f = freqAluno(t, s.id);
-    const sit = m === null ? "sem notas" : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? "em dia" : m < MEDIA_MIN ? "recuperação" : "frequência";
+    const sit = linhas ? (linhas.find(l => l.s.id === s.id)?.sit || "")
+      : m === null ? "sem notas" : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? "em dia" : m < MEDIA_MIN ? "recuperação" : "frequência";
     const r = ws.addRow([s.nome, ...avs.map(a => { const n = a.notas?.[s.id]; return n == null || n === "" ? null : Number(n); }), m === null ? null : Math.round(m * 10) / 10, f === null ? null : f / 100, sit]);
     r.eachCell((c, i) => { if (i > 1 && i <= avs.length + 2) c.numFmt = "0.0"; });
     r.getCell(avs.length + 3).numFmt = "0%";
@@ -2758,17 +2766,18 @@ async function boletimXlsx(t) {
   ws.getColumn(1).width = 34; for (let i = 2; i <= avs.length + 4; i++) ws.getColumn(i).width = 16;
   const bs = bimestresDe(t);
   if (bs.length) {
+    const ls = linhas || boletimTurma(t), comExame = temExameFinal(t) && ls.some(l => l.emExame);
+    const n1 = x => x === null || x === undefined ? null : Math.round(x * 10) / 10;
     const wb2 = wb.addWorksheet("Médias por período", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
-    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média final", "Frequência anual"]);
+    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média anual", ...(comExame ? ["Exame", "Média final"] : []), "Frequência anual", "Situação"]);
     h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; });
-    (t.alunos || []).forEach(s => {
-      const ms = bs.map(b => { const m = mediaAluno(t, s.id, b.num); return m === null ? null : Math.round(m * 10) / 10; });
-      const mf = mediaAnual(t, s.id), f = freqAluno(t, s.id);
-      const row = wb2.addRow([s.nome, ...ms, mf === null ? null : Math.round(mf * 10) / 10, f === null ? null : f / 100]);
-      row.eachCell((c, i) => { if (i > 1 && i <= bs.length + 2) c.numFmt = "0.0"; });
-      row.getCell(bs.length + 3).numFmt = "0%";
+    const colFreq = bs.length + 3 + (comExame ? 2 : 0);
+    ls.forEach(l => {
+      const row = wb2.addRow([l.s.nome, ...l.ms.map(n1), n1(l.anual), ...(comExame ? [notaOk(l.exame) ? Number(l.exame) : null, n1(l.final)] : []), l.freq === null ? null : l.freq / 100, l.sit]);
+      row.eachCell((c, i) => { if (i > 1 && i < colFreq) c.numFmt = "0.0"; });
+      row.getCell(colFreq).numFmt = "0%";
     });
-    wb2.getColumn(1).width = 34; for (let i = 2; i <= bs.length + 3; i++) wb2.getColumn(i).width = 16;
+    wb2.getColumn(1).width = 34; for (let i = 2; i <= colFreq + 1; i++) wb2.getColumn(i).width = 16;
   }
   const ch = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => a.data.localeCompare(b.data));
   if (ch.length) {
@@ -4333,7 +4342,7 @@ document.addEventListener("change", async e => {
     if (t && al && raw !== "") {
       const completo = bimCompleto(t, al.id, a.bimestre);
       const m = mediaAluno(t, al.id, a.bimestre), sit = situacaoAno(t, al.id), B = bimPorNum(t, a.bimestre);
-      if (completo && sit.estado === "exame" && !sit.faltam) toast(sit.semChance
+      if (sit.estado === "exame" && sit.anoCompleto) toast(sit.semChance
         ? `Atenção: ${al.nome} fechou o ano com média ${fmtNota(sit.anual)} e não alcança a média final nem com 10 no exame.`
         : `Atenção: ${al.nome} fechou o ano com média ${fmtNota(sit.anual)} e vai para o exame final${sit.notaMin != null ? `, precisando de ${fmtNota(sit.notaMin)}` : ""}.`);
       else if (completo && m !== null && m < MEDIA_MIN) toast(`Atenção: ${al.nome} ficou em recuperação${B ? " no " + B.nome : ""} (média ${fmtNota(m)}).`);
