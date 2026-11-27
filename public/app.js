@@ -2122,17 +2122,44 @@ function dlgProva(p) {
     `${S.provas.some(x => x.id === p.id) ? `<button type="button" class="btn danger" data-act="apagar-prova" style="margin-right:auto">Apagar</button>` : ""}<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar-prova">Salvar prova</button>`);
 }
 
-function provaDoc(p, gabarito) {
-  const t = turma(p.turmaId);
+/* ----- Prova A e B: a B tem as mesmas questões, em outra ordem, e as alternativas da múltipla escolha embaralhadas ----- */
+// Embaralhamento fixo: a mesma prova gera sempre a mesma versão B (ideia trazida do Professor Nota Mil)
+function ordemFixa(n, semente) {
+  const ix = Array.from({ length: n }, (_, i) => i);
+  let st = 2166136261;
+  for (const ch of semente) st = Math.imul(st ^ ch.charCodeAt(0), 16777619);
+  for (let i = n - 1; i > 0; i--) { st = (Math.imul(st, 1664525) + 1013904223) >>> 0; const j = Math.floor(st / 4294967296 * (i + 1)); [ix[i], ix[j]] = [ix[j], ix[i]]; }
+  // nunca devolve a ordem original: senão a B sairia igual à A
+  if (n > 1 && ix.every((x, i) => x === i)) ix.push(ix.shift());
+  return ix;
+}
+// Questões da prova na ordem da versão pedida; na B, a alternativa certa acompanha a troca de lugar
+function questoesDaVersao(p, versao = "A") {
   const qs = (p.questaoIds || []).map(id => S.questoes.find(q => q.id === id)).filter(Boolean);
-  return `<div class="doc"><div><span class="eyebrow">${esc(t?.disciplina || "")} · ${esc(t?.nome || "")} · ${esc(fmtDataLonga(p.data))}</span><h2 style="margin-top:4px">${esc(p.titulo)}</h2></div>
+  if (versao !== "B") return qs;
+  const semente = p.id + ":" + qs.map(q => q.id).join(",");
+  return ordemFixa(qs.length, semente).map(i => {
+    const q = qs[i], alts = q.alternativas || [];
+    if (q.tipo !== "multipla" || alts.length < 2) return q; // verdadeiro ou falso e dissertativa ficam como estão
+    const ord = ordemFixa(alts.length, semente + ":" + q.id);
+    return { ...q, alternativas: ord.map(k => alts[k]), altImgs: q.altImgs ? ord.map(k => q.altImgs[k]) : q.altImgs, correta: q.correta == null ? q.correta : ord.indexOf(q.correta) };
+  });
+}
+const rotuloVersao = v => v === "B" ? " · Versão B" : "";
+function provaDoc(p, gabarito, versao = "A") {
+  const t = turma(p.turmaId);
+  const qs = questoesDaVersao(p, versao);
+  return `<div class="doc"><div><span class="eyebrow">${esc(t?.disciplina || "")} · ${esc(t?.nome || "")} · ${esc(fmtDataLonga(p.data))}${versao === "B" ? " · <b>Versão B</b>" : ""}</span><h2 style="margin-top:4px">${esc(p.titulo)}</h2></div>
     <div class="grid2 small"><div>Nome: ______________________________</div><div>Nº: _____ &nbsp; Nota: _____</div></div>
     ${p.instrucoes ? `<p class="small muted" style="white-space:pre-wrap">${esc(p.instrucoes)}</p>` : ""}
     ${qs.map((q, i) => questaoHTML(q, i + 1, gabarito) + (q.tipo === "aberta" && !gabarito ? `<div style="border-bottom:1px solid var(--line);height:64px"></div>` : "")).join("")}</div>`;
 }
-function dlgVerProva(p, gab) {
-  abrirDlg(esc(p.titulo), `<div class="toolbar"><button type="button" class="btn sm ${gab ? "" : "primary"}" data-act="ver-prova" data-id="${esc(p.id)}">Versão do aluno</button><button type="button" class="btn sm ${gab ? "primary" : ""}" data-act="ver-prova-gab" data-id="${esc(p.id)}">Com gabarito</button></div>${provaDoc(p, gab)}`,
-    `<button type="button" class="btn" data-act="folha-respostas" data-id="${esc(p.id)}">Folha de respostas</button><button type="button" class="btn ai" data-act="corrigir-foto" data-id="${esc(p.id)}">${ico("spark")}Corrigir por foto</button>${botoesExport(`data-prova="${esc(p.id)}" data-gab="${gab ? 1 : 0}"`)}<button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
+function dlgVerProva(p, gab, versao = "A") {
+  const v = versao === "B" ? "B" : "A", dv = `data-v="${v}"`;
+  abrirDlg(esc(p.titulo), `<div class="toolbar"><button type="button" class="btn sm ${gab ? "" : "primary"}" data-act="ver-prova" data-id="${esc(p.id)}" ${dv}>Versão do aluno</button><button type="button" class="btn sm ${gab ? "primary" : ""}" data-act="ver-prova-gab" data-id="${esc(p.id)}" ${dv}>Com gabarito</button>
+    <span class="esc-rede" role="group" aria-label="Versão da prova" style="margin-left:auto">${["A", "B"].map(x => `<button type="button" class="tn-op" data-act="${gab ? "ver-prova-gab" : "ver-prova"}" data-id="${esc(p.id)}" data-v="${x}" aria-pressed="${x === v}">Versão ${x}</button>`).join("")}</span></div>
+    ${v === "B" ? `<p class="small muted" style="margin:6px 0 0">A versão B tem as mesmas questões em outra ordem, com as alternativas embaralhadas. Use a folha de respostas e o gabarito da versão B para quem fizer esta prova.</p>` : ""}${provaDoc(p, gab, v)}`,
+    `<button type="button" class="btn" data-act="folha-respostas" data-id="${esc(p.id)}" ${dv}>Folha de respostas${rotuloVersao(v)}</button><button type="button" class="btn ai" data-act="corrigir-foto" data-id="${esc(p.id)}">${ico("spark")}Corrigir por foto</button>${botoesExport(`data-prova="${esc(p.id)}" data-gab="${gab ? 1 : 0}" ${dv}`)}<button type="button" class="btn primary" data-act="fechar">Fechar</button>`);
 }
 
 /* ---------- IA ---------- */
@@ -2895,7 +2922,7 @@ async function exportar(alvo, formato, el) {
     let nome, blob, tipo, turmaId = "", sub = "";
     if (alvo.plano) { const p = alvo.plano; nome = p.titulo; tipo = "docx"; turmaId = p.turmaId; sub = "Planos de aula"; blob = await htmlParaDocx(corpoPlano(p)); }
     else if (alvo.material) { const m = alvo.material; nome = m.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; turmaId = m.turmaId; sub = "Materiais"; blob = await htmlParaDocx(materialCorpo(m, !!alvo.gab), estiloFolha(m)); }
-    else if (alvo.prova) { const p = alvo.prova; nome = p.titulo + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; turmaId = p.turmaId; sub = "Provas"; blob = await htmlParaDocx(provaDoc(p, !!alvo.gab)); }
+    else if (alvo.prova) { const p = alvo.prova, v = alvo.versao === "B" ? "B" : "A"; nome = p.titulo + (v === "B" ? " - versão B" : "") + (alvo.gab ? " - gabarito" : ""); tipo = "docx"; turmaId = p.turmaId; sub = "Provas"; blob = await htmlParaDocx(provaDoc(p, !!alvo.gab, v)); }
     else if (alvo.slides) { const d = alvo.slides; nome = d.titulo; tipo = "pptx"; turmaId = S.planos.find(x => x.id === d.planoId)?.turmaId || ""; sub = "Slides"; await carregarPptx(); blob = await montarPptx(d).write({ outputType: "blob" }); }
     else if (alvo.turma) { const t = alvo.turma; nome = "Boletim " + t.nome + " - " + new Date().toLocaleDateString("pt-BR"); tipo = "xlsx"; turmaId = t.id; sub = "Boletins"; blob = await boletimXlsx(t); }
     if (formato === "drive") await enviarDrive(nome, blob, tipo, turmaId, sub);
@@ -2921,7 +2948,7 @@ document.addEventListener("click", e => {
   const d = b.dataset, gab = d.gab === "1";
   const alvo = d.plano ? { plano: S.planos.find(x => x.id === d.plano) }
     : d.material ? { material: S.matAtual, gab }
-    : d.prova ? { prova: S.provas.find(x => x.id === d.prova), gab }
+    : d.prova ? { prova: S.provas.find(x => x.id === d.prova), gab, versao: d.v }
     : d.slides ? { slides: S.slAtual }
     : d.turma ? { turma: turma(d.turma) } : null;
   if (alvo && Object.values(alvo)[0]) exportar(alvo, d.fmt, b);
@@ -2929,24 +2956,24 @@ document.addEventListener("click", e => {
 
 /* ---------- Correção por foto ---------- */
 // Questões objetivas da prova, na numeração da prova impressa
-function objetivas(p) {
-  return (p.questaoIds || []).map((id, i) => ({ q: S.questoes.find(x => x.id === id), n: i + 1 })).filter(x => x.q)
+function objetivas(p, versao = "A") {
+  return questoesDaVersao(p, versao).map((q, i) => ({ q, n: i + 1 }))
     .filter(x => x.q.tipo !== "aberta" && (x.q.alternativas || []).length >= 2)
     .map(x => { const vf = x.q.tipo === "vf"; const opcoes = vf ? "VF" : "ABCDE".slice(0, Math.min(5, x.q.alternativas.length));
       return { n: x.n, opcoes, certa: x.q.correta == null ? null : opcoes[x.q.correta] || null }; });
 }
-function folhaRespostasHTML(p) {
-  const t = turma(p.turmaId), obj = objetivas(p);
+function folhaRespostasHTML(p, versao = "A") {
+  const t = turma(p.turmaId), obj = objetivas(p, versao);
   const metade = Math.ceil(obj.length / 2), cols = [obj.slice(0, metade), obj.slice(metade)];
   return `<div class="cab"><div>Escola: ________________________________</div><div>Data: ____/____/______</div><div>Nome: ____________________________________</div><div>Turma: ${t ? esc(t.nome) : "_______"}</div></div>
-    <h1>Folha de respostas · ${esc(p.titulo)}</h1><p class="instr">Pinte totalmente UMA bolinha por questão, com caneta azul ou preta. Não rasure. As questões dissertativas são respondidas na prova.</p>
+    <h1>Folha de respostas · ${esc(p.titulo)}${versao === "B" ? ` · <span class="fr-versao">VERSÃO B</span>` : ""}</h1><p class="instr">Pinte totalmente UMA bolinha por questão, com caneta azul ou preta. Não rasure. As questões dissertativas são respondidas na prova.</p>
     <div class="fr"><span class="mk tl"></span><span class="mk tr"></span><span class="mk bl"></span><span class="mk br"></span>
     <div class="fr-cols">${cols.map(c => `<div class="fr-col">${c.map(o => `<div class="fr-q"><b>${String(o.n).padStart(2, "0")}</b>${[...o.opcoes].map(l => `<span class="bol">${l}</span>`).join("")}</div>`).join("")}</div>`).join("")}</div></div>`;
 }
 const CSS_FR = `.folha .fr{position:relative;border:1.5px solid #111;border-radius:6px;padding:26px 30px;margin-top:10px}
 .folha .fr .mk{position:absolute;width:16px;height:16px;background:#111}.folha .fr .tl{top:6px;left:6px}.folha .fr .tr{top:6px;right:6px}.folha .fr .bl{bottom:6px;left:6px}.folha .fr .br{bottom:6px;right:6px}
 .folha .fr-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 40px}.folha .fr-q{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dotted #bbb;break-inside:avoid}
-.folha .fr-q b{width:30px;font-size:14pt}.folha .bol{width:26px;height:26px;border:1.6px solid #111;border-radius:50%;display:inline-grid;place-items:center;font-size:10pt;font-weight:700;color:#555}`;
+.folha .fr-versao{border:2px solid #111;padding:0 8px;border-radius:4px}.folha .fr-q b{width:30px;font-size:14pt}.folha .bol{width:26px;height:26px;border:1.6px solid #111;border-radius:50%;display:inline-grid;place-items:center;font-size:10pt;font-weight:700;color:#555}`;
 document.head.insertAdjacentHTML("beforeend", `<style>${CSS_FR}</style>`);
 
 async function prepararFoto(file) {
@@ -2963,14 +2990,16 @@ function dlgCorrigir(p) {
   const obj = objetivas(p);
   if (!obj.length) { toast("Esta prova não tem questões de múltipla escolha ou V/F para corrigir por foto."); return; }
   const ja = S.avaliacoes.find(a => a.turmaId === t.id && a.provaId === p.id);
-  dlg._cor = { provaId: p.id, alunoId: (t.alunos.find(a => !p.correcoes?.[a.id]) || t.alunos[0]).id, foto: "", leitura: null, marcadas: {}, avalId: ja ? ja.id : "nova", nota: "", status: "" };
+  const alunoId = (t.alunos.find(a => !p.correcoes?.[a.id]) || t.alunos[0]).id;
+  dlg._cor = { provaId: p.id, alunoId, versao: p.correcoes?.[alunoId]?.versao || "A", foto: "", leitura: null, marcadas: {}, avalId: ja ? ja.id : "nova", nota: "", status: "" };
   renderCorrecao();
 }
 function renderCorrecao() {
-  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), t = turma(p.turmaId), obj = objetivas(p);
+  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), t = turma(p.turmaId), obj = objetivas(p, c.versao);
   const abertas = (p.questaoIds || []).length - obj.length;
   const avs = S.avaliacoes.filter(a => a.turmaId === t.id);
   let corpo = `<div class="grid2"><div class="field"><label for="cAluno">Aluno</label><select class="input" id="cAluno">${t.alunos.map(a => `<option value="${esc(a.id)}" ${a.id === c.alunoId ? "selected" : ""}>${esc(a.nome)}${p.correcoes?.[a.id] ? " ✓ corrigida (" + fmtNota(p.correcoes[a.id].nota) + ")" : ""}</option>`).join("")}</select></div>
+    <div class="field"><label>Versão da prova deste aluno</label><div class="esc-rede" role="group" aria-label="Versão da prova deste aluno">${["A", "B"].map(v => `<button type="button" class="tn-op" data-act="cor-versao" data-v="${v}" aria-pressed="${c.versao === v}">Versão ${v}</button>`).join("")}</div></div>
     <div class="field"><label for="cFoto">Foto da folha de respostas</label><input class="input" id="cFoto" type="file" accept="image/*" capture="environment"></div></div>
     <p class="small muted">Fotografe a folha inteira, de cima, com boa luz, mostrando os quatro quadradinhos pretos dos cantos.</p>`;
   if (c.foto) corpo += `<div class="cor-wrap"><img class="cor-foto" src="${c.foto}" alt="Foto da folha de respostas">
@@ -2992,7 +3021,7 @@ function renderCorrecao() {
   abrirDlg("Corrigir por foto · " + esc(p.titulo), corpo, `<button type="button" class="btn" data-act="fechar">Fechar</button>${c.leitura ? `<button type="button" class="btn primary" data-act="cor-lancar">Lançar nota e ir para o próximo</button>` : ""}`);
 }
 async function lerFolha() {
-  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), obj = objetivas(p);
+  const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), obj = objetivas(p, c.versao);
   await comIA(async (signal, st) => {
     const [cab, dados] = c.foto.split(",");
     const r = await iaJSON({ tipo: "correcao", imagem: dados, mime: cab.includes("png") ? "image/png" : "image/jpeg", questoes: obj.map(o => ({ n: o.n, opcoes: o.opcoes })) }, signal);
@@ -3007,16 +3036,18 @@ async function lerFolha() {
 document.addEventListener("change", async e => {
   const c = dlg._cor; if (!c || !dlg.open) return;
   const el = e.target;
-  if (el.id === "cAluno") { c.alunoId = el.value; c.foto = ""; c.leitura = null; c.marcadas = {}; c.nota = ""; c.status = ""; renderCorrecao(); }
+  if (el.id === "cAluno") { c.alunoId = el.value; c.versao = S.provas.find(x => x.id === c.provaId)?.correcoes?.[el.value]?.versao || "A"; c.foto = ""; c.leitura = null; c.marcadas = {}; c.nota = ""; c.status = ""; renderCorrecao(); }
   else if (el.id === "cFoto" && el.files[0]) { try { c.foto = await prepararFoto(el.files[0]); c.leitura = null; c.marcadas = {}; c.nota = ""; c.status = ""; renderCorrecao(); } catch (_) { toast("Não consegui abrir essa imagem. Tente uma foto em JPG ou PNG."); } }
   else if (el.classList.contains("cor-sel")) { c.marcadas[el.dataset.n] = el.value; c.nota = ""; renderCorrecao(); }
   else if (el.id === "cAval") c.avalId = el.value;
 });
 document.addEventListener("input", e => { if (e.target.id === "cNota" && dlg._cor) dlg._cor.nota = e.target.value; });
 document.addEventListener("click", async e => {
-  const b = e.target.closest("[data-act='ia-corrigir'],[data-act='cor-lancar'],[data-act='folha-respostas'],[data-act='corrigir-foto']"); if (!b) return;
+  const b = e.target.closest("[data-act='ia-corrigir'],[data-act='cor-lancar'],[data-act='folha-respostas'],[data-act='corrigir-foto'],[data-act='cor-versao']"); if (!b) return;
   const act = b.dataset.act;
-  if (act === "folha-respostas") { const p = S.provas.find(x => x.id === b.dataset.id); if (!objetivas(p).length) { toast("Esta prova não tem questões objetivas."); return; } imprimir(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Folha de respostas</title><style>@page{size:A4;margin:14mm}body{margin:0}${CSS_FOLHA}${CSS_FR}</style></head><body><div class="folha">${folhaRespostasHTML(p)}</div></body></html>`); return; }
+  // trocar a versão muda o gabarito: a leitura anterior vale para a folha, mas a conta de acertos é refeita
+  if (act === "cor-versao") { const c = dlg._cor; if (c && c.versao !== b.dataset.v) { c.versao = b.dataset.v === "B" ? "B" : "A"; c.nota = ""; renderCorrecao(); } return; }
+  if (act === "folha-respostas") { const p = S.provas.find(x => x.id === b.dataset.id); if (!objetivas(p).length) { toast("Esta prova não tem questões objetivas."); return; } imprimir(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Folha de respostas${rotuloVersao(b.dataset.v)}</title><style>@page{size:A4;margin:14mm}body{margin:0}${CSS_FOLHA}${CSS_FR}</style></head><body><div class="folha">${folhaRespostasHTML(p, b.dataset.v === "B" ? "B" : "A")}</div></body></html>`); return; }
   if (act === "corrigir-foto") { dlgCorrigir(S.provas.find(x => x.id === b.dataset.id)); return; }
   if (act === "ia-corrigir") { lerFolha(); return; }
   const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), t = turma(p.turmaId);
@@ -3027,13 +3058,13 @@ document.addEventListener("click", async e => {
   av.notas = av.notas || {}; av.notas[c.alunoId] = Math.round(nota * 10) / 10;
   await salvar("avaliacoes", av);
   const pr = JSON.parse(JSON.stringify(p)); pr.correcoes = pr.correcoes || {};
-  pr.correcoes[c.alunoId] = { respostas: c.marcadas, nota: av.notas[c.alunoId], em: new Date().toISOString() };
+  pr.correcoes[c.alunoId] = { respostas: c.marcadas, nota: av.notas[c.alunoId], versao: c.versao || "A", em: new Date().toISOString() };
   await salvar("provas", pr);
   const aluno = t.alunos.find(a => a.id === c.alunoId);
   toast(`Nota de ${aluno ? aluno.nome.split(" ")[0] : "aluno"} lançada: ${fmtNota(av.notas[c.alunoId])}`);
   const prox = t.alunos.find(a => !pr.correcoes[a.id]);
   if (!prox) { fechar(); toast("Todas as provas da turma foram corrigidas"); return; }
-  Object.assign(c, { alunoId: prox.id, foto: "", leitura: null, marcadas: {}, nota: "", status: "" });
+  Object.assign(c, { alunoId: prox.id, versao: c.versao || "A", foto: "", leitura: null, marcadas: {}, nota: "", status: "" });
   renderCorrecao();
 });
 
@@ -4316,9 +4347,9 @@ document.addEventListener("click", async e => {
       Object.assign(o, { turmaId: val("prTurma"), data: val("prData"), instrucoes: val("prInst"), questaoIds: [...dlg.querySelectorAll('input[name="prQ"]:checked')].map(x => x.value) }); delete o.exemplo;
       fechar(); await salvar("provas", o); toast("Prova salva"); break; }
     case "apagar-prova": if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Confirmar exclusão"; return; } { const pid = dlg._obj.id; fechar(); await apagar("provas", pid); toast("Prova apagada"); } break;
-    case "ver-prova": dlgVerProva(S.provas.find(p => p.id === id), false); break;
-    case "ver-prova-gab": dlgVerProva(S.provas.find(p => p.id === id), true); break;
-    case "baixar-prova": { const p = S.provas.find(x => x.id === id); const g = b.dataset.gab === "1"; await baixar(`${slug(p.titulo)}${g ? "-gabarito" : ""}.html`, htmlArquivo(p.titulo, provaDoc(p, g))); break; }
+    case "ver-prova": dlgVerProva(S.provas.find(p => p.id === id), false, b.dataset.v); break;
+    case "ver-prova-gab": dlgVerProva(S.provas.find(p => p.id === id), true, b.dataset.v); break;
+    case "baixar-prova": { const p = S.provas.find(x => x.id === id); const g = b.dataset.gab === "1", v = b.dataset.v === "B" ? "B" : "A"; await baixar(`${slug(p.titulo)}${v === "B" ? "-versao-b" : ""}${g ? "-gabarito" : ""}.html`, htmlArquivo(p.titulo, provaDoc(p, g, v))); break; }
 
     case "sugestao": enviarChat(b.dataset.txt); break;
     case "limpar-chat": S.chat = []; render(); break;
