@@ -897,7 +897,7 @@ function painelNotasTurma(t) {
   // na escola com exame final, mostra as colunas do exame assim que alguém for para ele
   const comExame = temExameFinal(t) && ls.some(l => l.emExame);
   return `<section class="panel"><div class="panel-head"><div><h2>Notas da turma</h2><span class="small muted">Médias, frequência, faltas do Diário e situação de cada aluno.</span></div></div>
-    ${ls.length ? `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th>${comExame ? `<th class="c">Nota necessária no exame</th><th class="c">Exame</th><th class="c">Média final</th>` : ""}<th class="c">Freq. anual</th><th class="c">Faltas</th><th>Situação</th></tr></thead><tbody>
+    ${ls.length ? `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th>${comExame ? `<th class="c" title="Nota mínima no exame final">Mín. exame</th><th class="c">Exame</th><th class="c">Média final</th>` : ""}<th class="c">Freq. anual</th><th class="c">Faltas</th><th>Situação</th></tr></thead><tbody>
     ${ls.map(l => `<tr><td class="c num">${l.n}</td><td class="sticky-col">${esc(l.s.nome)}</td>${l.ms.map(m => `<td class="${clsNota(m)}">${fmtNota(m)}</td>`).join("")}<td class="${clsNota(l.anual)}" style="font-weight:700">${fmtNota(l.anual)}</td>${comExame ? `<td class="c num">${necessariaTxt(l) || "—"}</td><td class="c num">${notaOk(l.exame) ? fmtNota(l.exame) : "—"}</td><td class="${clsNotaFinal(l.final)}" style="font-weight:600">${fmtNota(l.final)}</td>` : ""}<td class="${clsFreq(l.freq)}">${l.freq === null ? "—" : l.freq + "%"}</td><td class="c num">${l.faltas}</td><td><span class="chip ${l.cls}">${esc(l.sit)}</span></td></tr>`).join("")}
     </tbody></table></div>` : `<p class="muted">Adicione os alunos em <a href="${linkTurma(t.id, "alunos")}">Alunos</a> ou importe o relatório de notas em PDF.</p>`}
     ${ls.length && !bs.length ? `<p class="small muted">Cadastre os períodos da turma para ver a nota de cada um.</p>` : ""}</section>`;
@@ -918,7 +918,7 @@ function imprimirBoletim(t) {
     <div class="cab"><div><b>Escola:</b> ${h(escolaDe(t) || "—")}<br><b>Professor(a):</b> ${h(S.nome)}<h1>Relatório de Notas por Componente Curricular</h1></div>
       <div><b>Ano letivo:</b> ${h(t.ano || "")}<br><b>Ano/Série:</b> ${h(t.serie || "—")}<br><b>Turma:</b> ${h(t.nome)}${t.turno ? " · " + h(t.turno) : ""}<br><b>Data de emissão:</b> ${fmtData(hoje())}</div></div>
     <div class="comp"><b>Componente curricular:</b> ${h(t.disciplina)}</div>
-    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th>${comExame ? `<th>Nota necessária no exame</th><th>Exame</th><th>Média final</th>` : ""}<th>Total de faltas</th><th>Situação</th></tr></thead><tbody>
+    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th>${comExame ? `<th>Mín. exame</th><th>Exame</th><th>Média final</th>` : ""}<th>Total de faltas</th><th>Situação</th></tr></thead><tbody>
     ${ls.map(l => `<tr><td>${l.n}</td><td class="al">${h(l.s.nome)}</td>${l.ms.map(m => `<td class="${m !== null && m < MEDIA_MIN ? "bad" : ""}">${m === null ? "" : fmtNota(m)}</td>`).join("")}<td class="${l.anual !== null && l.anual < MEDIA_MIN ? "bad" : ""}"><b>${l.anual === null ? "" : fmtNota(l.anual)}</b></td>${comExame ? `<td>${h(necessariaTxt(l))}</td><td>${notaOk(l.exame) ? fmtNota(l.exame) : ""}</td><td class="${l.final !== null && l.final < 5 ? "bad" : ""}"><b>${l.final === null ? "" : fmtNota(l.final)}</b></td>` : ""}<td>${l.faltas || ""}</td><td>${h(l.sit)}</td></tr>`).join("")}
     </tbody></table>
     <div class="tot">Total: ${ls.length}</div>
@@ -2780,7 +2780,7 @@ async function boletimXlsx(t) {
     const ls = linhas || boletimTurma(t), comExame = temExameFinal(t) && ls.some(l => l.emExame);
     const n1 = x => x === null || x === undefined ? null : Math.round(x * 10) / 10;
     const wb2 = wb.addWorksheet("Médias por período", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
-    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média anual", ...(comExame ? ["Nota necessária no exame", "Exame", "Média final"] : []), "Frequência anual", "Situação"]);
+    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média anual", ...(comExame ? ["Mín. exame", "Exame", "Média final"] : []), "Frequência anual", "Situação"]);
     h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; });
     const colFreq = bs.length + 3 + (comExame ? 3 : 0);
     ls.forEach(l => {
