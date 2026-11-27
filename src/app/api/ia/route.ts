@@ -6,6 +6,7 @@ import { situacaoIA, registrarUso, modeloDe } from "@/lib/uso";
 import { promptMaterial, SUBTIPOS, ADAPTACOES } from "@/lib/materiais";
 import { regrasFaixa } from "@/lib/faixas";
 import { conferirHabilidades } from "@/lib/bncc";
+import { promptRevisao, aplicarRevisao } from "@/lib/revisao-questoes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -281,13 +282,27 @@ export async function POST(req: Request) {
   // Pedidos que devolvem dados (plano, questões): espera a resposta inteira e devolve JSON.
   if (json) {
     try {
-      const msg = await stream.finalMessage().finally(fim);
-      await registrar(msg);
-      if (msg.stop_reason === "refusal") return Response.json({ erro: "A IA não atendeu esse pedido. Tente reformular o tema." }, { status: 422 });
+      const msg = await stream.finalMessage().catch((e) => { fim(); throw e; });
+      let entrada = msg.usage?.input_tokens ?? 0, saida = msg.usage?.output_tokens ?? 0;
+      if (msg.stop_reason === "refusal") { fim(); await registrarUso(pid, tipo, entrada, saida); return Response.json({ erro: "A IA não atendeu esse pedido. Tente reformular o tema." }, { status: 422 }); }
       const texto = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
       let dados;
       try { dados = extrairJSON(texto); }
-      catch { return Response.json({ erro: "A resposta veio num formato inesperado. Tente de novo." }, { status: 502 }); }
+      catch { fim(); await registrarUso(pid, tipo, entrada, saida); return Response.json({ erro: "A resposta veio num formato inesperado. Tente de novo." }, { status: 502 }); }
+      // questões: a IA resolve cada uma sozinha e compara com o gabarito; conta como o mesmo pedido.
+      // Se a revisão falhar, as questões vão sem ela (o professor sempre confere antes de guardar).
+      if (tipo === "questoes" && r.data.tipo === "questoes" && Array.isArray(dados) && dados.length) {
+        try {
+          const rev = await client.beta.messages.create({
+            model: modeloDe(tipo), max_tokens: 8000, system: SISTEMA, output_config: { effort: "medium" },
+            betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
+            messages: [{ role: "user", content: promptRevisao(dados.slice(0, 15), r.data.disciplina || "", r.data.serie || "") }],
+          }, { signal: req.signal });
+          entrada += rev.usage?.input_tokens ?? 0; saida += rev.usage?.output_tokens ?? 0;
+          dados = aplicarRevisao(dados, extrairJSON(rev.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("")));
+        } catch (e) { if (req.signal.aborted) throw e; }
+      }
+      fim(); await registrarUso(pid, tipo, entrada, saida);
       // habilidades sugeridas: só códigos que existem na BNCC, com a descrição oficial
       if (tipo === "habilidades" && dados && typeof dados === "object") dados = { ...dados, ...conferirHabilidades((dados as { habilidades?: unknown }).habilidades) };
       return Response.json({ dados });

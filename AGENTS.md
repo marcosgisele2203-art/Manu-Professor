@@ -82,6 +82,8 @@ O estilo e as questões também se adaptam à idade da turma: `src/lib/faixas.ts
 
 Catálogo oficial da BNCC (Fundamental e Médio, sem a Educação Infantil): `data/bncc/2018.json`, lido por `src/lib/bncc.ts`. As habilidades sugeridas pela IA (`tipo: "habilidades"`) passam por `conferirHabilidades()`: código EF/EM que não existe é retirado e a descrição vira a oficial. A busca sem IA fica em `GET /api/bncc`.
 
+Questões geradas (`tipo: "questoes"`) passam por uma revisão no mesmo pedido (`src/lib/revisao-questoes.ts`): a IA resolve cada questão sozinha e compara com o gabarito. As duas chamadas contam como um uso só. A questão com problema volta com `revisao: { ok: false, problema, corretaSugerida? }` e aparece desmarcada para o professor; se a revisão falhar, as questões vão sem ela.
+
 O modelo de cada função e o cálculo de custo ficam em `src/lib/uso.ts` (`modeloDe()` e `PRECOS`): Opus em todo conteúdo criativo; só as instruções de atividade usam um modelo mais barato. Ao trocar ou incluir um modelo, atualize os dois.
 
 ### Padrões do `public/app.js`
