@@ -3568,13 +3568,16 @@ function dlgHabIA(num) {
     <div id="hbLista"></div>`,
     `<button type="button" class="btn" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="bim-hab-salvar" disabled id="hbOk">Adicionar marcadas</button>`);
 }
+// busca e sugestão da IA enchem a mesma lista: cada uma pega uma vez nova, e só a mais recente pode mostrar o resultado
+const novaVezHabs = () => (dlg._vezHabs = (dlg._vezHabs || 0) + 1);
 async function iaHabs() {
-  const t = turmaAtual(), bs = bimestresDe(t), b = bimPorNum(t, dlg._bim);
+  const t = turmaAtual(), bs = bimestresDe(t), b = bimPorNum(t, dlg._bim), vez = novaVezHabs();
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "habilidades", periodo: b.nome, numero: Math.max(1, bs.indexOf(b) + 1), total: Math.max(1, bs.length), conteudos: val("hbCont") || undefined, turma: turmaIA(t.id) }, signal);
     const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").trim().slice(0, 40), descricao: String(h.descricao || "").slice(0, 2000) })).filter(h => h.descricao);
     // o servidor tira os códigos que não existem na BNCC
     const fora = Array.isArray(r?.retiradas) ? r.retiradas.length : 0;
+    if (vez !== dlg._vezHabs || !document.getElementById("hbLista")) { st.textContent = "Você buscou na BNCC enquanto a Manu pensava: ficou o resultado da busca."; return; }
     if (!hs.length) throw { message: fora ? "A Manu sugeriu códigos que não existem na BNCC. Tente de novo ou use a busca abaixo." : "A resposta veio vazia. Tente de novo." };
     listarHabsDlg(b, hs);
     st.textContent = fora ? `Marque as que vai usar. ${fora === 1 ? "1 código sugerido não existe" : fora + " códigos sugeridos não existem"} na BNCC e ${fora === 1 ? "foi retirado" : "foram retirados"}.` : "Marque as que vai usar.";
@@ -3592,16 +3595,16 @@ async function buscarBNCC() {
   const t = turmaAtual(), b = bimPorNum(t, dlg._bim), st = document.getElementById("hbBuscaSt"), q = val("hbBusca");
   if (!b || !st) return;
   st.textContent = "Buscando…";
-  const vez = (buscarBNCC.vez = (buscarBNCC.vez || 0) + 1);
+  const vez = novaVezHabs();
   try {
     const r = await api("GET", `/api/bncc?${new URLSearchParams({ q, serie: t.serie || t.nome || "", disciplina: t.disciplina || "" })}`);
     // outra busca começou depois desta, ou a janela já é outra: descarta a resposta antiga
-    if (vez !== buscarBNCC.vez || !st.isConnected) return;
+    if (vez !== dlg._vezHabs || !st.isConnected) return;
     const hs = (r.habilidades || []).map(h => ({ codigo: h.codigo, descricao: h.descricao }));
     if (!hs.length) { document.getElementById("hbLista").innerHTML = ""; st.textContent = q ? "Nada encontrado. Tente outra palavra ou só o código." : "Nada encontrado para esta série e disciplina."; return; }
     listarHabsDlg(b, hs, false);
     st.textContent = r.total > hs.length ? `Mostrando ${hs.length} de ${r.total}. Digite uma palavra para achar mais rápido.` : `${hs.length} ${hs.length === 1 ? "habilidade encontrada" : "habilidades encontradas"}. Marque as que vai usar.`;
-  } catch (e) { if (vez === buscarBNCC.vez && e?.code !== "auth") st.textContent = navigator.onLine === false ? "Sem internet. A busca precisa de conexão." : "Não foi possível buscar agora. Tente de novo."; }
+  } catch (e) { if (vez === dlg._vezHabs && e?.code !== "auth") st.textContent = navigator.onLine === false ? "Sem internet. A busca precisa de conexão." : "Não foi possível buscar agora. Tente de novo."; }
 }
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "hbBusca") { e.preventDefault(); buscarBNCC(); } });
 function dlgTecIA(num) {
