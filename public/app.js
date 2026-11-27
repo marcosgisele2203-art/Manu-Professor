@@ -889,7 +889,7 @@ function boletimTurma(t) {
         : x.resultado === "retido" ? (x.semChance ? "Retido" : `Retido no exame (${fmtNota(x.mediaFinal)})`) : "Exame final")
       : x.freqRisco ? `Frequência baixa (${x.f}%)` : { aprovado: "Aprovado", garantido: "Média garantida" }[x.estado] || "Em curso");
     const cls = s.situacao ? "" : x.resultado === "aprovado" && !x.freqRisco ? "ok" : x.estado === "exame" || x.freqRisco ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "";
-    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, freq: x.f, faltas, sit, cls, emExame: x.estado === "exame" && x.anoCompleto, exame: x.notaExame, final: x.mediaFinal };
+    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, freq: x.f, faltas, sit, cls, emExame: x.estado === "exame" && x.anoCompleto, exame: x.notaExame, final: x.mediaFinal, necessaria: x.notaMin ?? null, semChance: !!x.semChance };
   });
 }
 function painelNotasTurma(t) {
@@ -897,11 +897,13 @@ function painelNotasTurma(t) {
   // na escola com exame final, mostra as colunas do exame assim que alguém for para ele
   const comExame = temExameFinal(t) && ls.some(l => l.emExame);
   return `<section class="panel"><div class="panel-head"><div><h2>Notas da turma</h2><span class="small muted">Médias, frequência, faltas do Diário e situação de cada aluno.</span></div></div>
-    ${ls.length ? `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th>${comExame ? `<th class="c">Exame</th><th class="c">Média final</th>` : ""}<th class="c">Freq. anual</th><th class="c">Faltas</th><th>Situação</th></tr></thead><tbody>
-    ${ls.map(l => `<tr><td class="c num">${l.n}</td><td class="sticky-col">${esc(l.s.nome)}</td>${l.ms.map(m => `<td class="${clsNota(m)}">${fmtNota(m)}</td>`).join("")}<td class="${clsNota(l.anual)}" style="font-weight:700">${fmtNota(l.anual)}</td>${comExame ? `<td class="c num">${notaOk(l.exame) ? fmtNota(l.exame) : "—"}</td><td class="${clsNotaFinal(l.final)}" style="font-weight:600">${fmtNota(l.final)}</td>` : ""}<td class="${clsFreq(l.freq)}">${l.freq === null ? "—" : l.freq + "%"}</td><td class="c num">${l.faltas}</td><td><span class="chip ${l.cls}">${esc(l.sit)}</span></td></tr>`).join("")}
+    ${ls.length ? `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th>${comExame ? `<th class="c">Exame</th><th class="c">Média final</th>` : ""}<th class="c">Freq. anual</th><th class="c">Faltas</th>${comExame ? `<th class="c">Nota necessária no exame</th>` : ""}<th>Situação</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td class="c num">${l.n}</td><td class="sticky-col">${esc(l.s.nome)}</td>${l.ms.map(m => `<td class="${clsNota(m)}">${fmtNota(m)}</td>`).join("")}<td class="${clsNota(l.anual)}" style="font-weight:700">${fmtNota(l.anual)}</td>${comExame ? `<td class="c num">${notaOk(l.exame) ? fmtNota(l.exame) : "—"}</td><td class="${clsNotaFinal(l.final)}" style="font-weight:600">${fmtNota(l.final)}</td>` : ""}<td class="${clsFreq(l.freq)}">${l.freq === null ? "—" : l.freq + "%"}</td><td class="c num">${l.faltas}</td>${comExame ? `<td class="c num">${necessariaTxt(l) || "—"}</td>` : ""}<td><span class="chip ${l.cls}">${esc(l.sit)}</span></td></tr>`).join("")}
     </tbody></table></div>` : `<p class="muted">Adicione os alunos em <a href="${linkTurma(t.id, "alunos")}">Alunos</a> ou importe o relatório de notas em PDF.</p>`}
     ${ls.length && !bs.length ? `<p class="small muted">Cadastre os períodos da turma para ver a nota de cada um.</p>` : ""}</section>`;
 }
+// Nota necessária no exame, como na coluna do SGDE: só para quem está no exame e ainda pode alcançar a média final
+const necessariaTxt = l => !l.emExame ? "" : l.semChance ? "não alcança" : fmtNota(l.necessaria);
 // Relatório no mesmo desenho do SGDE, para imprimir ou salvar em PDF
 function imprimirBoletim(t) {
   const bs = bimestresDe(t), ls = boletimTurma(t), h = x => esc(x == null ? "" : String(x));
@@ -916,8 +918,8 @@ function imprimirBoletim(t) {
     <div class="cab"><div><b>Escola:</b> ${h(escolaDe(t) || "—")}<br><b>Professor(a):</b> ${h(S.nome)}<h1>Relatório de Notas por Componente Curricular</h1></div>
       <div><b>Ano letivo:</b> ${h(t.ano || "")}<br><b>Ano/Série:</b> ${h(t.serie || "—")}<br><b>Turma:</b> ${h(t.nome)}${t.turno ? " · " + h(t.turno) : ""}<br><b>Data de emissão:</b> ${fmtData(hoje())}</div></div>
     <div class="comp"><b>Componente curricular:</b> ${h(t.disciplina)}</div>
-    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th>${comExame ? `<th>Exame</th><th>Média final</th>` : ""}<th>Total de faltas</th><th>Situação</th></tr></thead><tbody>
-    ${ls.map(l => `<tr><td>${l.n}</td><td class="al">${h(l.s.nome)}</td>${l.ms.map(m => `<td class="${m !== null && m < MEDIA_MIN ? "bad" : ""}">${m === null ? "" : fmtNota(m)}</td>`).join("")}<td class="${l.anual !== null && l.anual < MEDIA_MIN ? "bad" : ""}"><b>${l.anual === null ? "" : fmtNota(l.anual)}</b></td>${comExame ? `<td>${notaOk(l.exame) ? fmtNota(l.exame) : ""}</td><td class="${l.final !== null && l.final < 5 ? "bad" : ""}"><b>${l.final === null ? "" : fmtNota(l.final)}</b></td>` : ""}<td>${l.faltas || ""}</td><td>${h(l.sit)}</td></tr>`).join("")}
+    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th>${comExame ? `<th>Exame</th><th>Média final</th>` : ""}<th>Total de faltas</th>${comExame ? `<th>Nota necessária no exame</th>` : ""}<th>Situação</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td>${l.n}</td><td class="al">${h(l.s.nome)}</td>${l.ms.map(m => `<td class="${m !== null && m < MEDIA_MIN ? "bad" : ""}">${m === null ? "" : fmtNota(m)}</td>`).join("")}<td class="${l.anual !== null && l.anual < MEDIA_MIN ? "bad" : ""}"><b>${l.anual === null ? "" : fmtNota(l.anual)}</b></td>${comExame ? `<td>${notaOk(l.exame) ? fmtNota(l.exame) : ""}</td><td class="${l.final !== null && l.final < 5 ? "bad" : ""}"><b>${l.final === null ? "" : fmtNota(l.final)}</b></td>` : ""}<td>${l.faltas || ""}</td>${comExame ? `<td>${h(necessariaTxt(l))}</td>` : ""}<td>${h(l.sit)}</td></tr>`).join("")}
     </tbody></table>
     <div class="tot">Total: ${ls.length}</div>
     <div class="res"><span>Abaixo da média: <b>${abaixo}</b></span><span>Média ${fmtNota(MEDIA_MIN)} ou mais: <b>${ativos.length - abaixo - sem}</b></span><span>Sem avaliações: <b>${sem}</b></span>${ls.length - ativos.length ? `<span>Saíram da turma: <b>${ls.length - ativos.length}</b></span>` : ""}</div>
@@ -1236,14 +1238,18 @@ function lerRelatorioSgde(paginas) {
   let cols = null; const meta = {}, linhas = [];
   for (const its of paginas) {
     const rotulo = r => { const i = its.find(x => x.s.startsWith(r)); if (!i) return ""; const resto = i.s.slice(r.length).replace(/^\s*:\s*/, "").trim(); return resto || its.filter(x => Math.abs(x.y - i.y) < 2 && x.x > i.x).sort((a, b) => a.x - b.x)[0]?.s || ""; };
-    meta.turma ||= rotulo("Turma:"); meta.componente ||= rotulo("Componente Curricular");
+    meta.turma ||= rotulo("Turma:"); meta.componente ||= rotulo("Componente Curricular") || rotulo("Unidade Curricular:");
     const h = s => its.find(x => x.s === s), b1 = h("1º"), nome = h("Nome"), sit = h("Situação");
     if (b1 && nome && sit) {
       const perto = s => its.filter(x => x.s === s && Math.abs(x.y - b1.y) < 30).sort((a, b) => a.x - b.x);
       const fin = perto("Final"), anual = perto("Anual")[0], total = perto("Total")[0], nec = perto("Necessária")[0], num = h("N°") || h("Nº");
+      // "Exame Final" e "Média Final" podem vir numa célula só ou quebrados em duas linhas ("Exame" em cima de "Final")
+      const finalDe = r => fin.find(f => perto(r).some(x => Math.abs(x.c - f.c) < 10));
+      const exame = perto("Exame Final")[0] || finalDe("Exame") || (fin.length === 2 ? fin[0] : null);
+      const mediaFinal = perto("Média Final")[0] || finalDe("Média") || (fin.length === 2 ? fin[1] : null);
       const est = perto("Estudante")[0] || perto("Cod.")[0];
       if (!est || !num || !h("2º") || !h("3º") || !h("4º")) throw new Error("cabecalho");
-      cols = [["cod", est.c], ["n", num.c], ["nome", nome.c], ["1", b1.c], ["2", h("2º").c], ["3", h("3º").c], ["4", h("4º").c], ["anual", anual?.c], ["exame", fin[0]?.c], ["final", fin[1]?.c], ["faltas", total?.c], ["necessaria", nec?.c], ["sit", sit.c]].filter(x => x[1] != null).sort((a, b) => a[1] - b[1]);
+      cols = [["cod", est.c], ["n", num.c], ["nome", nome.c], ["1", b1.c], ["2", h("2º").c], ["3", h("3º").c], ["4", h("4º").c], ["anual", anual?.c], ["exame", exame?.c], ["final", mediaFinal?.c], ["faltas", total?.c], ["necessaria", nec?.c], ["sit", sit.c]].filter(x => x[1] != null).sort((a, b) => a[1] - b[1]);
     }
     if (!cols) continue;
     // a coluna de um texto é a de centro mais próximo
@@ -1257,7 +1263,7 @@ function lerRelatorioSgde(paginas) {
       const sitTxt = txt("sit").replace(/(\p{L})\s+(\p{Ll})$/u, "$1$2"); // "Remanejad o" quebrado na célula
       const nomeAl = txt("nome").replace(/\s+/g, " ");
       if (!nomeAl) return;
-      linhas.push({ codigo: a.s, n: txt("n"), nome: nomeAl, notas: { 1: nota("1"), 2: nota("2"), 3: nota("3"), 4: nota("4") }, faltas: txt("faltas"), sitTxt, sit: SIT_SGDE[semAcento(txt("sit"))] || "" });
+      linhas.push({ codigo: a.s, n: txt("n"), nome: nomeAl, notas: { 1: nota("1"), 2: nota("2"), 3: nota("3"), 4: nota("4") }, exame: cols.some(k => k[0] === "exame") ? nota("exame") : null, faltas: txt("faltas"), sitTxt, sit: SIT_SGDE[semAcento(sitTxt)] || "" });
     });
   }
   if (!cols) throw new Error("cabecalho");
@@ -1299,14 +1305,16 @@ async function lerArquivoSgde(arq) {
     return `<label class="check"><input type="checkbox" name="sgdeBim" value="${n}" ${proprias ? "" : "checked"}><span><b>${esc(B.nome)}</b> · ${qtd} ${qtd === 1 ? "nota" : "notas"}${ja ? " · atualiza a importação anterior" : ""}${proprias ? ` <small class="muted">· você já lançou ${proprias} ${proprias === 1 ? "avaliação" : "avaliações"} neste bimestre; se marcar, a média importada entra como mais uma avaliação na conta</small>` : ""}</span></label>`;
   }).join("");
   const novos = rel.linhas.filter((l, i) => !casa[i]).length;
+  const comExame = rel.linhas.some(l => l.exame !== null);
   res.innerHTML = `${avisos.length ? `<div class="banner"><span><b>Confira se é o arquivo certo:</b> ${avisos.join("; ")}.</span></div>` : ""}
     <h3 style="margin:12px 0 4px">Bimestres</h3>${bimOps || `<p class="small muted">O relatório ainda não tem notas lançadas.</p>`}
     <h3 style="margin:12px 0 4px">Alunos</h3>
     <p class="small"><b>${rel.linhas.length}</b> no relatório · <b>${rel.linhas.length - novos}</b> já na turma${novos ? ` · <b>${novos}</b> ${novos === 1 ? "novo" : "novos"} (marque quem deve entrar na turma)` : ""}.</p>
-    <div class="table-wrap"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${[1, 2, 3, 4].map(n => `<th class="c">${n}º</th>`).join("")}<th>Situação</th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${[1, 2, 3, 4].map(n => `<th class="c">${n}º</th>`).join("")}${comExame ? `<th class="c">Exame final</th>` : ""}<th>Situação</th></tr></thead><tbody>
     ${rel.linhas.map((l, i) => { const s = casa[i];
-      return `<tr><td class="c num">${esc(l.n)}</td><td class="sticky-col">${s ? esc(s.nome) : `<label class="check" style="margin:0"><input type="checkbox" name="sgdeNovo" value="${i}" ${!l.sit || [1, 2, 3, 4].some(n => l.notas[n] !== null) ? "checked" : ""}><span>${esc(capitalizarNome(l.nome))} <small class="muted">· novo</small></span></label>`}</td>${[1, 2, 3, 4].map(n => `<td class="${clsNota(l.notas[n])}">${fmtNota(l.notas[n])}</td>`).join("")}<td>${l.sit ? `<span class="chip warn">${esc(l.sit)}</span>` : `<span class="small muted">${esc(l.sitTxt || "")}</span>`}</td></tr>`; }).join("")}
+      return `<tr><td class="c num">${esc(l.n)}</td><td class="sticky-col">${s ? esc(s.nome) : `<label class="check" style="margin:0"><input type="checkbox" name="sgdeNovo" value="${i}" ${!l.sit || [1, 2, 3, 4].some(n => l.notas[n] !== null) ? "checked" : ""}><span>${esc(capitalizarNome(l.nome))} <small class="muted">· novo</small></span></label>`}</td>${[1, 2, 3, 4].map(n => `<td class="${clsNota(l.notas[n])}">${fmtNota(l.notas[n])}</td>`).join("")}${comExame ? `<td class="c num">${l.exame === null ? "—" : fmtNota(l.exame)}</td>` : ""}<td>${l.sit ? `<span class="chip warn">${esc(l.sit)}</span>` : `<span class="small muted">${esc(l.sitTxt || "")}</span>`}</td></tr>`; }).join("")}
     </tbody></table></div>
+    ${comExame ? `<p class="small">As notas do <b>exame final</b> também entram${temExameFinal(t) ? "" : `, mas só aparecem depois que você marcar esta escola como <b>Com exame final</b> em Meu perfil`}. Uma nota do exame que você já lançou não é trocada.</p>` : ""}
     <p class="small muted">Os alunos transferidos, remanejados ou com matrícula indeferida ficam marcados na turma e saem das listas de recuperação. As faltas não são importadas: a frequência continua vindo do Diário.</p>`;
   ok.disabled = false;
   st.textContent = `Relatório de ${rel.meta.componente || "notas"} · ${rel.meta.turma || "turma"}. Confira e toque em Lançar notas.`;
@@ -1316,18 +1324,21 @@ async function importarSgde() {
   const bims = [...dlg.querySelectorAll('input[name="sgdeBim"]:checked')].map(x => Number(x.value));
   const novosSel = new Set([...dlg.querySelectorAll('input[name="sgdeNovo"]:checked')].map(x => Number(x.value)));
   const alunos = JSON.parse(JSON.stringify(t.alunos || [])), idDe = {};
-  let mudouSit = 0, novos = 0;
+  // nota do exame no mesmo lugar da tela de exame (t.exame); a que o professor já lançou vale mais que a do relatório
+  const exame = { ...(t.exame || {}) };
+  let mudouSit = 0, novos = 0, exames = 0;
   c.rel.linhas.forEach((l, i) => {
     let s = c.casa[i] && alunos.find(x => x.id === c.casa[i].id);
     if (!s && novosSel.has(i)) { s = { id: uid(), nome: capitalizarNome(limparNome(l.nome)).slice(0, 120) }; alunos.push(s); novos++; }
     if (!s) return;
     idDe[i] = s.id; s.codigo = l.codigo;
+    if (l.exame !== null && !notaOk(exame[s.id])) { exame[s.id] = l.exame; exames++; }
     if ((s.situacao || "") !== l.sit) mudouSit++;
     if (l.sit) s.situacao = l.sit; else delete s.situacao;
   });
   const confirmar = dlg.querySelector("#sgdeOk");
   confirmar.disabled = true;
-  if (!await salvarAlunos(alunos)) { confirmar.disabled = false; return; }
+  if (!await salvarAlunos(alunos, "", exames ? { exame } : {})) { confirmar.disabled = false; return; }
   fechar();
   let notas = 0, falhas = 0;
   for (const n of bims) {
@@ -1342,7 +1353,7 @@ async function importarSgde() {
     else falhas++;
   }
   if (falhas) { toast("Alguns bimestres não puderam ser importados. Confira as notas e tente importar esses bimestres de novo."); return; }
-  const partes = [notas ? `${notas} ${notas === 1 ? "nota lançada" : "notas lançadas"}` : "", novos ? `${novos} ${novos === 1 ? "aluno novo" : "alunos novos"}` : "", mudouSit ? `${mudouSit} ${mudouSit === 1 ? "situação atualizada" : "situações atualizadas"}` : ""].filter(Boolean);
+  const partes = [notas ? `${notas} ${notas === 1 ? "nota lançada" : "notas lançadas"}` : "", novos ? `${novos} ${novos === 1 ? "aluno novo" : "alunos novos"}` : "", mudouSit ? `${mudouSit} ${mudouSit === 1 ? "situação atualizada" : "situações atualizadas"}` : "", exames ? `${exames} ${exames === 1 ? "nota do exame" : "notas do exame"}` : ""].filter(Boolean);
   toast(partes.length ? partes.join(" · ") : "Nada novo para importar.");
 }
 document.addEventListener("change", e => { if (e.target.id === "sgdeArq") lerArquivoSgde(e.target.files && e.target.files[0]); });
@@ -2769,15 +2780,16 @@ async function boletimXlsx(t) {
     const ls = linhas || boletimTurma(t), comExame = temExameFinal(t) && ls.some(l => l.emExame);
     const n1 = x => x === null || x === undefined ? null : Math.round(x * 10) / 10;
     const wb2 = wb.addWorksheet("Médias por período", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
-    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média anual", ...(comExame ? ["Exame", "Média final"] : []), "Frequência anual", "Situação"]);
+    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média anual", ...(comExame ? ["Exame", "Média final"] : []), "Frequência anual", ...(comExame ? ["Nota necessária no exame"] : []), "Situação"]);
     h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; });
     const colFreq = bs.length + 3 + (comExame ? 2 : 0);
     ls.forEach(l => {
-      const row = wb2.addRow([l.s.nome, ...l.ms.map(n1), n1(l.anual), ...(comExame ? [notaOk(l.exame) ? Number(l.exame) : null, n1(l.final)] : []), l.freq === null ? null : l.freq / 100, l.sit]);
+      const row = wb2.addRow([l.s.nome, ...l.ms.map(n1), n1(l.anual), ...(comExame ? [notaOk(l.exame) ? Number(l.exame) : null, n1(l.final)] : []), l.freq === null ? null : l.freq / 100, ...(comExame ? [l.emExame && !l.semChance ? l.necessaria : necessariaTxt(l) || null] : []), l.sit]);
       row.eachCell((c, i) => { if (i > 1 && i < colFreq) c.numFmt = "0.0"; });
       row.getCell(colFreq).numFmt = "0%";
+      if (comExame) row.getCell(colFreq + 1).numFmt = "0.0";
     });
-    wb2.getColumn(1).width = 34; for (let i = 2; i <= colFreq + 1; i++) wb2.getColumn(i).width = 16;
+    wb2.getColumn(1).width = 34; for (let i = 2; i <= colFreq + 1 + (comExame ? 1 : 0); i++) wb2.getColumn(i).width = 16;
   }
   const ch = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => a.data.localeCompare(b.data));
   if (ch.length) {
@@ -3854,8 +3866,9 @@ function vAlunos() {
     <p class="small muted">Remover um aluno tira o nome dele da chamada, das notas e das entregas desta turma.</p></section>`
     : `<div class="empty"><img class="manu sm" src="/manu/manu-alunos.webp" alt=""><h3>Nenhum aluno ainda</h3><p>Digite o nome acima, cole a lista da secretaria ou envie o PDF ou a foto da lista.</p></div>`}`;
 }
-async function salvarAlunos(alunos, msg) {
-  const t = turmaAtual(), nt = JSON.parse(JSON.stringify(t)); nt.alunos = alunos; S.alEdit = null;
+// camposDaTurma: outros campos desta turma salvos junto (ex.: notas do exame importadas); não vão para as turmas irmãs
+async function salvarAlunos(alunos, msg, camposDaTurma = {}) {
+  const t = turmaAtual(), nt = { ...JSON.parse(JSON.stringify(t)), ...camposDaTurma, alunos }; S.alEdit = null;
   if (!await salvar("turmas", nt)) {
     if (turma(t.id) === nt) { S.turmas[S.turmas.indexOf(nt)] = t; render(); }
     return false;
