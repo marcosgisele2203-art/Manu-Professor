@@ -2189,14 +2189,24 @@ async function iaQuestoes() {
   const tema = val("gTema"); if (!tema) { dlg.querySelector("#iaStatus").textContent = "Escreva o tema primeiro."; return; }
   const qtd = Math.max(1, Math.min(15, parseInt(val("gQtd")) || 5));
   await comIA(async (signal, st) => {
+    st.textContent = "Criando as questões e conferindo o gabarito de cada uma… pode levar até dois minutos.";
     const arr = await iaJSON({ tipo: "questoes", tema, disciplina: val("gDisc"), serie: val("gSerie"), quantidade: qtd,
       tipoQuestao: val("gTipo") === "misto" ? "misture múltipla escolha, verdadeiro ou falso e dissertativa" : TIPO[val("gTipo")],
       dificuldade: val("gDif") === "variada" ? "variada" : DIF[val("gDif")] }, signal);
     if (!Array.isArray(arr) || !arr.length) throw { message: "A resposta veio num formato inesperado. Tente de novo." };
-    dlg._gerada = arr.filter(q => q && q.enunciado).map(q => ({ id: uid(), disciplina: val("gDisc"), tema, serie: val("gSerie"), tipo: TIPO[q.tipo] ? q.tipo : "multipla", dificuldade: DIF[q.dificuldade] ? q.dificuldade : "media", enunciado: String(q.enunciado), alternativas: Array.isArray(q.alternativas) ? q.alternativas.map(String) : [], correta: Number.isInteger(q.correta) ? q.correta : null, resposta: String(q.resposta || ""), explicacao: String(q.explicacao || "").slice(0, 600), erroComum: String(q.erroComum || "").slice(0, 300), bncc: String(q.bncc || "") }));
-    dlg.querySelector("#gLista").innerHTML = dlg._gerada.map((q, i) => `<label class="check"><input type="checkbox" name="gSel" value="${i}" checked><div style="min-width:0;flex:1">${questaoHTML(q, i + 1)}<div class="toolbar" style="margin-top:4px"><span class="chip">${esc(TIPO[q.tipo])}</span><span class="chip">${esc(DIF[q.dificuldade])}</span>${q.bncc ? `<span class="bncc">${esc(q.bncc)}</span>` : ""}</div></div></label>`).join("");
+    const validas = arr.filter(q => q && q.enunciado);
+    // revisão feita no servidor: a IA resolveu cada questão sozinha e comparou com o gabarito (não vai para o banco)
+    const revs = validas.map(q => q.revisao && q.revisao.ok === false ? { problema: String(q.revisao.problema || ""), sug: Number.isInteger(q.revisao.corretaSugerida) ? q.revisao.corretaSugerida : null } : null);
+    // só diz que conferiu se todas as questões voltaram com revisão; as que ficaram sem, o professor confere
+    const semRev = validas.map((q, i) => q.revisao ? 0 : i + 1).filter(Boolean), conferidas = !semRev.length;
+    dlg._gerada = validas.map(q => ({ id: uid(), disciplina: val("gDisc"), tema, serie: val("gSerie"), tipo: TIPO[q.tipo] ? q.tipo : "multipla", dificuldade: DIF[q.dificuldade] ? q.dificuldade : "media", enunciado: String(q.enunciado), alternativas: Array.isArray(q.alternativas) ? q.alternativas.map(String) : [], correta: Number.isInteger(q.correta) ? q.correta : null, resposta: String(q.resposta || ""), explicacao: String(q.explicacao || "").slice(0, 600), erroComum: String(q.erroComum || "").slice(0, 300), bncc: String(q.bncc || "") }));
+    dlg.querySelector("#gLista").innerHTML = dlg._gerada.map((q, i) => `<label class="check"><input type="checkbox" name="gSel" value="${i}" ${revs[i] ? "" : "checked"}><div style="min-width:0;flex:1">${questaoHTML(q, i + 1)}${revs[i] ? `<p class="small aviso-pop" style="margin:6px 0 0"><b>Confira antes de usar:</b> ${esc(revs[i].problema)}${revs[i].sug !== null ? ` A Manu acha que a resposta certa é a letra <b>${"ABCDE"[revs[i].sug]}</b>.` : ""}</p>` : ""}<div class="toolbar" style="margin-top:4px"><span class="chip">${esc(TIPO[q.tipo])}</span><span class="chip">${esc(DIF[q.dificuldade])}</span>${q.bncc ? `<span class="bncc">${esc(q.bncc)}</span>` : ""}</div></div></label>`).join("");
     dlg.querySelector("#gSalvar").disabled = false;
-    st.textContent = `${dlg._gerada.length} questões geradas. Desmarque as que não quiser.`;
+    const nProb = revs.filter(Boolean).length;
+    st.textContent = semRev.length === validas.length ? `${dlg._gerada.length} questões geradas. A conferência automática não respondeu desta vez: revise o gabarito de cada uma.`
+      : !conferidas ? `${dlg._gerada.length} questões geradas. A conferência não respondeu para ${semRev.length === 1 ? "a questão " + semRev[0] : "as questões " + semRev.join(", ")}: revise o gabarito${semRev.length === 1 ? "" : " delas"}.${nProb ? ` ${nProb === 1 ? "1 veio com problema e ficou desmarcada" : nProb + " vieram com problema e ficaram desmarcadas"}.` : ""}`
+      : nProb ? `${dlg._gerada.length} questões geradas e conferidas. ${nProb === 1 ? "1 veio com problema e ficou desmarcada" : nProb + " vieram com problema e ficaram desmarcadas"}: leia o aviso e decida.`
+      : `${dlg._gerada.length} questões geradas e conferidas: o gabarito de todas bateu. Desmarque as que não quiser.`;
   });
 }
 async function enviarChat(texto) {
