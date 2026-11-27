@@ -463,7 +463,7 @@ function cabecalhoTurma() {
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(rotuloTurma(x))}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(periodo) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${periodo === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
-  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) || (k === "inicio" && S.view === "construir") ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
   ${DO_BIMESTRE.includes(S.view) && S.view !== "bimestre" && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestre")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
 }
 document.addEventListener("click", e => {
@@ -3153,19 +3153,20 @@ async function mudarBim(num, fn, msg, t = turmaAtual()) {
 // Reúne as ferramentas de IA da turma numa página só, a partir do botão do Painel.
 // Usa a mesma caixa "Criar com IA" do bimestre (bimIA), já no bimestre de hoje; o professor pode trocar o período.
 function vConstruir() {
-  const t = turmaAtual(), bs = bimestresDe(t), sel = bimSelecionado(t), B = sel ? bimPorNum(t, sel) : null;
+  // com "Ano todo" escolhido no alto da turma, abre no bimestre de hoje (as ferramentas são sempre de um bimestre)
+  const t = turmaAtual(), bs = bimestresDe(t), sel = bimSelecionado(t), B = sel ? bimPorNum(t, sel) : bimDaData(t, hoje());
   const head = `<div class="page-head"><div><h1>Construir com a Manu IA</h1><p class="muted">Tudo o que a Manu cria para ${esc(t.nome)} · ${esc(t.disciplina)}, no bimestre escolhido.</p></div><div class="toolbar"><a class="btn" href="${linkTurma(t.id)}">Voltar ao Painel</a></div></div>`;
   const semIA = cap.ia ? "" : `<div class="banner"><b>IA ainda não configurada.</b><span>O administrador precisa definir a chave da Anthropic no servidor.</span></div>`;
   if (!bs.length) return head + semIA + `<div class="empty"><img class="manu sm" src="/manu/manu-planos.webp" alt=""><h3>Cadastre os bimestres da turma</h3><p>A Manu cria tudo pensando no período: habilidades, semanas e recursos de cada bimestre.</p><a class="btn primary" href="${linkTurma(t.id, "bimestres")}">Ir para Bimestres</a></div>`;
-  const escolha = `<div class="esc-rede" role="group" aria-label="Bimestre">${bs.map(b => `<button type="button" class="tn-op" data-act="bim-ativar" data-num="${b.num}" aria-pressed="${String(b.num) === String(sel)}">${esc(b.nome)}</button>`).join("")}</div>`;
+  const escolha = `<div class="esc-rede" role="group" aria-label="Bimestre">${bs.map(b => `<button type="button" class="tn-op" data-act="bim-ativar" data-num="${b.num}" aria-pressed="${!!B && String(b.num) === String(B.num)}">${esc(b.nome)}</button>`).join("")}</div>`;
   return head + semIA + `<section class="panel"><p class="small muted" style="margin:0 0 8px">Escolha o período:</p>${escolha}</section>`
     + (B ? `<section class="panel">${bimIA(B, true)}<p class="small muted" style="margin:10px 0 0">Habilidades e recursos do ${esc(B.nome)} ficam em <a href="${linkTurma(t.id, "bimestres")}">Bimestres</a>.</p></section>`
-      : `<p class="muted">Hoje não cai em nenhum bimestre da turma. Escolha um período acima.</p>`);
+      : `<p class="muted">Escolha um bimestre acima.</p>`);
 }
 // "Criar com IA" do bimestre: tudo que usa IA abre a partir daqui, já com o bimestre escolhido
 // foraDoBimestre: na página "Construir com a Manu IA", sem o número do passo e com o aviso apontando para Bimestres
 function bimIA(b, foraDoBimestre = false) {
-  const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = sel === String(b.num);
+  const t = turmaAtual(), sel = String(bimSelecionado(t)), ativo = foraDoBimestre || sel === String(b.num);
   if (!ativo) return `<div class="toolbar">${b.preparado ? "" : '<span class="passo-n">2</span>'}<button class="btn ai sm" data-act="bim-ativar" data-num="${b.num}">${ico("spark")}Criar com IA no ${esc(b.nome)}</button></div>`;
   const item = f => {
     const href = f.acao ? "" : f.href ? linkTurma(t.id, f.href.replace("#", "")) : linkTurma(t.id, f.aba);
