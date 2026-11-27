@@ -14,6 +14,8 @@ const MEDIA_MIN = 6, FREQ_MIN = 75;
 // Classes da célula de nota e de frequência: as classes "aviso" e "risco" juntam cor e sublinhado (app.css), para o alerta não depender só da cor
 const clsNota = m => "c num" + (m != null && m < MEDIA_MIN ? " aviso" : "");
 const clsFreq = f => "c num" + (f != null && f < FREQ_MIN ? " risco" : "");
+// a média final do exame fecha em 5,0, não em 6,0
+const clsNotaFinal = m => "c num" + (m != null && m < 5 ? " aviso" : "");
 
 function toast(msg) {
   const t = $("#toast"); t.textContent = msg; t.hidden = false;
@@ -311,6 +313,32 @@ function freqAluno(t, alunoId, bim) {
 }
 // Tipo de média do bimestre (como no SGDE): "aritmetica" (média com pesos) ou "somatoria" (soma das avaliações)
 const tipoMediaBim = (t, bim) => (bim && bimPorNum(t, bim)?.tipoMedia) || "aritmetica";
+
+/* ----- Regra de notas com exame final (escolas que fecham a nota de meio em meio) ----- */
+// Média por aproximação: ,0 a ,2 desce; ,3 a ,7 fecha em ,5; ,8 e ,9 sobem.
+// Olha só o primeiro decimal (a tabela da escola decide pelo décimo: 5,75 lê-se 5,7 e fecha em 5,5).
+function aproximar(n) {
+  if (n === null || n === undefined || n === "" || isNaN(n)) return null;
+  const dec = Math.floor(Number(n) * 10 + 1e-9); // décimos, truncados; o 1e-9 cobre o erro do ponto flutuante (4,9 × 10 = 48,999…)
+  const i = Math.floor(dec / 10), f = dec - i * 10;
+  return i + (f <= 2 ? 0 : f <= 7 ? 0.5 : 1);
+}
+// Peso da média anual e do exame na média final: MF = (3 × MA + 2 × NF) / 5
+const PESO_ANUAL = 3, PESO_EXAME = 2, MEDIA_FINAL_MIN = 5;
+// Nota mínima no exame para fechar a média final: NF = (5 × 5 − 3 × MA) / 2. Acima de 10 o aluno não alcança.
+function notaMinExame(anual) {
+  if (anual === null || anual === undefined || isNaN(anual)) return null;
+  return aproximar((MEDIA_FINAL_MIN * (PESO_ANUAL + PESO_EXAME) - PESO_ANUAL * Number(anual)) / PESO_EXAME);
+}
+// Média final de quem fez o exame, já aproximada
+function mediaFinalDe(anual, exame) {
+  if (anual === null || anual === undefined || isNaN(anual) || !notaOk(exame)) return null;
+  return aproximar((PESO_ANUAL * Number(anual) + PESO_EXAME * Number(exame)) / (PESO_ANUAL + PESO_EXAME));
+}
+// Escolas que usam essa regra são marcadas em Meu perfil; sem marcação, o cálculo continua como sempre foi
+const temExameFinal = t => regraNotas(escolaDe(t)) === "exame";
+// Fecha a nota de meio em meio só nas escolas que usam a regra
+const aprox = (t, n) => temExameFinal(t) ? aproximar(n) : n;
 const notaOk = n => n !== undefined && n !== null && n !== "" && !isNaN(n);
 function mediaAluno(t, alunoId, bim) {
   const todas = S.avaliacoes.filter(a => a.turmaId === t.id && (!bim || String(a.bimestre) === String(bim)));
@@ -318,7 +346,7 @@ function mediaAluno(t, alunoId, bim) {
   let m = tipoMediaBim(t, bim) === "somatoria" ? mediaSoma(avs, alunoId) : mediaPond(avs, alunoId);
   // recuperação: fica a maior entre a média e a nota da recuperação
   for (const r of recs) { const n = Number(r.notas[alunoId]); m = m === null ? n : Math.max(m, n); }
-  return m;
+  return aprox(t, m);
 }
 function mediaSoma(avs, alunoId) {
   const ns = avs.map(a => a.notas?.[alunoId]).filter(notaOk);
@@ -334,16 +362,29 @@ function mediaPond(avs, alunoId) {
 function mediaAnual(t, alunoId) {
   const bs = bimestresDe(t); if (!bs.length) return mediaAluno(t, alunoId);
   const ms = bs.map(b => mediaAluno(t, alunoId, b.num)).filter(x => x !== null);
-  return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null;
+  return ms.length ? aprox(t, ms.reduce((a, b) => a + b, 0) / ms.length) : null;
 }
 // Situação do aluno no ano: médias dos bimestres, média anual e quanto falta para passar
 function situacaoAno(t, alunoId) {
   const bs = bimestresDe(t), n = bs.length || 1, ms = bs.length ? bs.map(b => mediaAluno(t, alunoId, b.num)) : [mediaAluno(t, alunoId)];
   const com = ms.filter(x => x !== null), soma = com.reduce((a, b) => a + b, 0), faltam = ms.length - com.length;
-  const anual = com.length ? soma / com.length : null, f = freqAluno(t, alunoId);
+  const anual = com.length ? aprox(t, soma / com.length) : null, f = freqAluno(t, alunoId);
   const precisa = faltam && com.length ? (MEDIA_MIN * n - soma) / faltam : null;
-  const estado = !com.length ? "sem" : !faltam ? (soma / n >= MEDIA_MIN ? "aprovado" : "exame") : precisa <= 0 ? "garantido" : precisa > 10 ? "exame" : "andamento";
-  return { ms, anual, faltam, precisa, f, estado, freqRisco: f !== null && f < FREQ_MIN };
+  const estado = !com.length ? "sem" : !faltam ? (aprox(t, soma / n) >= MEDIA_MIN ? "aprovado" : "exame") : precisa <= 0 ? "garantido" : precisa > 10 ? "exame" : "andamento";
+  const sit = { ms, anual, faltam, precisa, f, estado, freqRisco: f !== null && f < FREQ_MIN };
+  // Ano fechado: todo período tem média E nenhuma avaliação ficou em branco (uma nota só já daria média)
+  sit.anoCompleto = !faltam && bs.length > 0 && bs.every(b => bimCompleto(t, alunoId, b.num));
+  // Exame final: só com o ano fechado, e só na escola que usa essa regra
+  if (temExameFinal(t) && estado === "exame" && sit.anoCompleto) {
+    sit.notaMin = notaMinExame(anual);
+    sit.semChance = sit.notaMin === null || sit.notaMin > 10; // nem com 10 no exame alcança a média final
+    sit.notaExame = (t.exame || {})[alunoId];
+    sit.mediaFinal = sit.semChance ? null : mediaFinalDe(anual, sit.notaExame);
+    // Vale a nota mínima da tabela da escola, não o resultado da conta: nas médias 2,0 / 3,0 / 4,0 / 5,0
+    // meio ponto a menos ainda fecharia 5,0 na aproximação, mas a tabela impressa exige a nota cheia.
+    sit.resultado = sit.semChance ? "retido" : !notaOk(sit.notaExame) ? null : Number(sit.notaExame) >= sit.notaMin ? "aprovado" : "retido";
+  }
+  return sit;
 }
 // quanto o aluno precisa no bimestre "num" para fechar a média (as outras médias já lançadas)
 function precisaNoBim(t, alunoId, num) {
@@ -356,7 +397,8 @@ function alertas(turmas = S.turmas) {
   turmas.forEach(t => (t.alunos || []).filter(a => !a.situacao).forEach(a => {
     const sit = situacaoAno(t, a.id), bAt = bimDaData(t, hoje()), mAt = bAt ? mediaAluno(t, a.id, bAt.num) : null;
     if (sit.freqRisco) out.push({ t, a, tipo: "freq", txt: `Frequência ${sit.f}%`, cls: "bad" });
-    if (sit.estado === "exame") out.push({ t, a, tipo: "nota", txt: sit.faltam ? "Não alcança a média nem com 10: exame final" : `Exame final (média ${fmtNota(sit.ms.reduce((x, y) => x + y, 0) / sit.ms.length)})`, cls: "bad" });
+    if (sit.resultado === "aprovado") { /* já fez o exame e passou: sai dos alertas */ }
+    else if (sit.estado === "exame") out.push({ t, a, tipo: "nota", txt: sit.semChance ? "Não alcança a média nem com 10 no exame" : sit.resultado === "retido" ? `Retido no exame (média final ${fmtNota(sit.mediaFinal)})` : sit.faltam ? "Não alcança a média nem com 10: exame final" : sit.notaMin != null ? `Exame final (média ${fmtNota(sit.anual)}, precisa de ${fmtNota(sit.notaMin)})` : `Exame final (média ${fmtNota(sit.anual)})`, cls: "bad" });
     else if (mAt !== null && mAt < MEDIA_MIN) out.push({ t, a, tipo: "nota", txt: `Recuperação no ${bAt.nome} (média ${fmtNota(mAt)})`, cls: "warn" });
   }));
   return out;
@@ -490,7 +532,7 @@ function vPerfil() {
   const es = S.escolas || [], ds = S.disciplinas || [], et = S.etapas || [];
   const sug = [...new Set((et.length ? et : Object.keys(COMPONENTES)).flatMap(e => COMPONENTES[e] || []))].filter(c => !ds.includes(c));
   const turmasDa = x => S.turmas.filter(t => escolaDe(t) === x);
-  const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li${act === "perfil-tira-esc" ? ' class="esc"' : ""}><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button>${act === "perfil-tira-esc" ? `<div class="esc-rede" role="group" aria-label="Rede da escola ${esc(x)}">${REDES.map(([r, n]) => `<button type="button" class="tn-op" data-act="perfil-rede" data-v="${esc(x)}" data-r="${r}" aria-pressed="${redeEscolhida(x) === r}">${n}</button>`).join("")}${redeEscolhida(x) ? "" : `<small class="muted">Qual é a rede desta escola?</small>`}</div><div class="esc-turmas">${turmasDa(x).map(t => `<a class="esc-turma" href="${linkTurma(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)}<small>${esc(t.disciplina)}${t.turno ? " · " + esc(t.turno) : ""}</small></a>`).join("")}<button type="button" class="btn sm" data-act="nova-turma" data-escola="${esc(x)}">${ico("plus")}Turma nesta escola</button></div>` : ""}</li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
+  const lista = (itens, act, vazio) => itens.length ? `<ul class="perfil-lista">${itens.map((x, i) => `<li${act === "perfil-tira-esc" ? ' class="esc"' : ""}><span>${esc(x)}${act === "perfil-tira-esc" && i === 0 && itens.length > 1 ? ' <span class="chip">principal</span>' : ""}</span>${act === "perfil-tira-esc" && i > 0 ? `<button type="button" class="btn ghost sm" data-act="perfil-principal" data-v="${esc(x)}">Tornar principal</button>` : ""}<button type="button" class="btn ghost sm" data-act="${act}" data-v="${esc(x)}" aria-label="Tirar ${esc(x)}">×</button>${act === "perfil-tira-esc" ? `<div class="esc-rede" role="group" aria-label="Rede da escola ${esc(x)}">${REDES.map(([r, n]) => `<button type="button" class="tn-op" data-act="perfil-rede" data-v="${esc(x)}" data-r="${r}" aria-pressed="${redeEscolhida(x) === r}">${n}</button>`).join("")}${redeEscolhida(x) ? "" : `<small class="muted">Qual é a rede desta escola?</small>`}</div><div class="esc-rede" role="group" aria-label="Como a escola ${esc(x)} fecha a nota do ano">${REGRAS_NOTAS.map(([r, n]) => `<button type="button" class="tn-op" data-act="perfil-regra-notas" data-v="${esc(x)}" data-r="${r}" aria-pressed="${regraNotas(x) === r}">${n}</button>`).join("")}<small class="muted">${regraNotas(x) === "exame" ? "A nota do bimestre e a média do ano fecham de meio em meio. Quem não chega a 6,0 faz exame final." : "Como a escola fecha a nota do ano."}</small></div><div class="esc-turmas">${turmasDa(x).map(t => `<a class="esc-turma" href="${linkTurma(t.id)}"><span class="swatch" style="background:${esc(t.cor)}"></span>${esc(t.nome)}<small>${esc(t.disciplina)}${t.turno ? " · " + esc(t.turno) : ""}</small></a>`).join("")}<button type="button" class="btn sm" data-act="nova-turma" data-escola="${esc(x)}">${ico("plus")}Turma nesta escola</button></div>` : ""}</li>`).join("")}</ul>` : `<p class="muted small">${vazio}</p>`;
   return `<div class="page-head"><div><h1>Meu perfil</h1><p class="muted">Suas escolas e disciplinas aparecem prontas para escolher quando você cria uma turma.</p></div></div>
   <section class="panel"><div class="panel-head"><h2>Sua foto</h2></div><div class="perfil-foto"><div class="brand-mark grande">${S.foto ? `<img src="${esc(S.foto)}" alt="Sua foto" referrerpolicy="no-referrer">` : `<span class="iniciais">${esc((S.nome || "?").trim().split(/\s+/).map(x => x[0]).filter(Boolean).slice(0, 2).join("").toUpperCase())}</span>`}</div>
     <div class="toolbar"><label class="btn">Escolher foto<input type="file" id="pfFoto" accept="image/*" hidden></label>${S.foto ? `<button type="button" class="btn ghost" data-act="perfil-foto-tirar">Tirar foto</button>` : ""}</div>
@@ -555,6 +597,7 @@ document.addEventListener("click", async e => {
   if (b.dataset.act === "perfil-principal") return salvarPerfil({ escolas: [v, ...es.filter(x => x !== v)] }, `${v} agora é a principal`);
   if (b.dataset.act === "perfil-tira-esc") return dlgTirarEscola(v);
   if (b.dataset.act === "perfil-rede") { await salvarRede(v, b.dataset.r); toast(`${v}: ${(REDES.find(x => x[0] === b.dataset.r) || [])[1] || b.dataset.r}`); return render(); }
+  if (b.dataset.act === "perfil-regra-notas") { await salvarRegraNotas(v, b.dataset.r); toast(`${v}: ${(REGRAS_NOTAS.find(x => x[0] === b.dataset.r) || [])[1] || b.dataset.r}`); return render(); }
   if (b.dataset.act === "perfil-tira-esc-ok") {
     const ts = S.turmas.filter(t => escolaDe(t) === v), modo = dlg.querySelector('input[name="teModo"]:checked')?.value;
     let destino = val2("teDest") === "__nova" ? val2("teNova").trim() : val2("teDest");
@@ -841,15 +884,21 @@ function boletimTurma(t) {
   return (t.alunos || []).map((s, i) => {
     const x = situacaoAno(t, s.id), faltas = S.chamadas.filter(c => c.turmaId === t.id && c.presencas?.[s.id] === "F").length;
     // frequência abaixo do mínimo reprova mesmo com média: nunca aparece como aprovado
-    const sit = s.situacao || (x.estado === "exame" ? "Exame final" : x.freqRisco ? `Frequência baixa (${x.f}%)` : { aprovado: "Aprovado", garantido: "Média garantida" }[x.estado] || "Em curso");
-    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, freq: x.f, faltas, sit, cls: s.situacao ? "" : x.estado === "exame" || x.freqRisco ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "" };
+    const sit = s.situacao || (x.estado === "exame"
+      ? (x.resultado === "aprovado" ? (x.freqRisco ? `Frequência baixa (${x.f}%)` : `Aprovado no exame (${fmtNota(x.mediaFinal)})`)
+        : x.resultado === "retido" ? (x.semChance ? "Retido" : `Retido no exame (${fmtNota(x.mediaFinal)})`) : "Exame final")
+      : x.freqRisco ? `Frequência baixa (${x.f}%)` : { aprovado: "Aprovado", garantido: "Média garantida" }[x.estado] || "Em curso");
+    const cls = s.situacao ? "" : x.resultado === "aprovado" && !x.freqRisco ? "ok" : x.estado === "exame" || x.freqRisco ? "bad" : x.estado === "aprovado" || x.estado === "garantido" ? "ok" : "";
+    return { n: i + 1, s, ms: bs.length ? x.ms : [], anual: x.anual, freq: x.f, faltas, sit, cls, emExame: x.estado === "exame" && x.anoCompleto, exame: x.notaExame, final: x.mediaFinal };
   });
 }
 function painelNotasTurma(t) {
   const bs = bimestresDe(t), ls = boletimTurma(t);
+  // na escola com exame final, mostra as colunas do exame assim que alguém for para ele
+  const comExame = temExameFinal(t) && ls.some(l => l.emExame);
   return `<section class="panel"><div class="panel-head"><div><h2>Notas da turma</h2><span class="small muted">Médias, frequência, faltas do Diário e situação de cada aluno.</span></div></div>
-    ${ls.length ? `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th><th class="c">Freq. anual</th><th class="c">Faltas</th><th>Situação</th></tr></thead><tbody>
-    ${ls.map(l => `<tr><td class="c num">${l.n}</td><td class="sticky-col">${esc(l.s.nome)}</td>${l.ms.map(m => `<td class="${clsNota(m)}">${fmtNota(m)}</td>`).join("")}<td class="${clsNota(l.anual)}" style="font-weight:700">${fmtNota(l.anual)}</td><td class="${clsFreq(l.freq)}">${l.freq === null ? "—" : l.freq + "%"}</td><td class="c num">${l.faltas}</td><td><span class="chip ${l.cls}">${esc(l.sit)}</span></td></tr>`).join("")}
+    ${ls.length ? `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="c">Nº</th><th class="sticky-col">Aluno</th>${bs.map(b => `<th class="c">${esc(b.nome)}</th>`).join("")}<th class="c">Média anual</th>${comExame ? `<th class="c">Exame</th><th class="c">Média final</th>` : ""}<th class="c">Freq. anual</th><th class="c">Faltas</th><th>Situação</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td class="c num">${l.n}</td><td class="sticky-col">${esc(l.s.nome)}</td>${l.ms.map(m => `<td class="${clsNota(m)}">${fmtNota(m)}</td>`).join("")}<td class="${clsNota(l.anual)}" style="font-weight:700">${fmtNota(l.anual)}</td>${comExame ? `<td class="c num">${notaOk(l.exame) ? fmtNota(l.exame) : "—"}</td><td class="${clsNotaFinal(l.final)}" style="font-weight:600">${fmtNota(l.final)}</td>` : ""}<td class="${clsFreq(l.freq)}">${l.freq === null ? "—" : l.freq + "%"}</td><td class="c num">${l.faltas}</td><td><span class="chip ${l.cls}">${esc(l.sit)}</span></td></tr>`).join("")}
     </tbody></table></div>` : `<p class="muted">Adicione os alunos em <a href="${linkTurma(t.id, "alunos")}">Alunos</a> ou importe o relatório de notas em PDF.</p>`}
     ${ls.length && !bs.length ? `<p class="small muted">Cadastre os períodos da turma para ver a nota de cada um.</p>` : ""}</section>`;
 }
@@ -857,6 +906,7 @@ function painelNotasTurma(t) {
 function imprimirBoletim(t) {
   const bs = bimestresDe(t), ls = boletimTurma(t), h = x => esc(x == null ? "" : String(x));
   const ativos = ls.filter(l => !l.s.situacao), abaixo = ativos.filter(l => l.anual !== null && l.anual < MEDIA_MIN).length, sem = ativos.filter(l => l.anual === null).length;
+  const comExame = temExameFinal(t) && ls.some(l => l.emExame);
   const css = `@page{size:A4;margin:10mm}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:10px}
     .cab{display:grid;grid-template-columns:1.2fr 1fr;border:1px solid #333;margin-bottom:6px}.cab>div{padding:6px 8px}.cab>div+div{border-left:1px solid #333}.cab h1{font-size:13px;margin:4px 0 0}
     .comp{border:1px solid #333;padding:3px 8px;margin-bottom:6px}
@@ -866,8 +916,8 @@ function imprimirBoletim(t) {
     <div class="cab"><div><b>Escola:</b> ${h(escolaDe(t) || "—")}<br><b>Professor(a):</b> ${h(S.nome)}<h1>Relatório de Notas por Componente Curricular</h1></div>
       <div><b>Ano letivo:</b> ${h(t.ano || "")}<br><b>Ano/Série:</b> ${h(t.serie || "—")}<br><b>Turma:</b> ${h(t.nome)}${t.turno ? " · " + h(t.turno) : ""}<br><b>Data de emissão:</b> ${fmtData(hoje())}</div></div>
     <div class="comp"><b>Componente curricular:</b> ${h(t.disciplina)}</div>
-    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th><th>Total de faltas</th><th>Situação</th></tr></thead><tbody>
-    ${ls.map(l => `<tr><td>${l.n}</td><td class="al">${h(l.s.nome)}</td>${l.ms.map(m => `<td class="${m !== null && m < MEDIA_MIN ? "bad" : ""}">${m === null ? "" : fmtNota(m)}</td>`).join("")}<td class="${l.anual !== null && l.anual < MEDIA_MIN ? "bad" : ""}"><b>${l.anual === null ? "" : fmtNota(l.anual)}</b></td><td>${l.faltas || ""}</td><td>${h(l.sit)}</td></tr>`).join("")}
+    <table><thead><tr><th>Nº</th><th>Nome</th>${bs.map(b => `<th>${h(b.nome)}</th>`).join("")}<th>Média anual</th>${comExame ? `<th>Exame</th><th>Média final</th>` : ""}<th>Total de faltas</th><th>Situação</th></tr></thead><tbody>
+    ${ls.map(l => `<tr><td>${l.n}</td><td class="al">${h(l.s.nome)}</td>${l.ms.map(m => `<td class="${m !== null && m < MEDIA_MIN ? "bad" : ""}">${m === null ? "" : fmtNota(m)}</td>`).join("")}<td class="${l.anual !== null && l.anual < MEDIA_MIN ? "bad" : ""}"><b>${l.anual === null ? "" : fmtNota(l.anual)}</b></td>${comExame ? `<td>${notaOk(l.exame) ? fmtNota(l.exame) : ""}</td><td class="${l.final !== null && l.final < 5 ? "bad" : ""}"><b>${l.final === null ? "" : fmtNota(l.final)}</b></td>` : ""}<td>${l.faltas || ""}</td><td>${h(l.sit)}</td></tr>`).join("")}
     </tbody></table>
     <div class="tot">Total: ${ls.length}</div>
     <div class="res"><span>Abaixo da média: <b>${abaixo}</b></span><span>Média ${fmtNota(MEDIA_MIN)} ou mais: <b>${ativos.length - abaixo - sem}</b></span><span>Sem avaliações: <b>${sem}</b></span>${ls.length - ativos.length ? `<span>Saíram da turma: <b>${ls.length - ativos.length}</b></span>` : ""}</div>
@@ -1096,6 +1146,27 @@ function imprimirDiario(t) {
   imprimir(html);
 }
 
+// Exame final: só os alunos que fecharam o ano abaixo da média, na escola que usa essa regra
+function painelExameFinal(t, sits) {
+  if (!temExameFinal(t)) return "";
+  const emExame = sits.filter(({ x }) => x.estado === "exame" && x.anoCompleto);
+  if (!emExame.length) return "";
+  const chip = x => x.semChance ? `<span class="chip bad">retido</span>`
+    : x.resultado === "aprovado" ? (x.freqRisco ? `<span class="chip bad">nota ok, mas frequência ${x.f}%</span>` : `<span class="chip ok">aprovado</span>`)
+    : x.resultado === "retido" ? `<span class="chip bad">retido</span>`
+    : `<span class="chip">falta a nota</span>`;
+  return `<section class="panel"><div class="panel-head"><div><h2>Exame final</h2><span class="small muted">${emExame.length} ${emExame.length === 1 ? "aluno" : "alunos"} · passa quem alcança a nota mínima. Média final = (3 × média anual + 2 × nota do exame) ÷ 5.</span></div></div>
+    <div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th><th class="c">Média anual</th><th class="c">Nota mínima</th><th class="c">Nota do exame</th><th class="c">Média final</th><th class="c">Resultado</th></tr></thead><tbody>
+      ${emExame.map(({ s, x }) => `<tr><td class="sticky-col">${esc(s.nome)}${marcaSit(s)}</td>
+        <td class="c num">${fmtNota(x.anual)}</td>
+        <td class="c num">${x.semChance ? "não alcança" : fmtNota(x.notaMin)}</td>
+        <td class="c">${x.semChance ? "—" : `<input class="grade nota-exame" type="text" inputmode="decimal" aria-label="Nota do exame final de ${esc(s.nome)}" data-aluno="${esc(s.id)}" value="${notaOk(x.notaExame) ? esc(String(x.notaExame).replace(".", ",")) : ""}">`}</td>
+        <td class="${clsNotaFinal(x.mediaFinal)}" style="font-weight:600">${fmtNota(x.mediaFinal)}</td>
+        <td class="c">${chip(x)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="small muted">Digite a nota e pressione Enter ou saia do campo para salvar. Quem está como <b>não alcança</b> não chega à média final nem tirando 10 no exame.</p></section>`;
+}
+
 /* ----- Notas ----- */
 function vNotas() {
   const t = turmaAtual();
@@ -1109,11 +1180,11 @@ function vNotas() {
     const sits = al.filter(s => !s.situacao).map(s => ({ s, x: situacaoAno(t, s.id) }));
     const grupo = (lista, cls, tit, txt) => lista.length ? `<div class="sit-g ${cls}"><b>${tit} <span class="num">${lista.length}</span></b><div>${lista.map(({ s, x }) => `<span class="chip ${cls}">${esc(s.nome)}${txt ? " · " + txt(x) : ""}</span>`).join("")}</div></div>` : "";
     const resumo = sits.some(({ x }) => x.estado !== "sem" || x.freqRisco) ? `<section class="panel sit-ano"><h2>Situação do ano</h2>
-      ${grupo(sits.filter(({ x }) => x.estado === "exame"), "bad", "Exame final / recuperação final", x => x.faltam ? "não alcança 6 nem com 10 no que falta" : `média ${fmtNota(x.ms.reduce((a, b) => a + b, 0) / x.ms.length)}`)}
+      ${grupo(sits.filter(({ x }) => x.estado === "exame"), "bad", "Exame final / recuperação final", x => x.faltam ? "não alcança 6 nem com 10 no que falta" : x.resultado ? `média ${fmtNota(x.anual)} · ${x.resultado}` : `média ${fmtNota(x.anual)}`)}
       ${grupo(sits.filter(({ x }) => x.estado === "andamento" && x.precisa > MEDIA_MIN), "warn", "Em risco: precisam de nota alta no que falta", x => `precisa de ${fmtNota(x.precisa)}`)}
       ${grupo(sits.filter(({ x }) => x.freqRisco), "bad", "Frequência abaixo de " + FREQ_MIN + "%", x => x.f + "%")}
       ${grupo(sits.filter(({ x }) => !x.freqRisco && (x.estado === "aprovado" || x.estado === "garantido")), "ok", "Aprovados ou com a média garantida", null)}</section>` : "";
-    return head + chipsPeriodo(t) + painelNotasTurma(t) + resumo + `
+    return head + chipsPeriodo(t) + painelNotasTurma(t) + resumo + painelExameFinal(t, sits) + `
       ${bs.map(b => {
         const avsB = S.avaliacoes.filter(x => x.turmaId === t.id && String(x.bimestre) === String(b.num)).sort((x, y) => (x.data || "").localeCompare(y.data || ""));
         const mt = mediaTurma(t, b.num);
@@ -2680,9 +2751,12 @@ async function boletimXlsx(t) {
   const cab = ws.addRow(["Aluno", ...avs.map(a => `${a.nome} (peso ${a.peso})`), "Média", "Frequência", "Situação"]);
   cab.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; c.alignment = { vertical: "middle", horizontal: "center", wrapText: true }; });
   cab.height = 32;
+  // com períodos cadastrados, a situação é a do ano (boletimTurma), a mesma da tela e do PDF
+  const linhas = bimestresDe(t).length ? boletimTurma(t) : null;
   (t.alunos || []).forEach(s => {
     const m = mediaAluno(t, s.id), f = freqAluno(t, s.id);
-    const sit = m === null ? "sem notas" : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? "em dia" : m < MEDIA_MIN ? "recuperação" : "frequência";
+    const sit = linhas ? (linhas.find(l => l.s.id === s.id)?.sit || "")
+      : m === null ? "sem notas" : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? "em dia" : m < MEDIA_MIN ? "recuperação" : "frequência";
     const r = ws.addRow([s.nome, ...avs.map(a => { const n = a.notas?.[s.id]; return n == null || n === "" ? null : Number(n); }), m === null ? null : Math.round(m * 10) / 10, f === null ? null : f / 100, sit]);
     r.eachCell((c, i) => { if (i > 1 && i <= avs.length + 2) c.numFmt = "0.0"; });
     r.getCell(avs.length + 3).numFmt = "0%";
@@ -2692,17 +2766,18 @@ async function boletimXlsx(t) {
   ws.getColumn(1).width = 34; for (let i = 2; i <= avs.length + 4; i++) ws.getColumn(i).width = 16;
   const bs = bimestresDe(t);
   if (bs.length) {
+    const ls = linhas || boletimTurma(t), comExame = temExameFinal(t) && ls.some(l => l.emExame);
+    const n1 = x => x === null || x === undefined ? null : Math.round(x * 10) / 10;
     const wb2 = wb.addWorksheet("Médias por período", { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] });
-    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média final", "Frequência anual"]);
+    const h = wb2.addRow(["Aluno", ...bs.map(b => b.nome), "Média anual", ...(comExame ? ["Exame", "Média final"] : []), "Frequência anual", "Situação"]);
     h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B7C8A" } }; });
-    (t.alunos || []).forEach(s => {
-      const ms = bs.map(b => { const m = mediaAluno(t, s.id, b.num); return m === null ? null : Math.round(m * 10) / 10; });
-      const mf = mediaAnual(t, s.id), f = freqAluno(t, s.id);
-      const row = wb2.addRow([s.nome, ...ms, mf === null ? null : Math.round(mf * 10) / 10, f === null ? null : f / 100]);
-      row.eachCell((c, i) => { if (i > 1 && i <= bs.length + 2) c.numFmt = "0.0"; });
-      row.getCell(bs.length + 3).numFmt = "0%";
+    const colFreq = bs.length + 3 + (comExame ? 2 : 0);
+    ls.forEach(l => {
+      const row = wb2.addRow([l.s.nome, ...l.ms.map(n1), n1(l.anual), ...(comExame ? [notaOk(l.exame) ? Number(l.exame) : null, n1(l.final)] : []), l.freq === null ? null : l.freq / 100, l.sit]);
+      row.eachCell((c, i) => { if (i > 1 && i < colFreq) c.numFmt = "0.0"; });
+      row.getCell(colFreq).numFmt = "0%";
     });
-    wb2.getColumn(1).width = 34; for (let i = 2; i <= bs.length + 3; i++) wb2.getColumn(i).width = 16;
+    wb2.getColumn(1).width = 34; for (let i = 2; i <= colFreq + 1; i++) wb2.getColumn(i).width = 16;
   }
   const ch = S.chamadas.filter(c => c.turmaId === t.id).sort((a, b) => a.data.localeCompare(b.data));
   if (ch.length) {
@@ -3341,6 +3416,15 @@ const redeEscolhida = e => (registroRedes()?.redes || {})[chaveEscola(e)] || "";
 async function salvarRede(escola, rede) {
   const r = registroRedes();
   await salvar("perfil", { id: r?.id || "pr" + uid(), tipo: "redes", redes: { ...(r?.redes || {}), [chaveEscola(escola)]: rede }, atualizadoEm: new Date().toISOString() });
+}
+// Como cada escola fecha a nota do ano (registro "notas" na coleção perfil, marcado em Meu perfil).
+// "padrao" é o que o sistema sempre fez: média 6,0, sem exame final.
+const REGRAS_NOTAS = [["padrao", "Média 6,0 direto"], ["exame", "Com exame final"]];
+const registroRegrasNotas = () => (S.perfil || []).filter(x => x.tipo === "notas").sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")))[0];
+const regraNotas = e => (registroRegrasNotas()?.regras || {})[chaveEscola(e)] || "padrao";
+async function salvarRegraNotas(escola, regra) {
+  const r = registroRegrasNotas();
+  await salvar("perfil", { id: r?.id || "pr" + uid(), tipo: "notas", regras: { ...(r?.regras || {}), [chaveEscola(escola)]: regra }, atualizadoEm: new Date().toISOString() });
 }
 // a habilidade é do componente da turma? (Matemática x Matemática - RA)
 const habDaTurma = (h, t) => !h.unidade || ehRA(h.unidade) === ehRA(t.disciplina);
@@ -4216,6 +4300,26 @@ document.addEventListener("change", async e => {
     await acaGravarLetra(el.dataset.aca, el.dataset.aluno, Number(el.dataset.item), letra);
     return;
   }
+  if (el.matches("input.nota-exame")) {
+    const t = turmaAtual(); if (!t) return;
+    const aluno = el.dataset.aluno, raw = el.value.trim().replace(",", "."), n = Number(raw);
+    if (raw && (!/^\d*(?:\.\d*)?$/.test(raw) || !Number.isFinite(n) || n < 0 || n > 10)) {
+      toast("A nota do exame deve ser um número de 0 a 10.");
+      el.value = String((t.exame || {})[aluno] ?? "").replace(".", ",");
+      return;
+    }
+    const novo = { ...t, exame: { ...(t.exame || {}) } };
+    if (raw) novo.exame[aluno] = n; else delete novo.exame[aluno];
+    if (!await salvar("turmas", novo, { adiarRender: true })) {
+      if (el.isConnected && document.activeElement !== el) el.value = String((turmaAtual()?.exame || {})[aluno] ?? "").replace(".", ",");
+      return;
+    }
+    if (raw !== "") {
+      const al = (t.alunos || []).find(x => x.id === aluno), sit = situacaoAno(turmaAtual(), aluno);
+      if (al && sit.resultado) toast(`${al.nome}: média final ${fmtNota(sit.mediaFinal)} · ${sit.resultado}.`);
+    }
+    return;
+  }
   if (el.matches("input.grade")) {
     const anterior = S.avaliacoes.find(x => x.id === el.dataset.av);
     if (!anterior) return;
@@ -4238,7 +4342,9 @@ document.addEventListener("change", async e => {
     if (t && al && raw !== "") {
       const completo = bimCompleto(t, al.id, a.bimestre);
       const m = mediaAluno(t, al.id, a.bimestre), sit = situacaoAno(t, al.id), B = bimPorNum(t, a.bimestre);
-      if (completo && sit.estado === "exame" && !sit.faltam) toast(`Atenção: ${al.nome} fechou o ano com média ${fmtNota(sit.ms.reduce((x, y) => x + y, 0) / sit.ms.length)} e vai para o exame final.`);
+      if (sit.estado === "exame" && sit.anoCompleto) toast(sit.semChance
+        ? `Atenção: ${al.nome} fechou o ano com média ${fmtNota(sit.anual)} e não alcança a média final nem com 10 no exame.`
+        : `Atenção: ${al.nome} fechou o ano com média ${fmtNota(sit.anual)} e vai para o exame final${sit.notaMin != null ? `, precisando de ${fmtNota(sit.notaMin)}` : ""}.`);
       else if (completo && m !== null && m < MEDIA_MIN) toast(`Atenção: ${al.nome} ficou em recuperação${B ? " no " + B.nome : ""} (média ${fmtNota(m)}).`);
     }
     return;
