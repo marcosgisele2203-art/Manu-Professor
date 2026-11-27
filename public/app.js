@@ -1314,7 +1314,7 @@ async function lerArquivoSgde(arq) {
     ${rel.linhas.map((l, i) => { const s = casa[i];
       return `<tr><td class="c num">${esc(l.n)}</td><td class="sticky-col">${s ? esc(s.nome) : `<label class="check" style="margin:0"><input type="checkbox" name="sgdeNovo" value="${i}" ${!l.sit || [1, 2, 3, 4].some(n => l.notas[n] !== null) ? "checked" : ""}><span>${esc(capitalizarNome(l.nome))} <small class="muted">· novo</small></span></label>`}</td>${[1, 2, 3, 4].map(n => `<td class="${clsNota(l.notas[n])}">${fmtNota(l.notas[n])}</td>`).join("")}${comExame ? `<td class="c num">${l.exame === null ? "—" : fmtNota(l.exame)}</td>` : ""}<td>${l.sit ? `<span class="chip warn">${esc(l.sit)}</span>` : `<span class="small muted">${esc(l.sitTxt || "")}</span>`}</td></tr>`; }).join("")}
     </tbody></table></div>
-    ${comExame ? `<p class="small">As notas do <b>exame final</b> também entram${temExameFinal(t) ? "" : `, mas só aparecem depois que você marcar esta escola como <b>Com exame final</b> em Meu perfil`}. Uma nota do exame que você já lançou não é trocada.</p>` : ""}
+    ${comExame ? `<p class="small">As notas do <b>exame final</b> também entram${temExameFinal(t) ? "" : `, mas só aparecem depois que você marcar esta escola como <b>Com exame final</b> em Meu perfil`}. Se o aluno já tinha nota do exame, fica a do relatório.</p>` : ""}
     <p class="small muted">Os alunos transferidos, remanejados ou com matrícula indeferida ficam marcados na turma e saem das listas de recuperação. As faltas não são importadas: a frequência continua vindo do Diário.</p>`;
   ok.disabled = false;
   st.textContent = `Relatório de ${rel.meta.componente || "notas"} · ${rel.meta.turma || "turma"}. Confira e toque em Lançar notas.`;
@@ -1324,7 +1324,7 @@ async function importarSgde() {
   const bims = [...dlg.querySelectorAll('input[name="sgdeBim"]:checked')].map(x => Number(x.value));
   const novosSel = new Set([...dlg.querySelectorAll('input[name="sgdeNovo"]:checked')].map(x => Number(x.value)));
   const alunos = JSON.parse(JSON.stringify(t.alunos || [])), idDe = {};
-  // nota do exame no mesmo lugar da tela de exame (t.exame); a que o professor já lançou vale mais que a do relatório
+  // nota do exame no mesmo lugar da tela de exame (t.exame); vale sempre a última lançada, do relatório ou digitada
   const exame = { ...(t.exame || {}) };
   let mudouSit = 0, novos = 0, exames = 0;
   c.rel.linhas.forEach((l, i) => {
@@ -1332,7 +1332,7 @@ async function importarSgde() {
     if (!s && novosSel.has(i)) { s = { id: uid(), nome: capitalizarNome(limparNome(l.nome)).slice(0, 120) }; alunos.push(s); novos++; }
     if (!s) return;
     idDe[i] = s.id; s.codigo = l.codigo;
-    if (l.exame !== null && !notaOk(exame[s.id])) { exame[s.id] = l.exame; exames++; }
+    if (l.exame !== null && (!notaOk(exame[s.id]) || Number(exame[s.id]) !== l.exame)) { exame[s.id] = l.exame; exames++; }
     if ((s.situacao || "") !== l.sit) mudouSit++;
     if (l.sit) s.situacao = l.sit; else delete s.situacao;
   });
