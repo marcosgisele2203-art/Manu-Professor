@@ -3045,8 +3045,8 @@ document.addEventListener("input", e => { if (e.target.id === "cNota" && dlg._co
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act='ia-corrigir'],[data-act='cor-lancar'],[data-act='folha-respostas'],[data-act='corrigir-foto'],[data-act='cor-versao']"); if (!b) return;
   const act = b.dataset.act;
-  // trocar a versão muda o gabarito: a leitura anterior vale para a folha, mas a conta de acertos é refeita
-  if (act === "cor-versao") { const c = dlg._cor; if (c && c.versao !== b.dataset.v) { c.versao = b.dataset.v === "B" ? "B" : "A"; c.nota = ""; renderCorrecao(); } return; }
+  // trocar a versão muda a ordem e as alternativas de cada número: a leitura antiga não serve, a foto é lida de novo
+  if (act === "cor-versao") { const c = dlg._cor; if (c && c.versao !== b.dataset.v) { Object.assign(c, { versao: b.dataset.v === "B" ? "B" : "A", leitura: null, marcadas: {}, nota: "", status: c.foto ? "Versão trocada. Toque em Ler respostas para ler a folha com o gabarito desta versão." : "" }); renderCorrecao(); } return; }
   if (act === "folha-respostas") { const p = S.provas.find(x => x.id === b.dataset.id); if (!objetivas(p).length) { toast("Esta prova não tem questões objetivas."); return; } imprimir(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Folha de respostas${rotuloVersao(b.dataset.v)}</title><style>@page{size:A4;margin:14mm}body{margin:0}${CSS_FOLHA}${CSS_FR}</style></head><body><div class="folha">${folhaRespostasHTML(p, b.dataset.v === "B" ? "B" : "A")}</div></body></html>`); return; }
   if (act === "corrigir-foto") { dlgCorrigir(S.provas.find(x => x.id === b.dataset.id)); return; }
   if (act === "ia-corrigir") { lerFolha(); return; }
