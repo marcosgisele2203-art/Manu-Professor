@@ -69,10 +69,13 @@ export function conferirHabilidades(lista: unknown): { habilidades: { codigo: st
     const codigo = String((h as { codigo?: unknown })?.codigo || "").trim().replace(/^[a-z]{2}\d{2}[a-z]{2,4}\d{2,3}|^[a-z]+/i, (m) => m.toUpperCase());
     const descricao = String((h as { descricao?: unknown })?.descricao || "");
     if (codigoConferivel(codigo)) {
-      // códigos do currículo de MS têm um final a mais (EF06MA07.s.01): confere só a parte da BNCC
-      const o = habilidadePorCodigo(codigo.match(/^E[FM]\d{2}[A-Z]{2,4}\d{2,3}/)?.[0] || codigo);
+      // códigos do currículo de MS têm um final a mais (EF06MA07.s.01): confere a parte da BNCC
+      const base = codigo.match(/^E[FM]\d{2}[A-Z]{2,4}\d{2,3}/)?.[0] || codigo, o = habilidadePorCodigo(base);
       if (!o) { retiradas.push(codigo); continue; }
-      habilidades.push({ codigo, descricao: o.descricao, oficial: true });
+      // só aceita o final no formato do currículo de MS; qualquer outro final some e fica o código oficial
+      const final = codigo.slice(base.length);
+      const cod = /^\.[a-z]\.\d{1,3}$/i.test(final) ? codigo : o.codigo;
+      if (!habilidades.some((x) => x.codigo === cod)) habilidades.push({ codigo: cod, descricao: o.descricao, oficial: true });
     } else habilidades.push({ codigo, descricao });
   }
   return { habilidades, retiradas };
