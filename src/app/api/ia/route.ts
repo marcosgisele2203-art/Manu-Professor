@@ -292,6 +292,8 @@ export async function POST(req: Request) {
       // questões: a IA resolve cada uma sozinha e compara com o gabarito; conta como o mesmo pedido.
       // Se a revisão falhar, as questões vão sem ela (o professor sempre confere antes de guardar).
       if (tipo === "questoes" && r.data.tipo === "questoes" && Array.isArray(dados) && dados.length) {
+        // o campo "revisao" só pode vir da conferência: se a geração inventar um, ele sai antes
+        dados = dados.map((q) => { if (q && typeof q === "object") { const { revisao: _r, ...resto } = q as Record<string, unknown>; return resto; } return q; });
         try {
           const rev = await client.beta.messages.create({
             model: modeloDe(tipo), max_tokens: 8000, system: SISTEMA, output_config: { effort: "medium" },

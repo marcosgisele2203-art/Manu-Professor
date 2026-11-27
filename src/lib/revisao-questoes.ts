@@ -25,7 +25,9 @@ Uma entrada por questão, com n a partir de 1. ok=false só quando houver um pro
 }
 
 // Junta a resposta da revisão às questões; resposta incompleta ou estranha é ignorada (a questão fica sem aviso).
-export function aplicarRevisao(questoes: Questao[], resposta: unknown): (Questao & { revisao?: Revisao })[] {
+export function aplicarRevisao(entrada: Questao[], resposta: unknown): (Questao & { revisao?: Revisao })[] {
+  // nenhuma questão entra aqui com "revisao": só a conferência pode pôr esse campo
+  const questoes = entrada.map((q) => { const { revisao: _r, ...resto } = q as Questao & { revisao?: unknown }; return resto; });
   const itens = (resposta as { revisao?: unknown })?.revisao;
   if (!Array.isArray(itens)) return questoes;
   return questoes.map((q, i) => {
