@@ -2197,12 +2197,14 @@ async function iaQuestoes() {
     const validas = arr.filter(q => q && q.enunciado);
     // revisão feita no servidor: a IA resolveu cada questão sozinha e comparou com o gabarito (não vai para o banco)
     const revs = validas.map(q => q.revisao && q.revisao.ok === false ? { problema: String(q.revisao.problema || ""), sug: Number.isInteger(q.revisao.corretaSugerida) ? q.revisao.corretaSugerida : null } : null);
-    const conferidas = validas.some(q => q.revisao);
+    // só diz que conferiu se todas as questões voltaram com revisão; as que ficaram sem, o professor confere
+    const semRev = validas.map((q, i) => q.revisao ? 0 : i + 1).filter(Boolean), conferidas = !semRev.length;
     dlg._gerada = validas.map(q => ({ id: uid(), disciplina: val("gDisc"), tema, serie: val("gSerie"), tipo: TIPO[q.tipo] ? q.tipo : "multipla", dificuldade: DIF[q.dificuldade] ? q.dificuldade : "media", enunciado: String(q.enunciado), alternativas: Array.isArray(q.alternativas) ? q.alternativas.map(String) : [], correta: Number.isInteger(q.correta) ? q.correta : null, resposta: String(q.resposta || ""), explicacao: String(q.explicacao || "").slice(0, 600), erroComum: String(q.erroComum || "").slice(0, 300), bncc: String(q.bncc || "") }));
     dlg.querySelector("#gLista").innerHTML = dlg._gerada.map((q, i) => `<label class="check"><input type="checkbox" name="gSel" value="${i}" ${revs[i] ? "" : "checked"}><div style="min-width:0;flex:1">${questaoHTML(q, i + 1)}${revs[i] ? `<p class="small aviso-pop" style="margin:6px 0 0"><b>Confira antes de usar:</b> ${esc(revs[i].problema)}${revs[i].sug !== null ? ` A Manu acha que a resposta certa é a letra <b>${"ABCDE"[revs[i].sug]}</b>.` : ""}</p>` : ""}<div class="toolbar" style="margin-top:4px"><span class="chip">${esc(TIPO[q.tipo])}</span><span class="chip">${esc(DIF[q.dificuldade])}</span>${q.bncc ? `<span class="bncc">${esc(q.bncc)}</span>` : ""}</div></div></label>`).join("");
     dlg.querySelector("#gSalvar").disabled = false;
     const nProb = revs.filter(Boolean).length;
-    st.textContent = !conferidas ? `${dlg._gerada.length} questões geradas. A conferência automática não respondeu desta vez: revise o gabarito de cada uma.`
+    st.textContent = semRev.length === validas.length ? `${dlg._gerada.length} questões geradas. A conferência automática não respondeu desta vez: revise o gabarito de cada uma.`
+      : !conferidas ? `${dlg._gerada.length} questões geradas. A conferência não respondeu para ${semRev.length === 1 ? "a questão " + semRev[0] : "as questões " + semRev.join(", ")}: revise o gabarito${semRev.length === 1 ? "" : " delas"}.${nProb ? ` ${nProb === 1 ? "1 veio com problema e ficou desmarcada" : nProb + " vieram com problema e ficaram desmarcadas"}.` : ""}`
       : nProb ? `${dlg._gerada.length} questões geradas e conferidas. ${nProb === 1 ? "1 veio com problema e ficou desmarcada" : nProb + " vieram com problema e ficaram desmarcadas"}: leia o aviso e decida.`
       : `${dlg._gerada.length} questões geradas e conferidas: o gabarito de todas bateu. Desmarque as que não quiser.`;
   });

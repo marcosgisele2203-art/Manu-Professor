@@ -300,7 +300,10 @@ export async function POST(req: Request) {
           }, { signal: req.signal });
           entrada += rev.usage?.input_tokens ?? 0; saida += rev.usage?.output_tokens ?? 0;
           dados = aplicarRevisao(dados, extrairJSON(rev.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("")));
-        } catch (e) { if (req.signal.aborted) throw e; }
+        } catch {
+          // o professor parou durante a conferência: a geração já tinha terminado, então registra o que foi gasto
+          if (req.signal.aborted) { fim(); await registrarUso(pid, tipo, entrada, saida); return Response.json({ erro: "Parado." }, { status: 499 }); }
+        }
       }
       fim(); await registrarUso(pid, tipo, entrada, saida);
       // habilidades sugeridas: só códigos que existem na BNCC, com a descrição oficial

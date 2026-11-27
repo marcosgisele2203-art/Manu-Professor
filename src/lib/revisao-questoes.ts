@@ -30,11 +30,12 @@ export function aplicarRevisao(questoes: Questao[], resposta: unknown): (Questao
   if (!Array.isArray(itens)) return questoes;
   return questoes.map((q, i) => {
     const r = itens.find((x) => Number((x as { n?: unknown })?.n) === i + 1) as { ok?: unknown; problema?: unknown; correta?: unknown } | undefined;
-    if (!r) return q;
+    // sem um "ok" verdadeiro ou falso, a resposta não serve: a questão fica sem revisão (a tela pede para conferir)
+    if (!r || typeof r.ok !== "boolean") return q;
     const alts = Array.isArray(q.alternativas) ? q.alternativas.length : 0;
     const sug = Number.isInteger(r.correta) && q.tipo !== "aberta" && (r.correta as number) >= 0 && (r.correta as number) < alts && r.correta !== q.correta ? (r.correta as number) : undefined;
     const problema = String(r.problema || "").trim().slice(0, 300);
-    const ok = r.ok !== false && sug === undefined;
+    const ok = r.ok && sug === undefined;
     return { ...q, revisao: ok ? { ok: true } : { ok: false, problema: problema || "A revisão encontrou um problema nesta questão. Confira antes de usar.", ...(sug !== undefined ? { corretaSugerida: sug } : {}) } };
   });
 }
