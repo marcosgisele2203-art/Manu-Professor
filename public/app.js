@@ -3022,14 +3022,20 @@ function renderCorrecao() {
 }
 async function lerFolha() {
   const c = dlg._cor, p = S.provas.find(x => x.id === c.provaId), obj = objetivas(p, c.versao);
+  // a leitura vale só para a versão, o aluno e a foto de quando começou: se algo mudou no meio, a resposta é descartada
+  const pedido = { versao: c.versao, alunoId: c.alunoId, foto: c.foto };
+  const mudou = () => dlg._cor !== c || c.versao !== pedido.versao || c.alunoId !== pedido.alunoId || c.foto !== pedido.foto;
+  let descartada = false;
   await comIA(async (signal, st) => {
     const [cab, dados] = c.foto.split(",");
     const r = await iaJSON({ tipo: "correcao", imagem: dados, mime: cab.includes("png") ? "image/png" : "image/jpeg", questoes: obj.map(o => ({ n: o.n, opcoes: o.opcoes })) }, signal);
+    if (mudou()) { descartada = true; return; }
     if (!r || typeof r.respostas !== "object") throw { message: "Não consegui ler a folha. Tire outra foto, mais de perto e com boa luz." };
     c.leitura = r; c.marcadas = {}; c.nota = "";
     obj.forEach(o => { const v = r.respostas[String(o.n)]; if (typeof v === "string" && o.opcoes.includes(v.toUpperCase())) c.marcadas[o.n] = v.toUpperCase(); });
     st.textContent = c.status = "Leitura feita. Confira as marcações com a foto antes de lançar.";
   });
+  if (descartada || mudou()) { if (dlg._cor === c && dlg.open) renderCorrecao(); return; }
   const stEl = dlg.querySelector("#iaStatus"); if (stEl) c.status = stEl.textContent;
   renderCorrecao();
 }
