@@ -19,9 +19,10 @@ function componentesDe(disciplina: string, medio: boolean): string[] | null {
   const d = semAcento(disciplina || "");
   if (!d || /polivalente|itinerario|projeto de vida/.test(d)) return null;
   if (!medio) {
-    if (/ingl/.test(d)) return ["Língua Inglesa"];
-    const ef = ["Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Ensino Religioso"].find((c) => semAcento(c) === d);
-    return ef ? [ef] : null;
+    // nomes como a turma costuma escrever: "Português", "Artes", "Ed. Física", "Religião"…
+    const ef: [RegExp, string][] = [[/ingl/, "Língua Inglesa"], [/portugu/, "Língua Portuguesa"], [/matem/, "Matemática"], [/ciencia/, "Ciências"], [/histori/, "História"], [/geograf/, "Geografia"], [/fisica/, "Educação Física"], [/religi/, "Ensino Religioso"], [/arte/, "Arte"]];
+    const c = ef.find(([r]) => r.test(d));
+    return c ? [c[1]] : null;
   }
   if (/portugu/.test(d)) return ["Língua Portuguesa", "Linguagens e suas Tecnologias"];
   if (/matem/.test(d)) return ["Matemática"];

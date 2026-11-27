@@ -3570,7 +3570,7 @@ async function iaHabs() {
   const t = turmaAtual(), bs = bimestresDe(t), b = bimPorNum(t, dlg._bim);
   await comIA(async (signal, st) => {
     const r = await iaJSON({ tipo: "habilidades", periodo: b.nome, numero: Math.max(1, bs.indexOf(b) + 1), total: Math.max(1, bs.length), conteudos: val("hbCont") || undefined, turma: turmaIA(t.id) }, signal);
-    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").toUpperCase().slice(0, 20), descricao: String(h.descricao || "").slice(0, 600) })).filter(h => h.descricao);
+    const hs = (r && Array.isArray(r.habilidades) ? r.habilidades : []).map(h => ({ codigo: String(h.codigo || "").toUpperCase().slice(0, 20), descricao: String(h.descricao || "").slice(0, 2000) })).filter(h => h.descricao);
     // o servidor tira os códigos que não existem na BNCC
     const fora = Array.isArray(r?.retiradas) ? r.retiradas.length : 0;
     if (!hs.length) throw { message: fora ? "A Manu sugeriu códigos que não existem na BNCC. Tente de novo ou use a busca abaixo." : "A resposta veio vazia. Tente de novo." };
