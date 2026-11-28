@@ -18,8 +18,25 @@ const clsFreq = f => "c num" + (f != null && f < FREQ_MIN ? " risco" : "");
 const clsNotaFinal = m => "c num" + (m != null && m < 5 ? " aviso" : "");
 
 function toast(msg) {
-  const t = $("#toast"); t.textContent = msg; t.hidden = false;
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600);
+  const noDialogo = $("#dlg").open;
+  const t = (noDialogo && $("#toastDlg")) || $("#toast");
+  if (toast._el && toast._el !== t) toast._el.hidden = true;
+  toast._el = t;
+  t.textContent = msg; t.hidden = false;
+  const status = $(noDialogo ? "#toastDlgStatus" : "#toastStatus");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => {
+    t.hidden = true;
+    status?.replaceChildren();
+  }, 2600);
+  clearTimeout(toast._a);
+  document.querySelectorAll("#toastStatus, #toastDlgStatus").forEach(el => el.replaceChildren());
+  if (status) {
+    // Dá tempo para o leitor registrar a região, inclusive ao repetir um aviso.
+    toast._a = setTimeout(() => {
+      if ($("#dlg").open === noDialogo) status.textContent = msg;
+    }, 60);
+  }
 }
 
 const I = {
@@ -1863,8 +1880,14 @@ function vAssistente() {
 /* ---------- diálogos ---------- */
 const dlg = $("#dlg");
 function abrirDlg(titulo, corpo, rodape) {
-  dlg.innerHTML = `<form class="dlg" method="dialog" id="dlgForm"><div class="dlg-head"><h2>${titulo}</h2><button type="button" class="btn ghost sm" data-act="fechar" aria-label="Fechar">${ico("x")}</button></div><div class="dlg-body">${corpo}</div><div class="dlg-foot">${rodape}</div></form>`;
-  if (!dlg.open) dlg.showModal();
+  dlg.querySelector("#dlgForm")?.remove();
+  dlg.insertAdjacentHTML("afterbegin", `<form class="dlg" method="dialog" id="dlgForm"><div class="dlg-head"><h2>${titulo}</h2><button type="button" class="btn ghost sm" data-act="fechar" aria-label="Fechar">${ico("x")}</button></div><div class="dlg-body">${corpo}</div><div class="dlg-foot">${rodape}</div></form>`);
+  if (!dlg.open) {
+    const aviso = $("#toastDlg");
+    if (aviso) aviso.hidden = true;
+    $("#toastDlgStatus")?.replaceChildren();
+    dlg.showModal();
+  }
 }
 const fechar = () => { if (sampleCtl) sampleCtl.abort(); dlg.close(); };
 const val = id => { const el = dlg.querySelector("#" + id); return el ? el.value.trim() : ""; };
