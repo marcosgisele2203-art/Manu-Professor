@@ -419,8 +419,14 @@ function render() {
   const fn = { inicio: S.dentroTurma ? vInicioTurma : vInicio, turmas: vTurmas, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, aca: vAca, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente, construir: vConstruir }[S.view] || vInicio;
   const faixaAnterior = S.view === "chamada" ? v.querySelector("#dFaixa") : null;
   const rolagemDiario = faixaAnterior?.scrollLeft;
+  const tabelaAnterior = S.view === "notas" ? v.querySelector("[data-tabela-notas]") : null;
+  const rolagemNotas = tabelaAnterior?.scrollLeft;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
   if (S.view === "chamada") ajustarDiario(faixaAnterior?.dataset.aula, rolagemDiario, ae);
+  if (rolagemNotas) {
+    const tabela = v.querySelector("[data-tabela-notas]");
+    if (tabela?.dataset.tabelaNotas === tabelaAnterior.dataset.tabelaNotas) tabela.scrollLeft = rolagemNotas;
+  }
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
@@ -1176,7 +1182,7 @@ function painelExameFinal(t, sits) {
     : x.resultado === "retido" ? `<span class="chip bad">retido</span>`
     : `<span class="chip">falta a nota</span>`;
   return `<section class="panel"><div class="panel-head"><div><h2>Exame final</h2><span class="small muted">${emExame.length} ${emExame.length === 1 ? "aluno" : "alunos"} · passa quem alcança a nota mínima. Média final = (3 × média anual + 2 × nota do exame) ÷ 5.</span></div></div>
-    <div class="table-wrap"><table><thead><tr><th class="sticky-col">Aluno</th><th class="c">Média anual</th><th class="c">Nota mínima</th><th class="c">Nota do exame</th><th class="c">Média final</th><th class="c">Resultado</th></tr></thead><tbody>
+    <div class="table-wrap" data-tabela-notas="${esc(JSON.stringify([t.id, null]))}"><table><thead><tr><th class="sticky-col">Aluno</th><th class="c">Média anual</th><th class="c">Nota mínima</th><th class="c">Nota do exame</th><th class="c">Média final</th><th class="c">Resultado</th></tr></thead><tbody>
       ${emExame.map(({ s, x }) => `<tr><td class="sticky-col">${esc(s.nome)}${marcaSit(s)}</td>
         <td class="c num">${fmtNota(x.anual)}</td>
         <td class="c num">${x.semChance ? "não alcança" : fmtNota(x.notaMin)}</td>
@@ -1222,7 +1228,7 @@ function vNotas() {
   const paraTxt = p => p === null ? "—" : p <= 0 ? `<span class="chip ok">já passou</span>` : p > 10 ? `<span class="chip bad">exame final</span>` : `<span class="chip ${p > MEDIA_MIN ? "warn" : ""} num">${fmtNota(p)}</span>`;
   const painel = rec.length ? `<section class="panel rec-aviso"><div class="rec-tit">${ico("notas")}<div><b>${rec.length} ${rec.length === 1 ? "aluno em recuperação" : "alunos em recuperação"}${B ? " no " + esc(B.nome) : ""}</b><span class="small muted">Média abaixo de ${MEDIA_MIN} com as notas lançadas até agora.</span></div></div>
     <div class="chips-esc">${rec.map(x => `<span class="chip warn">${esc(x.s.nome)} · ${fmtNota(x.m)}</span>`).join("")}</div></section>` : "";
-  return head + chipsPeriodo(t) + painel + `<div class="table-wrap"><table>
+  return head + chipsPeriodo(t) + painel + `<div class="table-wrap" data-tabela-notas="${esc(JSON.stringify([t.id, bim]))}"><table>
     <thead><tr><th class="sticky-col">Aluno</th>${avs.map(a => `<th class="c"><button class="btn sm ghost" data-act="editar-avaliacao" data-id="${esc(a.id)}" title="Editar avaliação">${a.sigla ? `<b>${esc(a.sigla)}</b> ` : ""}${esc(a.nome)}</button><div class="num" style="text-transform:none">${a.tipo === "recuperacao" ? "recuperação" : tipoMediaBim(t, a.bimestre) === "somatoria" ? `vale ${fmtNota(a.valor)}` : `peso ${esc(a.peso)}`} · ${fmtData(a.data)}</div></th>`).join("")}<th class="c">Média</th><th class="c">Freq.</th><th class="c">Situação</th>${temPara ? `<th class="c" title="Média mínima neste bimestre para fechar o ano com ${MEDIA_MIN}">Para passar</th>` : ""}</tr></thead>
     <tbody>${al.map(s => { const m = mediaAluno(t, s.id, bim), f = freqAluno(t, s.id, bim);
       const sit = s.situacao ? `<span class="chip">${esc(s.situacao)}</span>` : m === null ? `<span class="chip">sem notas</span>` : (m >= MEDIA_MIN && (f === null || f >= FREQ_MIN)) ? `<span class="chip ok">em dia</span>` : (m < MEDIA_MIN ? `<span class="chip warn">recuperação</span>` : `<span class="chip bad">frequência</span>`);
@@ -4492,6 +4498,15 @@ function colunaFoco(el) {
   const tab = td && td.closest("table");
   if (!tab) return;
   tab.querySelectorAll("tr").forEach(tr => tr.children[td.cellIndex]?.classList.add("col-foco"));
+  const tabela = tab.closest("[data-tabela-notas]");
+  if (!tabela) return;
+  const nome = td.parentElement.querySelector(".sticky-col");
+  const campo = el.getBoundingClientRect();
+  const limite = tabela.getBoundingClientRect().left + tabela.clientLeft + tabela.clientWidth;
+  // Ao navegar com Tab, a coluna fixa do aluno pode encobrir o campo que recebeu foco.
+  const inicio = nome.getBoundingClientRect().right + 4;
+  if (campo.left < inicio) tabela.scrollLeft -= inicio - campo.left;
+  else if (campo.right > limite - 4) tabela.scrollLeft += campo.right - limite + 4;
 }
 document.addEventListener("focusin", e => colunaFoco(e.target));
 document.addEventListener("focusout", () => colunaFoco(null));
