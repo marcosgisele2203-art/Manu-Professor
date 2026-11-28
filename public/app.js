@@ -438,7 +438,18 @@ function render() {
   const rolagemDiario = faixaAnterior?.scrollLeft;
   const tabelaAnterior = S.view === "notas" ? v.querySelector("[data-tabela-notas]") : null;
   const rolagemNotas = tabelaAnterior?.scrollLeft;
+  const abasAnteriores = S.dentroTurma ? v.querySelector(".abas") : null;
+  const abaAnterior = abasAnteriores?.querySelector('[aria-current="page"]')?.getAttribute("href");
+  const rolagemAbas = abasAnteriores?.scrollLeft || 0;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
+  const abas = S.dentroTurma ? v.querySelector(".abas") : null;
+  if (abas) {
+    abas.scrollLeft = rolagemAbas;
+    const abaAtual = abas.querySelector('[aria-current="page"]');
+    if (abas.dataset.secao !== abasAnteriores?.dataset.secao || abaAtual?.getAttribute("href") !== abaAnterior) {
+      mostrarAbaAtual(abas, abaAtual);
+    }
+  }
   if (S.view === "chamada") ajustarDiario(faixaAnterior?.dataset.aula, rolagemDiario, ae);
   if (rolagemNotas) {
     const tabela = v.querySelector("[data-tabela-notas]");
@@ -447,6 +458,17 @@ function render() {
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
+
+function mostrarAbaAtual(abas, abaAtual) {
+  if (!abas?.clientWidth || !abaAtual || abas.scrollWidth <= abas.clientWidth) return;
+  const faixa = abas.getBoundingClientRect(), aba = abaAtual.getBoundingClientRect();
+  if (aba.left < faixa.left) abas.scrollLeft -= faixa.left - aba.left;
+  else if (aba.right > faixa.right) abas.scrollLeft += aba.right - faixa.right;
+}
+matchMedia("(max-width:760px)").addEventListener?.("change", () => {
+  const abas = $(".abas");
+  mostrarAbaAtual(abas, abas?.querySelector('[aria-current="page"]'));
+});
 
 function renderNav() {
   const tt = S.dentroTurma && turmaAtual();
@@ -489,7 +511,7 @@ function cabecalhoTurma() {
     <div class="toolbar">${S.turmas.length > 1 ? `<select class="input" id="trocaTurma" aria-label="Trocar de turma" style="width:auto">${S.turmas.map(x => `<option value="${esc(x.id)}" ${x.id === t.id ? "selected" : ""}>${esc(rotuloTurma(x))}</option>`).join("")}</select>` : ""}
       ${bimestresDe(t).length ? `<select class="input" id="bimSel" aria-label="Período" style="width:auto">${bimestresDe(t).map(b => `<option value="${b.num}" ${String(periodo) === String(b.num) ? "selected" : ""}>${esc(b.nome)}</option>`).join("")}<option value="" ${periodo === "" ? "selected" : ""}>Ano todo</option></select>` : `<a class="btn sm ghost" href="${linkTurma(t.id, "bimestres")}">Criar bimestres</a>`}
       <button class="btn sm" data-act="editar-turma" data-id="${esc(t.id)}">Editar turma</button>${S.googleClientId ? `<button class="btn sm ghost" data-act="drive-pasta" data-id="${esc(t.id)}">${ico("drive")}Pasta no Drive</button>` : ""}</div></div>
-  <nav class="abas" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) || (k === "inicio" && S.view === "construir") ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+  <nav class="abas" data-secao="${esc(S.view)}" aria-label="Seções da turma">${ABAS.filter(a => ABAS_TOPO.includes(a[0])).map(([k, n]) => `<a href="${linkTurma(t.id, k)}" ${k === "notas" ? 'data-media-geral="1"' : k === "inicio" ? 'aria-label="Painel da turma"' : ""} ${S.view === k || (k === "bimestres" && DO_BIMESTRE.includes(S.view)) || (k === "inicio" && S.view === "construir") ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
   ${DO_BIMESTRE.includes(S.view) && S.view !== "bimestre" && bimSelecionado(t) ? `<a class="voltar-bim" href="${linkTurma(t.id, "bimestre")}">← ${esc(bimPorNum(t, bimSelecionado(t))?.nome || "Bimestres")}</a>` : ""}`;
 }
 document.addEventListener("click", e => {
