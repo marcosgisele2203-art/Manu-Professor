@@ -136,6 +136,9 @@ td .grade{width:64px;text-align:center;padding:4px 6px;border:1px solid var(--li
 td .grade:focus{border-color:var(--accent)}
 .sticky-col{position:sticky;left:0;background:var(--surface);z-index:1}
 th.sticky-col{background:var(--surface-2);z-index:2}
+@media (max-width:760px){
+  [data-tabela-notas] .sticky-col{max-width:min(10rem,40vw);white-space:normal;overflow-wrap:anywhere}
+}
 /* Régua de lançamento: a linha do aluno e a coluna da avaliação acendem enquanto a nota é digitada, para não lançar na linha errada em turma grande */
 tbody tr:has(.grade:focus) td,tbody tr:has(.grade:focus) td.sticky-col{background:var(--accent-soft)}
 td.col-foco,th.col-foco{background:var(--accent-soft)}
