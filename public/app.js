@@ -534,7 +534,6 @@ function dlgNovaSenha() {
     <div class="field"><label for="nsNova">Senha nova</label><input class="input" id="nsNova" type="password" autocomplete="new-password" minlength="8"></div>
     <div class="field"><label for="nsConf">Repita a senha nova</label><input class="input" id="nsConf" type="password" autocomplete="new-password"></div><p class="small" id="nsMsg"></p>`,
     `<button type="button" class="btn primary" data-act="senha-salvar">Salvar senha</button>`);
-  dlg.addEventListener("cancel", e => { if (S.trocarSenha) e.preventDefault(); }, { once: true });
 }
 async function salvarSenha(atual, nova, conf, msgEl) {
   if (nova.length < 8) { msgEl.textContent = "A senha nova precisa ter pelo menos 8 caracteres."; return false; }
@@ -1901,15 +1900,23 @@ function vAssistente() {
 
 /* ---------- diálogos ---------- */
 const dlg = $("#dlg");
+dlg.setAttribute("aria-labelledby", "dlgTitulo");
+dlg.addEventListener("cancel", e => {
+  if (S.trocarSenha && dlg.querySelector("#nsNova")) e.preventDefault();
+});
 function abrirDlg(titulo, corpo, rodape) {
   dlg.querySelector("#dlgForm")?.remove();
-  dlg.insertAdjacentHTML("afterbegin", `<form class="dlg" method="dialog" id="dlgForm"><div class="dlg-head"><h2>${titulo}</h2><button type="button" class="btn ghost sm" data-act="fechar" aria-label="Fechar">${ico("x")}</button></div><div class="dlg-body">${corpo}</div><div class="dlg-foot">${rodape}</div></form>`);
-  if (!dlg.open) {
-    const aviso = $("#toastDlg");
-    if (aviso) aviso.hidden = true;
-    $("#toastDlgStatus")?.replaceChildren();
-    dlg.showModal();
+  dlg.insertAdjacentHTML("afterbegin", `<form class="dlg" method="dialog" id="dlgForm"><div class="dlg-head"><h2 id="dlgTitulo" tabindex="-1">${titulo}</h2><button type="button" class="btn ghost sm" data-act="fechar" aria-label="Fechar">${ico("x")}</button></div><div class="dlg-body">${corpo}</div><div class="dlg-foot">${rodape}</div></form>`);
+  if (dlg.open) {
+    // O botão da etapa anterior sai do DOM ao trocar o formulário.
+    const foco = dlg.querySelector("[data-foco-dialogo]") || dlg.querySelector("#dlgTitulo");
+    foco.focus({ preventScroll: true });
+    return;
   }
+  const aviso = $("#toastDlg");
+  if (aviso) aviso.hidden = true;
+  $("#toastDlgStatus")?.replaceChildren();
+  dlg.showModal();
 }
 const fechar = () => { if (sampleCtl) sampleCtl.abort(); dlg.close(); };
 const val = id => { const el = dlg.querySelector("#" + id); return el ? el.value.trim() : ""; };
@@ -1992,7 +1999,18 @@ document.addEventListener("click", e => {
   }
   else { abrirPopTurma(false); (dlg.querySelector("#tDisc") || dlg.querySelector('input[name="tDiscs"]'))?.focus(); }
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && dlg.open && !dlg.querySelector("#tnPop")?.hidden) { e.preventDefault(); abrirPopTurma(false); } });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || !dlg.open) return;
+  if (S.trocarSenha && dlg.querySelector("#nsNova")) {
+    e.preventDefault();
+    return;
+  }
+  const lista = dlg.querySelector("#tnPop:not([hidden])");
+  if (!lista) return;
+  e.preventDefault();
+  if (lista.contains(document.activeElement)) dlg.querySelector("#tNome")?.focus();
+  abrirPopTurma(false);
+});
 // fecha a lista ao tocar fora dela (no início do toque, para não brigar com o foco no campo)
 document.addEventListener("pointerdown", e => {
   if (!dlg.open || !dlg.querySelector("#tnPop") || dlg.querySelector("#tnPop").hidden || e.target.closest(".tn-campo, .tn-pop")) return;
@@ -3514,7 +3532,7 @@ function passoEntrevista() {
     ? `<textarea class="input" id="entTxt" rows="4" maxlength="800" placeholder="${esc(q.ph)}">${esc(v || "")}</textarea>`
     : `<div class="ent-ops" role="group" aria-label="${esc(q.p)}">${opsDe(q).map(o => `<button type="button" class="tn-op" data-act="ent-op" data-v="${esc(o)}" aria-pressed="${q.tipo === "unica" ? v === o : (Array.isArray(v) ? v : []).includes(o)}">${esc(o)}</button>`).join("")}</div>
       ${q.tipo === "multi" ? `<input class="input" id="entOutro" maxlength="160" placeholder="Outro (opcional)" value="${esc(outros.join(", "))}">` : ""}<p class="small muted">${q.tipo === "multi" ? "Pode marcar mais de uma." : "Escolha uma."}</p>`;
-  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-entrevista.webp" alt=""><div class="ent-fala">${intro}<b>${esc(q.p)}</b></div></div>
+  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-entrevista.webp" alt=""><div class="ent-fala">${intro}<b data-foco-dialogo tabindex="-1">${esc(q.p)}</b></div></div>
     <div class="ent-prog"><i style="width:${Math.round((st.passo + 1) / n * 100)}%"></i></div><p class="small muted">Pergunta ${st.passo + 1} de ${n}</p>${campo}</div>`,
     `${st.passo ? `<button type="button" class="btn ghost" data-act="ent-voltar">Voltar</button>` : `<button type="button" class="btn ghost" data-act="ent-pular">Agora não</button>`}<button type="button" class="btn primary" data-act="ent-proxima">${st.passo === n - 1 ? "Ver resumo" : "Próxima"}</button>`);
 }
@@ -3528,7 +3546,7 @@ function guardarPasso() {
 }
 function resumoEntrevista() {
   const txt = textoEstilo(dlg._ent.r);
-  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-entrevista.webp" alt=""><div class="ent-fala"><b>${txt ? "Entendi! Vou planejar assim:" : "Você não marcou nada."}</b></div></div>
+  abrirDlg("Meu jeito de dar aula", `<div class="ent"><div class="ent-manu"><img src="/manu/manu-entrevista.webp" alt=""><div class="ent-fala"><b data-foco-dialogo tabindex="-1">${txt ? "Entendi! Vou planejar assim:" : "Você não marcou nada."}</b></div></div>
     ${txt ? listaEstilo(txt) : `<p class="muted">Sem problema: a Manu planeja do jeito padrão.</p>`}<p class="small muted">Dá para refazer quando quiser em Meu perfil.</p></div>`,
     `<button type="button" class="btn ghost" data-act="ent-voltar">Voltar</button><button type="button" class="btn primary" data-act="ent-salvar">Salvar</button>`);
 }
