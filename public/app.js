@@ -1560,9 +1560,16 @@ function acaEscolher(letra) {
   else { acaPickFechar(); document.activeElement?.blur?.(); }
 }
 document.addEventListener("focusin", e => { if (e.target.matches && e.target.matches("input.aca")) acaPickMostrar(e.target); });
+document.addEventListener("click", e => {
+  if (!acaPickAlvo && e.target.matches?.("input.aca")) acaPickMostrar(e.target);
+});
 document.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement?.matches?.("input.aca")) acaPickFechar(); }, 0));
 document.addEventListener("keydown", e => {
-  if (!e.target.matches || !e.target.matches("input.aca") || !acaPickAlvo || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!e.target.matches?.("input.aca") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!acaPickAlvo) {
+    if (e.key === "Enter") { e.preventDefault(); acaPickMostrar(e.target); }
+    return;
+  }
   const k = e.key.toUpperCase();
   if (ACA_LETRAS.includes(k)) { e.preventDefault(); acaEscolher(k); }
   else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); acaEscolher(""); }
@@ -4479,7 +4486,7 @@ document.addEventListener("submit", e => {
   if (e.target.id === "chatForm") { e.preventDefault(); const i = $("#chatInput"); const v = i.value.trim(); i.value = ""; i.blur(); enviarChat(v); }
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && e.target.matches("input.grade")) { e.preventDefault(); e.target.blur(); }
+  if (!e.defaultPrevented && e.key === "Enter" && e.target.matches("input.grade")) { e.preventDefault(); e.target.blur(); }
   if (e.target.id === "chatInput" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatForm").requestSubmit(); }
 });
 dlg.addEventListener("close", () => { if (sampleCtl) sampleCtl.abort(); dlg._af = null; });
