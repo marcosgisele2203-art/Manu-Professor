@@ -417,7 +417,10 @@ function render() {
   if (S.mode === "erro") { v.innerHTML = `<div class="empty"><h3>${S.erroRede ? "Sem internet" : "Não foi possível carregar seus dados"}</h3><p>${S.erroRede ? "Este aparelho ainda não tem uma cópia dos seus dados. Abra o sistema uma vez com internet; depois ele funciona mesmo sem conexão." : "Verifique a internet e recarregue a página."}</p><button class="btn primary" onclick="location.reload()">Recarregar</button></div>`; return; }
   if (S.dentroTurma && !turma(S.turmaSel)) { S.dentroTurma = false; S.view = "turmas"; }
   const fn = { inicio: S.dentroTurma ? vInicioTurma : vInicio, turmas: vTurmas, alunos: vAlunos, horario: vHorario, bimestres: vBimestres, bimestre: vBimestre, chamada: vChamada, notas: vNotas, aca: vAca, planos: vPlanos, atividades: vAtividades, materiais: vMateriais, slides: vSlides, enem: vEnem, perfil: vPerfil, calendario: vCalendario, questoes: vQuestoes, provas: vProvas, assistente: vAssistente, construir: vConstruir }[S.view] || vInicio;
+  const faixaAnterior = S.view === "chamada" ? v.querySelector("#dFaixa") : null;
+  const rolagemDiario = faixaAnterior?.scrollLeft;
   v.innerHTML = S.dentroTurma ? cabecalhoTurma() + `<div class="turma-conteudo">${fn()}</div>` : fn();
+  if (S.view === "chamada") ajustarDiario(faixaAnterior?.dataset.aula, rolagemDiario, ae);
   if (S.view === "assistente") { const c = $("#chatLog"); if (c) c.scrollTop = c.scrollHeight; }
 }
 document.addEventListener("focusout", () => setTimeout(() => { if (pending) render(); }, 0));
@@ -1050,7 +1053,7 @@ function vChamada() {
   const dias = diasDoDiario(t), data = S.chamadaData, c = chamadaDe(t, data), pres = c?.presencas || {}, al = t.alunos || [];
   const { b } = periodoDiario(t), passados = dias.filter(d => d <= hoje()), feitas = passados.filter(d => statusAula(t, d) === "ok").length, pend = passados.filter(d => ["pend", "meio"].includes(statusAula(t, d)));
   const ICO_ST = { ok: "✓", meio: "•", pend: "!", hoje: "", fut: "" };
-  const faixa = `<div class="d-faixa" id="dFaixa" role="list" aria-label="Aulas">${[...new Set([...dias, data])].sort().map(d => { const st = statusAula(t, d); return `<button type="button" role="listitem" class="d-dia ${st}${d === data ? " sel" : ""}" data-act="d-dia" data-data="${d}" aria-current="${d === data}" title="${st === "ok" ? "Aula registrada" : st === "meio" ? "Falta completar" : st === "pend" ? "Aula sem registro" : ""}"><small>${DIAS[diaSemana(d)]?.slice(0, 3) || ""}</small><b>${d.slice(8)}/${d.slice(5, 7)}</b><i>${ICO_ST[st]}</i></button>`; }).join("")}</div>`;
+  const faixa = `<div class="d-faixa" id="dFaixa" data-aula="${esc(JSON.stringify([t.id, b?.num, data]))}" role="list" aria-label="Aulas">${[...new Set([...dias, data])].sort().map(d => { const st = statusAula(t, d); return `<button type="button" role="listitem" class="d-dia ${st}${d === data ? " sel" : ""}" data-act="d-dia" data-data="${d}" aria-current="${d === data}" title="${st === "ok" ? "Aula registrada" : st === "meio" ? "Falta completar" : st === "pend" ? "Aula sem registro" : ""}"><small>${DIAS[diaSemana(d)]?.slice(0, 3) || ""}</small><b>${d.slice(8)}/${d.slice(5, 7)}</b><i>${ICO_ST[st]}</i></button>`; }).join("")}</div>`;
   const fechamento = `<section class="panel d-fech"><div class="d-fech-num"><b class="num">${feitas}</b><span>de ${passados.length} aulas registradas${b ? " no " + esc(b.nome) : ""}</span></div>
     <div class="d-fech-pend">${pend.length ? `<span class="small"><b>${pend.length}</b> ${pend.length === 1 ? "aula precisa" : "aulas precisam"} de registro:</span> ${pend.slice(-8).map(d => `<button class="chip ${statusAula(t, d) === "pend" ? "bad" : "warn"}" data-act="d-dia" data-data="${d}">${fmtData(d)}</button>`).join("")}${pend.length > 8 ? ` <span class="small muted">e mais ${pend.length - 8}</span>` : ""}` : `<span class="chip ok">Diário em dia</span>`}</div></section>`;
   const ini = periodoDiario(t).ini, fim = periodoDiario(t).fim;
@@ -1089,14 +1092,27 @@ function vChamada() {
       <textarea class="input" id="dObs" rows="2" placeholder="Ex.: aula encurtada por reunião; turma participou bem.">${esc(c?.observacao || "")}</textarea></div>
   </section>`;
 }
-// rola a faixa de dias até a aula escolhida
-const _rotaDiario = () => setTimeout(() => { const f = document.getElementById("dFaixa"), s = f && f.querySelector(".sel"); if (s) f.scrollLeft = s.offsetLeft - f.clientWidth / 2 + s.clientWidth / 2; }, 20);
+function ajustarDiario(aulaAnterior, rolagem, foco) {
+  const faixa = $("#dFaixa");
+  if (!faixa) return;
+  if (faixa.dataset.aula !== aulaAnterior) {
+    const dia = faixa.querySelector(".sel");
+    if (dia) faixa.scrollLeft = dia.getBoundingClientRect().left - faixa.getBoundingClientRect().left - (faixa.clientWidth - dia.offsetWidth) / 2;
+    return;
+  }
+  faixa.scrollLeft = rolagem;
+  // O Diário redesenha ao salvar. Quem usa Tab continua no mesmo aluno.
+  if (!foco?.matches(".d-alunos button[data-aluno]")) return;
+  const aluno = CSS.escape(foco.dataset.aluno), acao = foco.dataset.act;
+  const botao = $(`.d-alunos [data-act="${acao}"][data-aluno="${aluno}"]`) || $(`.d-alunos [data-act="d-falta"][data-aluno="${aluno}"]`);
+  botao?.focus({ preventScroll: true });
+}
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act^='d-']"); if (!b) return;
   const t = turmaAtual(); if (!t) return;
   const act = b.dataset.act, data = S.chamadaData;
-  if (act === "d-dia") { S.chamadaData = b.dataset.data; render(); _rotaDiario(); return; }
-  if (act === "d-ant" || act === "d-prox") { const ds = diasDoDiario(t), i = ds.indexOf(data); let n = act === "d-ant" ? (i < 0 ? ds.filter(d => d < data).pop() : ds[i - 1]) : (i < 0 ? ds.find(d => d > data) : ds[i + 1]); if (n) { S.chamadaData = n; render(); _rotaDiario(); } return; }
+  if (act === "d-dia") { S.chamadaData = b.dataset.data; render(); return; }
+  if (act === "d-ant" || act === "d-prox") { const ds = diasDoDiario(t), i = ds.indexOf(data); let n = act === "d-ant" ? (i < 0 ? ds.filter(d => d < data).pop() : ds[i - 1]) : (i < 0 ? ds.find(d => d > data) : ds[i + 1]); if (n) { S.chamadaData = n; render(); } return; }
   if (act === "d-imprimir") return imprimirDiario(t);
   if (act === "d-falta") return mudarAula(t, data, c => { const v = c.presencas[b.dataset.aluno]; c.presencas[b.dataset.aluno] = v === "P" ? "F" : "P"; });
   if (act === "d-just") return mudarAula(t, data, c => { const v = c.presencas[b.dataset.aluno]; c.presencas[b.dataset.aluno] = v === "J" ? "F" : "J"; });
@@ -4371,7 +4387,7 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("change", async e => {
   const el = e.target;
-  if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); _rotaDiario(); return; }
+  if (el.id === "chData") { S.chamadaData = el.value || hoje(); render(); return; }
   if (el.id === "acaArquivo") {
     const arq = el.files && el.files[0]; if (!arq) return;
     const st = dlg.querySelector("#acaArqSt"), a = dlg._obj;
@@ -4502,7 +4518,6 @@ function lerRota() {
 function rota() {
   lerRota(); render(); window.scrollTo(0, 0);
   // na aba Bimestres, já mostra o bimestre escolhido (onde fica o Criar com IA)
-  if (S.view === "chamada") _rotaDiario();
   if (S.view === "bimestres") { const t = turmaAtual(), n = t && bimSelecionado(t); if (n && n !== "1") setTimeout(() => document.getElementById("bim-" + n)?.scrollIntoView({ block: "start" }), 30); }
 }
 window.addEventListener("hashchange", rota);
