@@ -24,8 +24,12 @@ export default function Inicio() {
           <main className="content" id="view" aria-live="polite"></main>
         </div>
       </div>
-      <dialog id="dlg"></dialog>
-      <div className="toast" id="toast" hidden></div>
+      <dialog id="dlg">
+        <div className="toast" id="toastDlg" aria-hidden="true" hidden></div>
+        <div className="so-leitor" id="toastDlgStatus" role="status" aria-atomic="true"></div>
+      </dialog>
+      <div className="toast" id="toast" aria-hidden="true" hidden></div>
+      <div className="so-leitor" id="toastStatus" role="status" aria-atomic="true"></div>
       <Script src="/app.js" strategy="afterInteractive" />
     </>
   );
